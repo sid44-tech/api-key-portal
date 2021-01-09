@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: api-key-portal
+
+server:
+  port: 8080
