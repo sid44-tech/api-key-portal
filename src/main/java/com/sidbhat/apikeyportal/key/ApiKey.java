@@ -1,0 +1,135 @@
+package com.sidbhat.apikeyportal.key;
+
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.Objects;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.PrePersist;
+import javax.persistence.Table;
+
+/**
+ * A single API / access key for a third-party service.
+ */
+@Entity
+@Table(name = "api_key")
+public class ApiKey {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, length = 100)
+    private String name;
+
+    @Column(name = "service_name", nullable = false, length = 100)
+    private String serviceName;
+
+    @Column(name = "key_value", nullable = false, length = 2048)
+    private String keyValue;
+
+    /** Date the key was issued by the service. */
+    @Column(name = "created_on", nullable = false)
+    private LocalDate createdOn;
+
+    /** Date the key stops working. {@code null} means the key does not expire. */
+    @Column(name = "expires_on")
+    private LocalDate expiresOn;
+
+    @Column(name = "added_at", nullable = false, updatable = false)
+    private Instant addedAt;
+
+    protected ApiKey() {
+        // for JPA
+    }
+
+    public ApiKey(String name, String serviceName, String keyValue, LocalDate createdOn, LocalDate expiresOn) {
+        this.name = name;
+        this.serviceName = serviceName;
+        this.keyValue = keyValue;
+        this.createdOn = createdOn;
+        this.expiresOn = expiresOn;
+    }
+
+    @PrePersist
+    void onPrePersist() {
+        if (addedAt == null) {
+            addedAt = Instant.now();
+        }
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getServiceName() {
+        return serviceName;
+    }
+
+    public void setServiceName(String serviceName) {
+        this.serviceName = serviceName;
+    }
+
+    public String getKeyValue() {
+        return keyValue;
+    }
+
+    public void setKeyValue(String keyValue) {
+        this.keyValue = keyValue;
+    }
+
+    public LocalDate getCreatedOn() {
+        return createdOn;
+    }
+
+    public void setCreatedOn(LocalDate createdOn) {
+        this.createdOn = createdOn;
+    }
+
+    public LocalDate getExpiresOn() {
+        return expiresOn;
+    }
+
+    public void setExpiresOn(LocalDate expiresOn) {
+        this.expiresOn = expiresOn;
+    }
+
+    public Instant getAddedAt() {
+        return addedAt;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof ApiKey)) {
+            return false;
+        }
+        ApiKey other = (ApiKey) o;
+        return id != null && Objects.equals(id, other.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
+    }
+
+    @Override
+    public String toString() {
+        // never include the key value here, this ends up in logs
+        return "ApiKey{id=" + id + ", name='" + name + "', serviceName='" + serviceName + "'}";
+    }
+}
