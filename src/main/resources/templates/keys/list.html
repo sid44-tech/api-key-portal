@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Keys</title>
+</head>
+<body>
+<main layout:fragment="content">
+    <h1 class="h3 mb-4">My keys</h1>
+
+    <div th:if="${#lists.isEmpty(keys)}" class="alert alert-info">
+        No keys yet.
+    </div>
+
+    <div class="table-responsive" th:unless="${#lists.isEmpty(keys)}">
+        <table class="table table-hover">
+            <thead class="thead-light">
+            <tr>
+                <th scope="col">Service</th>
+                <th scope="col">Name</th>
+                <th scope="col">Value</th>
+                <th scope="col">Created</th>
+                <th scope="col">Expires</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="key : ${keys}">
+                <td th:text="${key.serviceName}">GitHub</td>
+                <td th:text="${key.name}">Deploy token</td>
+                <td><code th:text="${key.keyValue}">ghp_xxx</code></td>
+                <td th:text="${#temporals.format(key.createdOn, 'MMM d, yyyy')}">Jan 1, 2021</td>
+                <td th:text="${key.expiresOn != null ? #temporals.format(key.expiresOn, 'MMM d, yyyy') : 'Never'}">Never</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+</body>
+</html>
