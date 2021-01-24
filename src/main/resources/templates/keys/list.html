@@ -7,10 +7,13 @@
 </head>
 <body>
 <main layout:fragment="content">
-    <h1 class="h3 mb-4">My keys</h1>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">My keys</h1>
+        <a th:href="@{/keys/new}" class="btn btn-primary">Add key</a>
+    </div>
 
     <div th:if="${#lists.isEmpty(keys)}" class="alert alert-info">
-        No keys yet.
+        No keys yet. <a th:href="@{/keys/new}" class="alert-link">Add your first one.</a>
     </div>
 
     <div class="table-responsive" th:unless="${#lists.isEmpty(keys)}">
