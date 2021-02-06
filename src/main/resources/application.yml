@@ -15,3 +15,9 @@ spring:
 
 server:
   port: 8080
+
+portal:
+  encryption:
+    # Development key only! Override with PORTAL_ENCRYPTION_KEY anywhere real keys are stored.
+    # Generate one with: openssl rand -base64 32
+    key: ${PORTAL_ENCRYPTION_KEY:}

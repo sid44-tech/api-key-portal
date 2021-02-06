@@ -5,12 +5,15 @@ import java.time.LocalDate;
 import java.util.Objects;
 
 import javax.persistence.Column;
+import javax.persistence.Convert;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.PrePersist;
 import javax.persistence.Table;
+
+import com.sidbhat.apikeyportal.crypto.EncryptedStringConverter;
 
 /**
  * A single API / access key for a third-party service.
@@ -29,6 +32,7 @@ public class ApiKey {
     @Column(name = "service_name", nullable = false, length = 100)
     private String serviceName;
 
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "key_value", nullable = false, length = 2048)
     private String keyValue;
 
