@@ -32,7 +32,11 @@
             <tr th:each="key : ${keys}">
                 <td th:text="${key.serviceName}">GitHub</td>
                 <td th:text="${key.name}">Deploy token</td>
-                <td><code th:text="${key.keyValue}">ghp_xxx</code></td>
+                <td class="key-value">
+                    <code class="key-value-text" th:text="${key.maskedValue}">••••••••</code>
+                    <button type="button" class="btn btn-sm btn-link js-reveal"
+                            th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">Show</button>
+                </td>
                 <td th:text="${#temporals.format(key.createdOn, 'MMM d, yyyy')}">Jan 1, 2021</td>
                 <td th:text="${key.expiresOn != null ? #temporals.format(key.expiresOn, 'MMM d, yyyy') : 'Never'}">Never</td>
                 <td class="text-right">
@@ -72,6 +76,7 @@
 </main>
 
 <th:block layout:fragment="scripts">
+    <script th:src="@{/js/keys.js}"></script>
     <script>
         $('#deleteModal').on('show.bs.modal', function (event) {
             var button = $(event.relatedTarget);

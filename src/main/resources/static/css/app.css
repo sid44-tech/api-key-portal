@@ -1,3 +1,7 @@
 body {
     padding-bottom: 3rem;
 }
+
+.key-value code {
+    word-break: break-all;
+}

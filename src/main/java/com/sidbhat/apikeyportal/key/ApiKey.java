@@ -22,6 +22,8 @@ import com.sidbhat.apikeyportal.crypto.EncryptedStringConverter;
 @Table(name = "api_key")
 public class ApiKey {
 
+    private static final String MASK = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -92,6 +94,18 @@ public class ApiKey {
 
     public void setKeyValue(String keyValue) {
         this.keyValue = keyValue;
+    }
+
+    /**
+     * Masked version of the value that is safe to render, e.g. {@code ••••••••3f9a}.
+     * Only the last four characters are shown, and only for values long enough that
+     * doing so doesn't give much away.
+     */
+    public String getMaskedValue() {
+        if (keyValue == null || keyValue.length() < 12) {
+            return MASK;
+        }
+        return MASK + keyValue.substring(keyValue.length() - 4);
     }
 
     public LocalDate getCreatedOn() {
