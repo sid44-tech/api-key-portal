@@ -36,6 +36,8 @@
                     <code class="key-value-text" th:text="${key.maskedValue}">••••••••</code>
                     <button type="button" class="btn btn-sm btn-link js-reveal"
                             th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">Show</button>
+                    <button type="button" class="btn btn-sm btn-link js-copy"
+                            th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">Copy</button>
                 </td>
                 <td th:text="${#temporals.format(key.createdOn, 'MMM d, yyyy')}">Jan 1, 2021</td>
                 <td th:text="${key.expiresOn != null ? #temporals.format(key.expiresOn, 'MMM d, yyyy') : 'Never'}">Never</td>
