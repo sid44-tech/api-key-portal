@@ -31,7 +31,7 @@
             <tbody>
             <tr th:each="key : ${keys}">
                 <td th:text="${key.serviceName}">GitHub</td>
-                <td th:text="${key.name}">Deploy token</td>
+                <td><a th:href="@{/keys/{id}(id=${key.id})}" th:text="${key.name}">Deploy token</a></td>
                 <td class="key-value">
                     <code class="key-value-text" th:text="${key.maskedValue}">••••••••</code>
                     <button type="button" class="btn btn-sm btn-link js-reveal"

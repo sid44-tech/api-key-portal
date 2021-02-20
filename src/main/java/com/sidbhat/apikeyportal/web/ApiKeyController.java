@@ -29,6 +29,12 @@ public class ApiKeyController {
         return "keys/list";
     }
 
+    @GetMapping("/{id}")
+    public String detail(@PathVariable Long id, Model model) {
+        model.addAttribute("key", apiKeyService.getById(id));
+        return "keys/detail";
+    }
+
     @GetMapping("/new")
     public String newKey(Model model) {
         model.addAttribute("form", new ApiKeyForm());

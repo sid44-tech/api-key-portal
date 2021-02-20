@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title th:text="${key.name}">Key</title>
+</head>
+<body>
+<main layout:fragment="content">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a th:href="@{/keys}">Keys</a></li>
+            <li class="breadcrumb-item active" aria-current="page" th:text="${key.name}">Key</li>
+        </ol>
+    </nav>
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div>
+                <span class="text-muted" th:text="${key.serviceName}">GitHub</span>
+                <h1 class="h4 mb-0" th:text="${key.name}">Deploy token</h1>
+            </div>
+        </div>
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-3">Value</dt>
+                <dd class="col-sm-9 key-value">
+                    <code class="key-value-text" th:text="${key.maskedValue}">••••••••</code>
+                    <button type="button" class="btn btn-sm btn-link js-reveal"
+                            th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">Show</button>
+                    <button type="button" class="btn btn-sm btn-link js-copy"
+                            th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">Copy</button>
+                </dd>
+
+                <dt class="col-sm-3">Created</dt>
+                <dd class="col-sm-9" th:text="${#temporals.format(key.createdOn, 'MMMM d, yyyy')}">January 1, 2021</dd>
+
+                <dt class="col-sm-3">Expires</dt>
+                <dd class="col-sm-9"
+                    th:text="${key.expiresOn != null ? #temporals.format(key.expiresOn, 'MMMM d, yyyy') : 'Never'}">
+                    Never
+                </dd>
+
+                <dt class="col-sm-3">Added to portal</dt>
+                <dd class="col-sm-9" th:text="${#temporals.format(key.addedAt, 'MMMM d, yyyy h:mm a')}">-</dd>
+            </dl>
+        </div>
+        <div class="card-footer text-right">
+            <form th:action="@{/keys/{id}/delete(id=${key.id})}" method="post" class="d-inline"
+                  onsubmit="return confirm('Delete this key? This can\'t be undone.');">
+                <button type="submit" class="btn btn-outline-danger">Delete</button>
+            </form>
+        </div>
+    </div>
+</main>
+
+<th:block layout:fragment="scripts">
+    <script th:src="@{/js/keys.js}"></script>
+</th:block>
+</body>
+</html>
