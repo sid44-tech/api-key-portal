@@ -2,6 +2,7 @@ package com.sidbhat.apikeyportal.key;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 
 import javax.persistence.Column;
@@ -122,6 +123,17 @@ public class ApiKey {
 
     public void setExpiresOn(LocalDate expiresOn) {
         this.expiresOn = expiresOn;
+    }
+
+    public ExpirationStatus getExpirationStatus() {
+        return ExpirationStatus.of(expiresOn, LocalDate.now());
+    }
+
+    /**
+     * Days until the key expires, negative if it already has, or {@code null} if it never expires.
+     */
+    public Long getDaysUntilExpiry() {
+        return expiresOn == null ? null : ChronoUnit.DAYS.between(LocalDate.now(), expiresOn);
     }
 
     public Instant getAddedAt() {

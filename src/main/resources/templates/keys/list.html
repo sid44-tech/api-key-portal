@@ -29,7 +29,7 @@
             </tr>
             </thead>
             <tbody>
-            <tr th:each="key : ${keys}">
+            <tr th:each="key : ${keys}" th:classappend="${key.expirationStatus.name() == 'EXPIRED'} ? 'text-muted'">
                 <td th:text="${key.serviceName}">GitHub</td>
                 <td><a th:href="@{/keys/{id}(id=${key.id})}" th:text="${key.name}">Deploy token</a></td>
                 <td class="key-value">
@@ -40,7 +40,10 @@
                             th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">Copy</button>
                 </td>
                 <td th:text="${#temporals.format(key.createdOn, 'MMM d, yyyy')}">Jan 1, 2021</td>
-                <td th:text="${key.expiresOn != null ? #temporals.format(key.expiresOn, 'MMM d, yyyy') : 'Never'}">Never</td>
+                <td>
+                    <span th:text="${key.expiresOn != null ? #temporals.format(key.expiresOn, 'MMM d, yyyy') : 'Never'}">Never</span>
+                    <span th:replace="fragments/badges :: expiration(${key})"></span>
+                </td>
                 <td class="text-right">
                     <button type="button" class="btn btn-sm btn-outline-danger"
                             data-toggle="modal" data-target="#deleteModal"

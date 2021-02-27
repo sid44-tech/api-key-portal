@@ -20,6 +20,7 @@
                 <span class="text-muted" th:text="${key.serviceName}">GitHub</span>
                 <h1 class="h4 mb-0" th:text="${key.name}">Deploy token</h1>
             </div>
+            <span th:replace="fragments/badges :: expiration(${key})"></span>
         </div>
         <div class="card-body">
             <dl class="row mb-0">
@@ -40,6 +41,11 @@
                     th:text="${key.expiresOn != null ? #temporals.format(key.expiresOn, 'MMMM d, yyyy') : 'Never'}">
                     Never
                 </dd>
+
+                <th:block th:if="${key.daysUntilExpiry != null and key.daysUntilExpiry >= 0}">
+                    <dt class="col-sm-3">Days remaining</dt>
+                    <dd class="col-sm-9" th:text="${key.daysUntilExpiry}">30</dd>
+                </th:block>
 
                 <dt class="col-sm-3">Added to portal</dt>
                 <dd class="col-sm-9" th:text="${#temporals.format(key.addedAt, 'MMMM d, yyyy h:mm a')}">-</dd>

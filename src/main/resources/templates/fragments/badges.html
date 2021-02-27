@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="expiration(key)" th:with="status=${key.expirationStatus}">
+    <span th:if="${status.name() != 'NEVER'}"
+          th:class="${'badge badge-' + status.badgeClass}"
+          th:text="${status.label}">Active</span>
+</th:block>
+</body>
+</html>
