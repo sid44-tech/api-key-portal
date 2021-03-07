@@ -21,8 +21,13 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .authorizeRequests(authorize -> authorize
                         .antMatchers("/webjars/**", "/css/**", "/js/**", "/favicon.ico").permitAll()
                         .anyRequest().authenticated())
-                .formLogin(form -> form.defaultSuccessUrl("/keys"))
-                .logout(logout -> logout.logoutSuccessUrl("/login?logout"));
+                .formLogin(form -> form
+                        .loginPage("/login")
+                        .defaultSuccessUrl("/keys")
+                        .permitAll())
+                .logout(logout -> logout
+                        .logoutSuccessUrl("/login?logout")
+                        .permitAll());
     }
 
     @Bean
