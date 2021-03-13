@@ -60,6 +60,7 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <form method="post" id="deleteForm">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                     <div class="modal-header">
                         <h5 class="modal-title" id="deleteModalLabel">Delete key?</h5>
                         <button type="button" class="close" data-dismiss="modal" aria-label="Close">

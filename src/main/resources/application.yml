@@ -9,14 +9,15 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
-  h2:
-    console:
-      enabled: true
 
 server:
   port: 8080
 
 portal:
+  security:
+    username: ${PORTAL_USERNAME:admin}
+    # BCrypt hash of the login password, from PORTAL_PASSWORD_HASH
+    password-hash: ${PORTAL_PASSWORD_HASH:}
   encryption:
     # Development key only! Override with PORTAL_ENCRYPTION_KEY anywhere real keys are stored.
     # Generate one with: openssl rand -base64 32
