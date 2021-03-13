@@ -1,5 +1,6 @@
 package com.sidbhat.apikeyportal.security;
 
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -13,6 +14,7 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 
 @Configuration
 @EnableWebSecurity
+@EnableConfigurationProperties(SecurityProperties.class)
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     @Override
