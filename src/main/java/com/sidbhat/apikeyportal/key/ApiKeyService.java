@@ -38,6 +38,19 @@ public class ApiKeyService {
     }
 
     @Transactional
+    public ApiKey update(Long id, String name, String serviceName, String keyValue, LocalDate createdOn,
+            LocalDate expiresOn) {
+        ApiKey key = getById(id);
+        key.setName(name.trim());
+        key.setServiceName(serviceName.trim());
+        key.setKeyValue(keyValue == null ? key.getKeyValue() : keyValue.trim());
+        key.setCreatedOn(createdOn);
+        key.setExpiresOn(expiresOn);
+        log.info("Updated {}", key);
+        return key;
+    }
+
+    @Transactional
     public void delete(Long id) {
         ApiKey key = getById(id);
         repository.delete(key);

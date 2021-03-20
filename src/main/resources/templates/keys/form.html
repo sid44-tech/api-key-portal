@@ -3,15 +3,17 @@
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       layout:decorate="~{layout/main}">
 <head>
-    <title>Add key</title>
+    <title th:text="${form.new} ? 'Add key' : 'Edit key'">Add key</title>
 </head>
 <body>
 <main layout:fragment="content">
     <div class="row justify-content-center">
         <div class="col-lg-8">
-            <h1 class="h3 mb-4">Add a key</h1>
+            <h1 class="h3 mb-4" th:text="${form.new} ? 'Add a key' : 'Edit key'">Add a key</h1>
 
-            <form th:action="@{/keys}" th:object="${form}" method="post" novalidate>
+            <form th:action="${form.new} ? @{/keys} : @{/keys/{id}(id=${form.id})}"
+                  th:object="${form}" method="post" novalidate>
+                <input type="hidden" th:field="*{id}">
                 <div class="form-row">
                     <div class="form-group col-md-6">
                         <label for="serviceName">Service</label>
@@ -30,8 +32,13 @@
                 <div class="form-group">
                     <label for="keyValue">Key value</label>
                     <textarea class="form-control text-monospace" th:field="*{keyValue}" rows="3"
-                              th:errorclass="is-invalid" autocomplete="off" spellcheck="false" required></textarea>
+                              th:classappend="${#fields.hasErrors('keyValue') or #fields.hasErrors('keyValuePresentForNewKey')} ? 'is-invalid'"
+                              autocomplete="off" spellcheck="false" th:required="${form.new}"></textarea>
+                    <small class="form-text text-muted" th:unless="${form.new}">
+                        Leave blank to keep the current value.
+                    </small>
                     <div class="invalid-feedback" th:errors="*{keyValue}"></div>
+                    <div class="invalid-feedback" th:errors="*{keyValuePresentForNewKey}"></div>
                 </div>
 
                 <div class="form-row">
@@ -51,7 +58,7 @@
                 </div>
 
                 <button type="submit" class="btn btn-primary">Save key</button>
-                <a th:href="@{/keys}" class="btn btn-link">Cancel</a>
+                <a th:href="${form.new} ? @{/keys} : @{/keys/{id}(id=${form.id})}" class="btn btn-link">Cancel</a>
             </form>
         </div>
     </div>

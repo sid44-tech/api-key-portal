@@ -10,10 +10,15 @@ import javax.validation.constraints.Size;
 
 import org.springframework.format.annotation.DateTimeFormat;
 
+import com.sidbhat.apikeyportal.key.ApiKey;
+
 /**
- * Backing object for the add key form.
+ * Backing object for the add / edit key form.
  */
 public class ApiKeyForm {
+
+    /** {@code null} when adding a new key. */
+    private Long id;
 
     @NotBlank
     @Size(max = 100)
@@ -23,7 +28,7 @@ public class ApiKeyForm {
     @Size(max = 100)
     private String serviceName;
 
-    @NotBlank
+    /** Required for new keys. When editing, blank means keep the current value. */
     @Size(max = 1024)
     private String keyValue;
 
@@ -35,9 +40,37 @@ public class ApiKeyForm {
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate expiresOn;
 
+    public static ApiKeyForm from(ApiKey key) {
+        ApiKeyForm form = new ApiKeyForm();
+        form.id = key.getId();
+        form.name = key.getName();
+        form.serviceName = key.getServiceName();
+        form.createdOn = key.getCreatedOn();
+        form.expiresOn = key.getExpiresOn();
+        // keyValue intentionally left blank, it is never rendered into the page
+        return form;
+    }
+
+    public boolean isNew() {
+        return id == null;
+    }
+
+    @AssertTrue(message = "must not be blank")
+    public boolean isKeyValuePresentForNewKey() {
+        return !isNew() || (keyValue != null && !keyValue.isBlank());
+    }
+
     @AssertTrue(message = "must be after the created date")
     public boolean isExpiresOnAfterCreatedOn() {
         return expiresOn == null || createdOn == null || expiresOn.isAfter(createdOn);
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
     }
 
     public String getName() {

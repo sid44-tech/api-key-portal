@@ -51,6 +51,24 @@ public class ApiKeyController {
         return "redirect:/keys";
     }
 
+    @GetMapping("/{id}/edit")
+    public String edit(@PathVariable Long id, Model model) {
+        model.addAttribute("form", ApiKeyForm.from(apiKeyService.getById(id)));
+        return "keys/form";
+    }
+
+    @PostMapping("/{id}")
+    public String update(@PathVariable Long id, @Valid @ModelAttribute("form") ApiKeyForm form,
+            BindingResult bindingResult) {
+        form.setId(id);
+        if (bindingResult.hasErrors()) {
+            return "keys/form";
+        }
+        apiKeyService.update(id, form.getName(), form.getServiceName(), form.getKeyValue(), form.getCreatedOn(),
+                form.getExpiresOn());
+        return "redirect:/keys/" + id;
+    }
+
     @PostMapping("/{id}/delete")
     public String delete(@PathVariable Long id) {
         apiKeyService.delete(id);

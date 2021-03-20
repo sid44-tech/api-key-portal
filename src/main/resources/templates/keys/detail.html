@@ -52,6 +52,7 @@
             </dl>
         </div>
         <div class="card-footer text-right">
+            <a th:href="@{/keys/{id}/edit(id=${key.id})}" class="btn btn-outline-secondary">Edit</a>
             <form th:action="@{/keys/{id}/delete(id=${key.id})}" method="post" class="d-inline"
                   onsubmit="return confirm('Delete this key? This can\'t be undone.');">
                 <button type="submit" class="btn btn-outline-danger">Delete</button>
