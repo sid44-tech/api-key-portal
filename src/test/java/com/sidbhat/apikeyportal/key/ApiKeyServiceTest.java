@@ -66,4 +66,25 @@ class ApiKeyServiceTest {
         assertThatThrownBy(() -> service.delete(1L)).isInstanceOf(ApiKeyNotFoundException.class);
         verify(repository, never()).delete(any());
     }
+
+    @Test
+    void updateReplacesValueWhenProvided() {
+        ApiKey key = new ApiKey("Deploy", "GitHub", "ghp_old", LocalDate.now(), null);
+        when(repository.findById(1L)).thenReturn(Optional.of(key));
+
+        service.update(1L, "Deploy", "GitHub", " ghp_new ", key.getCreatedOn(), null);
+
+        assertThat(key.getKeyValue()).isEqualTo("ghp_new");
+    }
+
+    @Test
+    void updateKeepsExistingValueWhenBlank() {
+        ApiKey key = new ApiKey("Deploy", "GitHub", "ghp_old", LocalDate.now(), null);
+        when(repository.findById(1L)).thenReturn(Optional.of(key));
+
+        service.update(1L, "Deploy v2", "GitHub", "", key.getCreatedOn(), null);
+
+        assertThat(key.getName()).isEqualTo("Deploy v2");
+        assertThat(key.getKeyValue()).isEqualTo("ghp_old");
+    }
 }

@@ -43,7 +43,9 @@ public class ApiKeyService {
         ApiKey key = getById(id);
         key.setName(name.trim());
         key.setServiceName(serviceName.trim());
-        key.setKeyValue(keyValue == null ? key.getKeyValue() : keyValue.trim());
+        if (keyValue != null && !keyValue.isBlank()) {
+            key.setKeyValue(keyValue.trim());
+        }
         key.setCreatedOn(createdOn);
         key.setExpiresOn(expiresOn);
         log.info("Updated {}", key);
