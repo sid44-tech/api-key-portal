@@ -5,6 +5,8 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +24,16 @@ public class ApiKeyService {
 
     public List<ApiKey> findAll() {
         return repository.findAllByOrderByServiceNameAscNameAsc();
+    }
+
+    public List<ApiKey> search(String text, String serviceName) {
+        return repository.findAll(Specification.where(ApiKeySpecifications.textContains(text))
+                        .and(ApiKeySpecifications.serviceIs(serviceName)),
+                Sort.by("serviceName", "name"));
+    }
+
+    public List<String> findServiceNames() {
+        return repository.findDistinctServiceNames();
     }
 
     public ApiKey getById(Long id) {

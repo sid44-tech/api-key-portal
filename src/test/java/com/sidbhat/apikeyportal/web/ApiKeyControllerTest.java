@@ -50,7 +50,7 @@ class ApiKeyControllerTest {
     @Test
     @WithMockUser
     void listsKeysWithoutRenderingValues() throws Exception {
-        when(apiKeyService.findAll()).thenReturn(List.of(
+        when(apiKeyService.search(null, null)).thenReturn(List.of(
                 new ApiKey("CI", "GitHub", "ghp_supersecretvalue1234", LocalDate.now(), null)));
 
         mvc.perform(get("/keys"))

@@ -63,4 +63,13 @@ class ApiKeyRepositoryTest {
         assertThat(repository.findById(saved.getId()))
                 .hasValueSatisfying(key -> assertThat(key.getKeyValue()).isEqualTo("sk_live_secret"));
     }
+
+    @Test
+    void findsDistinctServiceNames() {
+        repository.save(new ApiKey("Prod", "Stripe", "sk_1", LocalDate.now(), null));
+        repository.save(new ApiKey("Personal", "GitHub", "ghp_2", LocalDate.now(), null));
+        repository.save(new ApiKey("CI", "GitHub", "ghp_3", LocalDate.now(), null));
+
+        assertThat(repository.findDistinctServiceNames()).containsExactly("GitHub", "Stripe");
+    }
 }

@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import com.sidbhat.apikeyportal.key.ApiKeyService;
 
@@ -24,8 +25,12 @@ public class ApiKeyController {
     }
 
     @GetMapping
-    public String list(Model model) {
-        model.addAttribute("keys", apiKeyService.findAll());
+    public String list(@RequestParam(name = "q", required = false) String query,
+            @RequestParam(name = "service", required = false) String service, Model model) {
+        model.addAttribute("keys", apiKeyService.search(query, service));
+        model.addAttribute("services", apiKeyService.findServiceNames());
+        model.addAttribute("q", query);
+        model.addAttribute("service", service);
         return "keys/list";
     }
 
