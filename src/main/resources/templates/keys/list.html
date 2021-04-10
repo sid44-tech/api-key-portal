@@ -13,17 +13,24 @@
     </div>
 
     <form th:action="@{/keys}" method="get" class="form-row mb-3">
-        <div class="col-md-6 mb-2">
+        <div class="col-md-4 mb-2">
             <label class="sr-only" for="q">Search</label>
             <input type="search" class="form-control" id="q" name="q" th:value="${q}"
                    placeholder="Search by name or service">
         </div>
-        <div class="col-md-4 mb-2">
+        <div class="col-md-3 mb-2">
             <label class="sr-only" for="service">Service</label>
             <select class="custom-select" id="service" name="service" onchange="this.form.submit()">
                 <option value="">All services</option>
                 <option th:each="s : ${services}" th:value="${s}" th:text="${s}"
                         th:selected="${s == service}">GitHub</option>
+            </select>
+        </div>
+        <div class="col-md-3 mb-2">
+            <label class="sr-only" for="sort">Sort by</label>
+            <select class="custom-select" id="sort" name="sort" onchange="this.form.submit()">
+                <option th:each="s : ${sorts}" th:value="${s}" th:text="${'Sort: ' + s.label}"
+                        th:selected="${s == sort}">Sort: Service</option>
             </select>
         </div>
         <div class="col-md-2 mb-2">

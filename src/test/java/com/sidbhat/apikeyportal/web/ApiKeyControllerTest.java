@@ -30,6 +30,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.sidbhat.apikeyportal.key.ApiKey;
 import com.sidbhat.apikeyportal.key.ApiKeyNotFoundException;
 import com.sidbhat.apikeyportal.key.ApiKeyService;
+import com.sidbhat.apikeyportal.key.ApiKeySort;
 
 @WebMvcTest(controllers = {ApiKeyController.class, ApiKeyValueController.class})
 class ApiKeyControllerTest {
@@ -50,7 +51,7 @@ class ApiKeyControllerTest {
     @Test
     @WithMockUser
     void listsKeysWithoutRenderingValues() throws Exception {
-        when(apiKeyService.search(null, null)).thenReturn(List.of(
+        when(apiKeyService.search(null, null, ApiKeySort.SERVICE)).thenReturn(List.of(
                 new ApiKey("CI", "GitHub", "ghp_supersecretvalue1234", LocalDate.now(), null)));
 
         mvc.perform(get("/keys"))

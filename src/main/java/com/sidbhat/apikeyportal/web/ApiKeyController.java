@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import com.sidbhat.apikeyportal.key.ApiKeyService;
+import com.sidbhat.apikeyportal.key.ApiKeySort;
 
 @Controller
 @RequestMapping("/keys")
@@ -26,9 +27,12 @@ public class ApiKeyController {
 
     @GetMapping
     public String list(@RequestParam(name = "q", required = false) String query,
-            @RequestParam(name = "service", required = false) String service, Model model) {
-        model.addAttribute("keys", apiKeyService.search(query, service));
+            @RequestParam(name = "service", required = false) String service,
+            @RequestParam(name = "sort", defaultValue = "SERVICE") ApiKeySort sort, Model model) {
+        model.addAttribute("keys", apiKeyService.search(query, service, sort));
         model.addAttribute("services", apiKeyService.findServiceNames());
+        model.addAttribute("sorts", ApiKeySort.values());
+        model.addAttribute("sort", sort);
         model.addAttribute("q", query);
         model.addAttribute("service", service);
         return "keys/list";
