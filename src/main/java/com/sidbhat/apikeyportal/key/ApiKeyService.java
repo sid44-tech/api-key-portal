@@ -35,6 +35,15 @@ public class ApiKeyService {
                 .and(ApiKeySpecifications.orderBy(sort != null ? sort : ApiKeySort.SERVICE)));
     }
 
+    /**
+     * Status counts across all keys. Computed in memory using {@link ExpirationStatus} so
+     * there's a single definition of "expiring soon" - fine for the number of keys one
+     * person has.
+     */
+    public KeySummary getSummary() {
+        return KeySummary.of(repository.findAll());
+    }
+
     public List<String> findServiceNames() {
         return repository.findDistinctServiceNames();
     }

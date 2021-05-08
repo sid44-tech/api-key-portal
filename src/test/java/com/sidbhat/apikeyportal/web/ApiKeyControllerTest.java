@@ -31,6 +31,7 @@ import com.sidbhat.apikeyportal.key.ApiKey;
 import com.sidbhat.apikeyportal.key.ApiKeyNotFoundException;
 import com.sidbhat.apikeyportal.key.ApiKeyService;
 import com.sidbhat.apikeyportal.key.ApiKeySort;
+import com.sidbhat.apikeyportal.key.KeySummary;
 
 @WebMvcTest(controllers = {ApiKeyController.class, ApiKeyValueController.class})
 class ApiKeyControllerTest {
@@ -51,8 +52,9 @@ class ApiKeyControllerTest {
     @Test
     @WithMockUser
     void listsKeysWithoutRenderingValues() throws Exception {
-        when(apiKeyService.search(null, null, ApiKeySort.SERVICE)).thenReturn(List.of(
-                new ApiKey("CI", "GitHub", "ghp_supersecretvalue1234", LocalDate.now(), null)));
+        List<ApiKey> keys = List.of(new ApiKey("CI", "GitHub", "ghp_supersecretvalue1234", LocalDate.now(), null));
+        when(apiKeyService.search(null, null, ApiKeySort.SERVICE)).thenReturn(keys);
+        when(apiKeyService.getSummary()).thenReturn(KeySummary.of(keys));
 
         mvc.perform(get("/keys"))
                 .andExpect(status().isOk())

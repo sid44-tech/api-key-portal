@@ -30,6 +30,7 @@ public class ApiKeyController {
             @RequestParam(name = "service", required = false) String service,
             @RequestParam(name = "sort", defaultValue = "SERVICE") ApiKeySort sort, Model model) {
         model.addAttribute("keys", apiKeyService.search(query, service, sort));
+        model.addAttribute("summary", apiKeyService.getSummary());
         model.addAttribute("services", apiKeyService.findServiceNames());
         model.addAttribute("sorts", ApiKeySort.values());
         model.addAttribute("sort", sort);

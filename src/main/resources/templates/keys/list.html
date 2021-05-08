@@ -12,6 +12,35 @@
         <a th:href="@{/keys/new}" class="btn btn-primary">Add key</a>
     </div>
 
+    <div class="row mb-4" th:if="${summary.total > 0}">
+        <div class="col-sm-4 mb-3 mb-sm-0">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <div class="display-4" th:text="${summary.total}">0</div>
+                    <div class="text-muted">Keys</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-4 mb-3 mb-sm-0">
+            <a th:href="@{/keys(sort=EXPIRES)}" class="card text-center h-100 text-decoration-none"
+               th:classappend="${summary.expiringSoon > 0} ? 'border-warning'">
+                <div class="card-body">
+                    <div class="display-4 text-warning" th:text="${summary.expiringSoon}">0</div>
+                    <div class="text-muted">Expiring in the next 30 days</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-sm-4">
+            <a th:href="@{/keys(sort=EXPIRES)}" class="card text-center h-100 text-decoration-none"
+               th:classappend="${summary.expired > 0} ? 'border-danger'">
+                <div class="card-body">
+                    <div class="display-4 text-danger" th:text="${summary.expired}">0</div>
+                    <div class="text-muted">Expired</div>
+                </div>
+            </a>
+        </div>
+    </div>
+
     <form th:action="@{/keys}" method="get" class="form-row mb-3">
         <div class="col-md-4 mb-2">
             <label class="sr-only" for="q">Search</label>
