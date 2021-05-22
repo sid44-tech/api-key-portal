@@ -13,11 +13,12 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import com.sidbhat.apikeyportal.config.JpaAuditingConfig;
 import com.sidbhat.apikeyportal.crypto.EncryptionProperties;
 import com.sidbhat.apikeyportal.crypto.EncryptionService;
 
 @DataJpaTest
-@Import(EncryptionService.class)
+@Import({EncryptionService.class, JpaAuditingConfig.class})
 @EnableConfigurationProperties(EncryptionProperties.class)
 class ApiKeyRepositoryTest {
 
@@ -31,12 +32,13 @@ class ApiKeyRepositoryTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void savesKeyAndStampsAddedAt() {
+    void savesKeyAndStampsAuditTimestamps() {
         ApiKey saved = repository.save(new ApiKey("Deploy token", "GitHub", "ghp_abc123",
                 LocalDate.of(2021, 1, 4), LocalDate.of(2021, 7, 4)));
 
         assertThat(saved.getId()).isNotNull();
         assertThat(saved.getAddedAt()).isNotNull();
+        assertThat(saved.getUpdatedAt()).isNotNull();
     }
 
     @Test

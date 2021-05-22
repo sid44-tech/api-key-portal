@@ -49,6 +49,9 @@
 
                 <dt class="col-sm-3">Added to portal</dt>
                 <dd class="col-sm-9" th:text="${#temporals.format(key.addedAt, 'MMMM d, yyyy h:mm a')}">-</dd>
+
+                <dt class="col-sm-3">Last updated</dt>
+                <dd class="col-sm-9" th:text="${#temporals.format(key.updatedAt, 'MMMM d, yyyy h:mm a')}">-</dd>
             </dl>
         </div>
         <div class="card-footer text-right">

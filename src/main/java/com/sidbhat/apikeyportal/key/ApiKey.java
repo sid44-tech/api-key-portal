@@ -8,11 +8,15 @@ import java.util.Objects;
 import javax.persistence.Column;
 import javax.persistence.Convert;
 import javax.persistence.Entity;
+import javax.persistence.EntityListeners;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
-import javax.persistence.PrePersist;
 import javax.persistence.Table;
+
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import com.sidbhat.apikeyportal.crypto.EncryptedStringConverter;
 
@@ -21,6 +25,7 @@ import com.sidbhat.apikeyportal.crypto.EncryptedStringConverter;
  */
 @Entity
 @Table(name = "api_key")
+@EntityListeners(AuditingEntityListener.class)
 public class ApiKey {
 
     private static final String MASK = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
@@ -47,8 +52,13 @@ public class ApiKey {
     @Column(name = "expires_on")
     private LocalDate expiresOn;
 
+    @CreatedDate
     @Column(name = "added_at", nullable = false, updatable = false)
     private Instant addedAt;
+
+    @LastModifiedDate
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
 
     protected ApiKey() {
         // for JPA
@@ -60,13 +70,6 @@ public class ApiKey {
         this.keyValue = keyValue;
         this.createdOn = createdOn;
         this.expiresOn = expiresOn;
-    }
-
-    @PrePersist
-    void onPrePersist() {
-        if (addedAt == null) {
-            addedAt = Instant.now();
-        }
     }
 
     public Long getId() {
@@ -138,6 +141,10 @@ public class ApiKey {
 
     public Instant getAddedAt() {
         return addedAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 
     @Override

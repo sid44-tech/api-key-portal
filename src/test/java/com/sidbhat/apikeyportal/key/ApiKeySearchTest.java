@@ -11,11 +11,12 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 
+import com.sidbhat.apikeyportal.config.JpaAuditingConfig;
 import com.sidbhat.apikeyportal.crypto.EncryptionProperties;
 import com.sidbhat.apikeyportal.crypto.EncryptionService;
 
 @DataJpaTest
-@Import({EncryptionService.class, ApiKeyService.class})
+@Import({EncryptionService.class, JpaAuditingConfig.class, ApiKeyService.class})
 @EnableConfigurationProperties(EncryptionProperties.class)
 class ApiKeySearchTest {
 
