@@ -1,0 +1,5 @@
+spring:
+  datasource:
+    url: ${PORTAL_DB_URL:jdbc:postgresql://localhost:5432/keyportal}
+    username: ${PORTAL_DB_USERNAME:keyportal}
+    password: ${PORTAL_DB_PASSWORD:}

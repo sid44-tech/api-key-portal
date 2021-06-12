@@ -1,0 +1,19 @@
+version: "3.8"
+
+# Local Postgres for running the app with the "postgres" profile:
+#   docker-compose up -d
+#   ./mvnw spring-boot:run -Dspring-boot.run.profiles=postgres
+services:
+  postgres:
+    image: postgres:13.3
+    environment:
+      POSTGRES_DB: keyportal
+      POSTGRES_USER: keyportal
+      POSTGRES_PASSWORD: ${PORTAL_DB_PASSWORD:?set PORTAL_DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
