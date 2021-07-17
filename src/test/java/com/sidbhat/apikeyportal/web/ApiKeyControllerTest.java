@@ -72,12 +72,13 @@ class ApiKeyControllerTest {
                         .param("name", "CI")
                         .param("keyValue", "ghp_abc")
                         .param("createdOn", "2021-03-01")
-                        .param("expiresOn", "2021-09-01"))
+                        .param("expiresOn", "2021-09-01")
+                        .param("notes", "repo scope"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/keys"));
 
         verify(apiKeyService).create("CI", "GitHub", "ghp_abc", LocalDate.of(2021, 3, 1),
-                LocalDate.of(2021, 9, 1));
+                LocalDate.of(2021, 9, 1), "repo scope");
     }
 
     @Test
@@ -93,7 +94,7 @@ class ApiKeyControllerTest {
                 .andExpect(view().name("keys/form"))
                 .andExpect(model().attributeHasFieldErrors("form", "serviceName", "expiresOnAfterCreatedOn"));
 
-        verify(apiKeyService, never()).create(any(), any(), any(), any(), any());
+        verify(apiKeyService, never()).create(any(), any(), any(), any(), any(), any());
     }
 
     @Test

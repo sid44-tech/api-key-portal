@@ -54,16 +54,18 @@ public class ApiKeyService {
 
     @Transactional
     public ApiKey create(String name, String serviceName, String keyValue, LocalDate createdOn,
-            LocalDate expiresOn) {
-        ApiKey key = repository.save(new ApiKey(name.trim(), serviceName.trim(), keyValue.trim(),
-                createdOn != null ? createdOn : LocalDate.now(), expiresOn));
+            LocalDate expiresOn, String notes) {
+        ApiKey newKey = new ApiKey(name.trim(), serviceName.trim(), keyValue.trim(),
+                createdOn != null ? createdOn : LocalDate.now(), expiresOn);
+        newKey.setNotes(trimToNull(notes));
+        ApiKey key = repository.save(newKey);
         log.info("Created {}", key);
         return key;
     }
 
     @Transactional
     public ApiKey update(Long id, String name, String serviceName, String keyValue, LocalDate createdOn,
-            LocalDate expiresOn) {
+            LocalDate expiresOn, String notes) {
         ApiKey key = getById(id);
         key.setName(name.trim());
         key.setServiceName(serviceName.trim());
@@ -72,6 +74,7 @@ public class ApiKeyService {
         }
         key.setCreatedOn(createdOn);
         key.setExpiresOn(expiresOn);
+        key.setNotes(trimToNull(notes));
         log.info("Updated {}", key);
         return key;
     }
@@ -81,5 +84,9 @@ public class ApiKeyService {
         ApiKey key = getById(id);
         repository.delete(key);
         log.info("Deleted {}", key);
+    }
+
+    private static String trimToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

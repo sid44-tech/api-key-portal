@@ -52,6 +52,10 @@ public class ApiKey {
     @Column(name = "expires_on")
     private LocalDate expiresOn;
 
+    /** Free-form notes, e.g. scopes or where the key is used. Not encrypted. */
+    @Column(length = 1000)
+    private String notes;
+
     @CreatedDate
     @Column(name = "added_at", nullable = false, updatable = false)
     private Instant addedAt;
@@ -137,6 +141,14 @@ public class ApiKey {
      */
     public Long getDaysUntilExpiry() {
         return expiresOn == null ? null : ChronoUnit.DAYS.between(LocalDate.now(), expiresOn);
+    }
+
+    public String getNotes() {
+        return notes;
+    }
+
+    public void setNotes(String notes) {
+        this.notes = notes;
     }
 
     public Instant getAddedAt() {

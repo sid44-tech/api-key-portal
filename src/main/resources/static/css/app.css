@@ -5,3 +5,7 @@ body {
 .key-value code {
     word-break: break-all;
 }
+
+.notes {
+    white-space: pre-line;
+}

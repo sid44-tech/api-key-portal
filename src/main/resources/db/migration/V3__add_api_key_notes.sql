@@ -1,0 +1,1 @@
+ALTER TABLE api_key ADD COLUMN notes VARCHAR(1000);

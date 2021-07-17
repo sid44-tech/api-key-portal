@@ -47,6 +47,11 @@
                     <dd class="col-sm-9" th:text="${key.daysUntilExpiry}">30</dd>
                 </th:block>
 
+                <th:block th:if="${key.notes != null}">
+                    <dt class="col-sm-3">Notes</dt>
+                    <dd class="col-sm-9 notes" th:text="${key.notes}">Notes</dd>
+                </th:block>
+
                 <dt class="col-sm-3">Added to portal</dt>
                 <dd class="col-sm-9" th:text="${#temporals.format(key.addedAt, 'MMMM d, yyyy h:mm a')}">-</dd>
 

@@ -57,7 +57,7 @@ public class ApiKeyController {
             return "keys/form";
         }
         apiKeyService.create(form.getName(), form.getServiceName(), form.getKeyValue(), form.getCreatedOn(),
-                form.getExpiresOn());
+                form.getExpiresOn(), form.getNotes());
         return "redirect:/keys";
     }
 
@@ -75,7 +75,7 @@ public class ApiKeyController {
             return "keys/form";
         }
         apiKeyService.update(id, form.getName(), form.getServiceName(), form.getKeyValue(), form.getCreatedOn(),
-                form.getExpiresOn());
+                form.getExpiresOn(), form.getNotes());
         return "redirect:/keys/" + id;
     }
 

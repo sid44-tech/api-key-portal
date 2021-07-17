@@ -47,6 +47,7 @@ public class ApiKeyForm {
         form.serviceName = key.getServiceName();
         form.createdOn = key.getCreatedOn();
         form.expiresOn = key.getExpiresOn();
+        form.notes = key.getNotes();
         // keyValue intentionally left blank, it is never rendered into the page
         return form;
     }
@@ -59,6 +60,9 @@ public class ApiKeyForm {
     public boolean isKeyValuePresentForNewKey() {
         return !isNew() || (keyValue != null && !keyValue.isBlank());
     }
+
+    @Size(max = 1000)
+    private String notes;
 
     @AssertTrue(message = "must be after the created date")
     public boolean isExpiresOnAfterCreatedOn() {
@@ -111,5 +115,13 @@ public class ApiKeyForm {
 
     public void setExpiresOn(LocalDate expiresOn) {
         this.expiresOn = expiresOn;
+    }
+
+    public String getNotes() {
+        return notes;
+    }
+
+    public void setNotes(String notes) {
+        this.notes = notes;
     }
 }
