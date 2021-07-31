@@ -116,6 +116,22 @@
         </table>
     </div>
 
+    <nav aria-label="Key list pages" th:if="${page.totalPages > 1}">
+        <ul class="pagination justify-content-center">
+            <li class="page-item" th:classappend="${page.first} ? 'disabled'">
+                <a class="page-link" th:href="@{/keys(q=${q},service=${service},sort=${sort},page=${page.number - 1})}">Previous</a>
+            </li>
+            <li class="page-item" th:each="i : ${#numbers.sequence(0, page.totalPages - 1)}"
+                th:classappend="${i == page.number} ? 'active'">
+                <a class="page-link" th:href="@{/keys(q=${q},service=${service},sort=${sort},page=${i})}"
+                   th:text="${i + 1}">1</a>
+            </li>
+            <li class="page-item" th:classappend="${page.last} ? 'disabled'">
+                <a class="page-link" th:href="@{/keys(q=${q},service=${service},sort=${sort},page=${page.number + 1})}">Next</a>
+            </li>
+        </ul>
+    </nav>
+
     <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">

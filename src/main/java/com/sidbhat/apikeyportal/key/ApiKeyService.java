@@ -5,6 +5,8 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,14 +27,19 @@ public class ApiKeyService {
         return repository.findAllByOrderByServiceNameAscNameAsc();
     }
 
-    public List<ApiKey> search(String text, String serviceName) {
-        return search(text, serviceName, ApiKeySort.SERVICE);
-    }
+    public static final int PAGE_SIZE = 20;
 
-    public List<ApiKey> search(String text, String serviceName, ApiKeySort sort) {
+    /**
+     * One page of keys matching the filters.
+     *
+     * @param page zero-based page number
+     */
+    public Page<ApiKey> search(String text, String serviceName, ApiKeySort sort, int page) {
+        // ordering is applied by the specification, so the PageRequest stays unsorted
         return repository.findAll(Specification.where(ApiKeySpecifications.textContains(text))
-                .and(ApiKeySpecifications.serviceIs(serviceName))
-                .and(ApiKeySpecifications.orderBy(sort != null ? sort : ApiKeySort.SERVICE)));
+                        .and(ApiKeySpecifications.serviceIs(serviceName))
+                        .and(ApiKeySpecifications.orderBy(sort != null ? sort : ApiKeySort.SERVICE)),
+                PageRequest.of(Math.max(page, 0), PAGE_SIZE));
     }
 
     /**

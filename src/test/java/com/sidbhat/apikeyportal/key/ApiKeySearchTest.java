@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
 
 import com.sidbhat.apikeyportal.config.JpaAuditingConfig;
 import com.sidbhat.apikeyportal.crypto.EncryptionProperties;
@@ -37,36 +38,52 @@ class ApiKeySearchTest {
 
     @Test
     void returnsEverythingWithoutFilters() {
-        assertThat(service.search(null, "")).hasSize(4);
+        assertThat(service.search(null, "", null, 0).getContent()).hasSize(4);
     }
 
     @Test
     void matchesNameOrServiceCaseInsensitively() {
-        assertThat(service.search("DEPLOY", null)).extracting(ApiKey::getName)
+        assertThat(service.search("DEPLOY", null, null, 0).getContent()).extracting(ApiKey::getName)
                 .containsExactly("CI deploy", "Deploy");
-        assertThat(service.search("git", null)).extracting(ApiKey::getName)
+        assertThat(service.search("git", null, null, 0).getContent()).extracting(ApiKey::getName)
                 .containsExactly("CI deploy", "Personal");
     }
 
     @Test
     void filtersByService() {
-        assertThat(service.search(null, "GitHub")).extracting(ApiKey::getServiceName).containsOnly("GitHub");
+        assertThat(service.search(null, "GitHub", null, 0).getContent())
+                .extracting(ApiKey::getServiceName).containsOnly("GitHub");
     }
 
     @Test
     void combinesTextAndServiceFilters() {
-        assertThat(service.search("deploy", "Heroku")).extracting(ApiKey::getName).containsExactly("Deploy");
+        assertThat(service.search("deploy", "Heroku", null, 0).getContent())
+                .extracting(ApiKey::getName).containsExactly("Deploy");
     }
 
     @Test
     void sortsByExpiryWithNonExpiringKeysLast() {
-        assertThat(service.search(null, null, ApiKeySort.EXPIRES)).extracting(ApiKey::getName)
+        assertThat(service.search(null, null, ApiKeySort.EXPIRES, 0).getContent()).extracting(ApiKey::getName)
                 .containsExactly("Deploy", "Prod secret key", "CI deploy", "Personal");
     }
 
     @Test
     void sortsByNewestFirst() {
-        assertThat(service.search(null, null, ApiKeySort.CREATED)).extracting(ApiKey::getName)
+        assertThat(service.search(null, null, ApiKeySort.CREATED, 0).getContent()).extracting(ApiKey::getName)
                 .containsExactly("Personal", "Deploy", "Prod secret key", "CI deploy");
+    }
+
+    @Test
+    void pagesResults() {
+        for (int i = 0; i < ApiKeyService.PAGE_SIZE; i++) {
+            repository.save(new ApiKey("Key " + i, "Zapier", "zp_" + i, LocalDate.now(), null));
+        }
+
+        Page<ApiKey> first = service.search(null, null, ApiKeySort.SERVICE, 0);
+        Page<ApiKey> second = service.search(null, null, ApiKeySort.SERVICE, 1);
+
+        assertThat(first.getTotalElements()).isEqualTo(ApiKeyService.PAGE_SIZE + 4);
+        assertThat(first.getContent()).hasSize(ApiKeyService.PAGE_SIZE);
+        assertThat(second.getContent()).hasSize(4).extracting(ApiKey::getServiceName).containsOnly("Zapier");
     }
 }

@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -53,7 +54,7 @@ class ApiKeyControllerTest {
     @WithMockUser
     void listsKeysWithoutRenderingValues() throws Exception {
         List<ApiKey> keys = List.of(new ApiKey("CI", "GitHub", "ghp_supersecretvalue1234", LocalDate.now(), null));
-        when(apiKeyService.search(null, null, ApiKeySort.SERVICE)).thenReturn(keys);
+        when(apiKeyService.search(null, null, ApiKeySort.SERVICE, 0)).thenReturn(new PageImpl<>(keys));
         when(apiKeyService.getSummary()).thenReturn(KeySummary.of(keys));
 
         mvc.perform(get("/keys"))

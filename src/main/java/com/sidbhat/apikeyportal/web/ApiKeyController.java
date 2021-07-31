@@ -2,6 +2,7 @@ package com.sidbhat.apikeyportal.web;
 
 import javax.validation.Valid;
 
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import com.sidbhat.apikeyportal.key.ApiKey;
 import com.sidbhat.apikeyportal.key.ApiKeyService;
 import com.sidbhat.apikeyportal.key.ApiKeySort;
 
@@ -28,8 +30,11 @@ public class ApiKeyController {
     @GetMapping
     public String list(@RequestParam(name = "q", required = false) String query,
             @RequestParam(name = "service", required = false) String service,
-            @RequestParam(name = "sort", defaultValue = "SERVICE") ApiKeySort sort, Model model) {
-        model.addAttribute("keys", apiKeyService.search(query, service, sort));
+            @RequestParam(name = "sort", defaultValue = "SERVICE") ApiKeySort sort,
+            @RequestParam(name = "page", defaultValue = "0") int page, Model model) {
+        Page<ApiKey> keys = apiKeyService.search(query, service, sort, page);
+        model.addAttribute("keys", keys.getContent());
+        model.addAttribute("page", keys);
         model.addAttribute("summary", apiKeyService.getSummary());
         model.addAttribute("services", apiKeyService.findServiceNames());
         model.addAttribute("sorts", ApiKeySort.values());
