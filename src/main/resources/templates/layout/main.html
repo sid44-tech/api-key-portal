@@ -22,6 +22,21 @@
     </div>
 </nav>
 
+<div class="container" th:if="${success != null or error != null}">
+    <div class="alert alert-success alert-dismissible fade show" role="alert" th:if="${success != null}">
+        <span th:text="${success}">Saved.</span>
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert" th:if="${error != null}">
+        <span th:text="${error}">Something went wrong.</span>
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+        </button>
+    </div>
+</div>
+
 <main class="container" layout:fragment="content">
     <p>Page content goes here.</p>
 </main>

@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.sidbhat.apikeyportal.key.ApiKey;
 import com.sidbhat.apikeyportal.key.ApiKeyService;
@@ -57,12 +58,14 @@ public class ApiKeyController {
     }
 
     @PostMapping
-    public String create(@Valid @ModelAttribute("form") ApiKeyForm form, BindingResult bindingResult) {
+    public String create(@Valid @ModelAttribute("form") ApiKeyForm form, BindingResult bindingResult,
+            RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
             return "keys/form";
         }
-        apiKeyService.create(form.getName(), form.getServiceName(), form.getKeyValue(), form.getCreatedOn(),
+        ApiKey key = apiKeyService.create(form.getName(), form.getServiceName(), form.getKeyValue(), form.getCreatedOn(),
                 form.getExpiresOn(), form.getNotes());
+        redirectAttributes.addFlashAttribute("success", "Added " + key.getServiceName() + " / " + key.getName() + ".");
         return "redirect:/keys";
     }
 
@@ -74,19 +77,21 @@ public class ApiKeyController {
 
     @PostMapping("/{id}")
     public String update(@PathVariable Long id, @Valid @ModelAttribute("form") ApiKeyForm form,
-            BindingResult bindingResult) {
+            BindingResult bindingResult, RedirectAttributes redirectAttributes) {
         form.setId(id);
         if (bindingResult.hasErrors()) {
             return "keys/form";
         }
         apiKeyService.update(id, form.getName(), form.getServiceName(), form.getKeyValue(), form.getCreatedOn(),
                 form.getExpiresOn(), form.getNotes());
+        redirectAttributes.addFlashAttribute("success", "Changes saved.");
         return "redirect:/keys/" + id;
     }
 
     @PostMapping("/{id}/delete")
-    public String delete(@PathVariable Long id) {
-        apiKeyService.delete(id);
+    public String delete(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        ApiKey key = apiKeyService.delete(id);
+        redirectAttributes.addFlashAttribute("success", "Deleted " + key.getServiceName() + " / " + key.getName() + ".");
         return "redirect:/keys";
     }
 }

@@ -9,6 +9,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
@@ -68,6 +69,9 @@ class ApiKeyControllerTest {
     @Test
     @WithMockUser
     void createRedirectsToListOnSuccess() throws Exception {
+        when(apiKeyService.create(any(), any(), any(), any(), any(), any()))
+                .thenReturn(new ApiKey("CI", "GitHub", "ghp_abc", LocalDate.now(), null));
+
         mvc.perform(post("/keys").with(csrf())
                         .param("serviceName", "GitHub")
                         .param("name", "CI")
@@ -76,7 +80,8 @@ class ApiKeyControllerTest {
                         .param("expiresOn", "2021-09-01")
                         .param("notes", "repo scope"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/keys"));
+                .andExpect(redirectedUrl("/keys"))
+                .andExpect(flash().attribute("success", "Added GitHub / CI."));
 
         verify(apiKeyService).create("CI", "GitHub", "ghp_abc", LocalDate.of(2021, 3, 1),
                 LocalDate.of(2021, 9, 1), "repo scope");
@@ -110,8 +115,11 @@ class ApiKeyControllerTest {
     @Test
     @WithMockUser
     void deleteRedirectsToList() throws Exception {
+        when(apiKeyService.delete(1L)).thenReturn(new ApiKey("CI", "GitHub", "ghp_abc", LocalDate.now(), null));
+
         mvc.perform(post("/keys/1/delete").with(csrf()))
-                .andExpect(redirectedUrl("/keys"));
+                .andExpect(redirectedUrl("/keys"))
+                .andExpect(flash().attribute("success", "Deleted GitHub / CI."));
 
         verify(apiKeyService).delete(1L);
     }

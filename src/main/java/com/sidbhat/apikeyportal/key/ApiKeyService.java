@@ -87,10 +87,11 @@ public class ApiKeyService {
     }
 
     @Transactional
-    public void delete(Long id) {
+    public ApiKey delete(Long id) {
         ApiKey key = getById(id);
         repository.delete(key);
         log.info("Deleted {}", key);
+        return key;
     }
 
     private static String trimToNull(String value) {
