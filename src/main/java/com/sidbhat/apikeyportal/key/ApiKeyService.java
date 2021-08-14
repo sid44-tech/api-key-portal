@@ -23,10 +23,6 @@ public class ApiKeyService {
         this.repository = repository;
     }
 
-    public List<ApiKey> findAll() {
-        return repository.findAllByOrderByServiceNameAscNameAsc();
-    }
-
     public static final int PAGE_SIZE = 20;
 
     /**
@@ -60,28 +56,30 @@ public class ApiKeyService {
     }
 
     @Transactional
-    public ApiKey create(String name, String serviceName, String keyValue, LocalDate createdOn,
-            LocalDate expiresOn, String notes) {
-        ApiKey newKey = new ApiKey(name.trim(), serviceName.trim(), keyValue.trim(),
-                createdOn != null ? createdOn : LocalDate.now(), expiresOn);
-        newKey.setNotes(trimToNull(notes));
+    public ApiKey create(ApiKeyDetails details) {
+        ApiKey newKey = new ApiKey(details.getName().trim(), details.getServiceName().trim(),
+                details.getKeyValue().trim(),
+                details.getCreatedOn() != null ? details.getCreatedOn() : LocalDate.now(),
+                details.getExpiresOn());
+        newKey.setNotes(trimToNull(details.getNotes()));
         ApiKey key = repository.save(newKey);
         log.info("Created {}", key);
         return key;
     }
 
     @Transactional
-    public ApiKey update(Long id, String name, String serviceName, String keyValue, LocalDate createdOn,
-            LocalDate expiresOn, String notes) {
+    public ApiKey update(Long id, ApiKeyDetails details) {
         ApiKey key = getById(id);
-        key.setName(name.trim());
-        key.setServiceName(serviceName.trim());
-        if (keyValue != null && !keyValue.isBlank()) {
-            key.setKeyValue(keyValue.trim());
+        key.setName(details.getName().trim());
+        key.setServiceName(details.getServiceName().trim());
+        // blank means "keep the current value"
+        String keyValue = trimToNull(details.getKeyValue());
+        if (keyValue != null) {
+            key.setKeyValue(keyValue);
         }
-        key.setCreatedOn(createdOn);
-        key.setExpiresOn(expiresOn);
-        key.setNotes(trimToNull(notes));
+        key.setCreatedOn(details.getCreatedOn());
+        key.setExpiresOn(details.getExpiresOn());
+        key.setNotes(trimToNull(details.getNotes()));
         log.info("Updated {}", key);
         return key;
     }

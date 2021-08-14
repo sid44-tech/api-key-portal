@@ -1,5 +1,6 @@
 package com.sidbhat.apikeyportal.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -22,6 +23,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -30,6 +32,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.sidbhat.apikeyportal.key.ApiKey;
+import com.sidbhat.apikeyportal.key.ApiKeyDetails;
 import com.sidbhat.apikeyportal.key.ApiKeyNotFoundException;
 import com.sidbhat.apikeyportal.key.ApiKeyService;
 import com.sidbhat.apikeyportal.key.ApiKeySort;
@@ -69,7 +72,7 @@ class ApiKeyControllerTest {
     @Test
     @WithMockUser
     void createRedirectsToListOnSuccess() throws Exception {
-        when(apiKeyService.create(any(), any(), any(), any(), any(), any()))
+        when(apiKeyService.create(any()))
                 .thenReturn(new ApiKey("CI", "GitHub", "ghp_abc", LocalDate.now(), null));
 
         mvc.perform(post("/keys").with(csrf())
@@ -83,8 +86,14 @@ class ApiKeyControllerTest {
                 .andExpect(redirectedUrl("/keys"))
                 .andExpect(flash().attribute("success", "Added GitHub / CI."));
 
-        verify(apiKeyService).create("CI", "GitHub", "ghp_abc", LocalDate.of(2021, 3, 1),
-                LocalDate.of(2021, 9, 1), "repo scope");
+        ArgumentCaptor<ApiKeyDetails> details = ArgumentCaptor.forClass(ApiKeyDetails.class);
+        verify(apiKeyService).create(details.capture());
+        assertThat(details.getValue().getName()).isEqualTo("CI");
+        assertThat(details.getValue().getServiceName()).isEqualTo("GitHub");
+        assertThat(details.getValue().getKeyValue()).isEqualTo("ghp_abc");
+        assertThat(details.getValue().getCreatedOn()).isEqualTo(LocalDate.of(2021, 3, 1));
+        assertThat(details.getValue().getExpiresOn()).isEqualTo(LocalDate.of(2021, 9, 1));
+        assertThat(details.getValue().getNotes()).isEqualTo("repo scope");
     }
 
     @Test
@@ -100,7 +109,7 @@ class ApiKeyControllerTest {
                 .andExpect(view().name("keys/form"))
                 .andExpect(model().attributeHasFieldErrors("form", "serviceName", "expiresOnAfterCreatedOn"));
 
-        verify(apiKeyService, never()).create(any(), any(), any(), any(), any(), any());
+        verify(apiKeyService, never()).create(any());
     }
 
     @Test

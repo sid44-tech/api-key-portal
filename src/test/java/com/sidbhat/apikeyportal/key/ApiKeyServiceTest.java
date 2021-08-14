@@ -33,7 +33,7 @@ class ApiKeyServiceTest {
     void createTrimsInputAndDefaultsCreatedOnToToday() {
         when(repository.save(any(ApiKey.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        ApiKey key = service.create("  Deploy  ", " GitHub ", " ghp_abc ", null, null, "  ");
+        ApiKey key = service.create(new ApiKeyDetails("  Deploy  ", " GitHub ", " ghp_abc ", null, null, "  "));
 
         assertThat(key.getName()).isEqualTo("Deploy");
         assertThat(key.getServiceName()).isEqualTo("GitHub");
@@ -73,7 +73,7 @@ class ApiKeyServiceTest {
         ApiKey key = new ApiKey("Deploy", "GitHub", "ghp_old", LocalDate.now(), null);
         when(repository.findById(1L)).thenReturn(Optional.of(key));
 
-        service.update(1L, "Deploy", "GitHub", " ghp_new ", key.getCreatedOn(), null, "repo scope");
+        service.update(1L, new ApiKeyDetails("Deploy", "GitHub", " ghp_new ", key.getCreatedOn(), null, "repo scope"));
 
         assertThat(key.getKeyValue()).isEqualTo("ghp_new");
         assertThat(key.getNotes()).isEqualTo("repo scope");
@@ -84,7 +84,7 @@ class ApiKeyServiceTest {
         ApiKey key = new ApiKey("Deploy", "GitHub", "ghp_old", LocalDate.now(), null);
         when(repository.findById(1L)).thenReturn(Optional.of(key));
 
-        service.update(1L, "Deploy v2", "GitHub", "", key.getCreatedOn(), null, null);
+        service.update(1L, new ApiKeyDetails("Deploy v2", "GitHub", "", key.getCreatedOn(), null, null));
 
         assertThat(key.getName()).isEqualTo("Deploy v2");
         assertThat(key.getKeyValue()).isEqualTo("ghp_old");

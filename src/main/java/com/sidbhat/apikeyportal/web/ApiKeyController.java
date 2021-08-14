@@ -63,8 +63,7 @@ public class ApiKeyController {
         if (bindingResult.hasErrors()) {
             return "keys/form";
         }
-        ApiKey key = apiKeyService.create(form.getName(), form.getServiceName(), form.getKeyValue(), form.getCreatedOn(),
-                form.getExpiresOn(), form.getNotes());
+        ApiKey key = apiKeyService.create(form.toDetails());
         redirectAttributes.addFlashAttribute("success", "Added " + key.getServiceName() + " / " + key.getName() + ".");
         return "redirect:/keys";
     }
@@ -82,8 +81,7 @@ public class ApiKeyController {
         if (bindingResult.hasErrors()) {
             return "keys/form";
         }
-        apiKeyService.update(id, form.getName(), form.getServiceName(), form.getKeyValue(), form.getCreatedOn(),
-                form.getExpiresOn(), form.getNotes());
+        apiKeyService.update(id, form.toDetails());
         redirectAttributes.addFlashAttribute("success", "Changes saved.");
         return "redirect:/keys/" + id;
     }

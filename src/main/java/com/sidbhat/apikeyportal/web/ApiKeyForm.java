@@ -11,6 +11,7 @@ import javax.validation.constraints.Size;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import com.sidbhat.apikeyportal.key.ApiKey;
+import com.sidbhat.apikeyportal.key.ApiKeyDetails;
 
 /**
  * Backing object for the add / edit key form.
@@ -50,6 +51,10 @@ public class ApiKeyForm {
         form.notes = key.getNotes();
         // keyValue intentionally left blank, it is never rendered into the page
         return form;
+    }
+
+    public ApiKeyDetails toDetails() {
+        return new ApiKeyDetails(name, serviceName, keyValue, createdOn, expiresOn, notes);
     }
 
     public boolean isNew() {
