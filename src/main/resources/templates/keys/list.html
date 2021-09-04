@@ -41,29 +41,29 @@
         </div>
     </div>
 
-    <form th:action="@{/keys}" method="get" class="form-row mb-3">
-        <div class="col-md-4 mb-2">
-            <label class="sr-only" for="q">Search</label>
+    <form th:action="@{/keys}" method="get" class="row g-2 mb-3">
+        <div class="col-md-4">
+            <label class="visually-hidden" for="q">Search</label>
             <input type="search" class="form-control" id="q" name="q" th:value="${q}"
                    placeholder="Search by name or service">
         </div>
-        <div class="col-md-3 mb-2">
-            <label class="sr-only" for="service">Service</label>
-            <select class="custom-select" id="service" name="service" onchange="this.form.submit()">
+        <div class="col-md-3">
+            <label class="visually-hidden" for="service">Service</label>
+            <select class="form-select" id="service" name="service" onchange="this.form.submit()">
                 <option value="">All services</option>
                 <option th:each="s : ${services}" th:value="${s}" th:text="${s}"
                         th:selected="${s == service}">GitHub</option>
             </select>
         </div>
-        <div class="col-md-3 mb-2">
-            <label class="sr-only" for="sort">Sort by</label>
-            <select class="custom-select" id="sort" name="sort" onchange="this.form.submit()">
+        <div class="col-md-3">
+            <label class="visually-hidden" for="sort">Sort by</label>
+            <select class="form-select" id="sort" name="sort" onchange="this.form.submit()">
                 <option th:each="s : ${sorts}" th:value="${s}" th:text="${'Sort: ' + s.label}"
                         th:selected="${s == sort}">Sort: Service</option>
             </select>
         </div>
-        <div class="col-md-2 mb-2">
-            <button type="submit" class="btn btn-outline-secondary btn-block">Search</button>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-outline-secondary w-100">Search</button>
         </div>
     </form>
 
@@ -78,14 +78,14 @@
 
     <div class="table-responsive" th:unless="${#lists.isEmpty(keys)}">
         <table class="table table-hover">
-            <thead class="thead-light">
+            <thead class="table-light">
             <tr>
                 <th scope="col">Service</th>
                 <th scope="col">Name</th>
                 <th scope="col">Value</th>
                 <th scope="col">Created</th>
                 <th scope="col">Expires</th>
-                <th scope="col" class="text-right">Actions</th>
+                <th scope="col" class="text-end">Actions</th>
             </tr>
             </thead>
             <tbody>
@@ -104,9 +104,9 @@
                     <span th:text="${key.expiresOn != null ? #temporals.format(key.expiresOn, 'MMM d, yyyy') : 'Never'}">Never</span>
                     <span th:replace="fragments/badges :: expiration(${key})"></span>
                 </td>
-                <td class="text-right">
+                <td class="text-end">
                     <button type="button" class="btn btn-sm btn-outline-danger"
-                            data-toggle="modal" data-target="#deleteModal"
+                            data-bs-toggle="modal" data-bs-target="#deleteModal"
                             th:attr="data-key-name=${key.serviceName + ' / ' + key.name},data-delete-url=@{/keys/{id}/delete(id=${key.id})}">
                         Delete
                     </button>
@@ -139,16 +139,14 @@
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                     <div class="modal-header">
                         <h5 class="modal-title" id="deleteModalLabel">Delete key?</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <p class="mb-0"><strong id="deleteKeyName"></strong> will be permanently removed.
                             This can't be undone.</p>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-danger">Delete</button>
                     </div>
                 </form>
@@ -160,10 +158,10 @@
 <th:block layout:fragment="scripts">
     <script th:src="@{/js/keys.js}"></script>
     <script>
-        $('#deleteModal').on('show.bs.modal', function (event) {
-            var button = $(event.relatedTarget);
-            $('#deleteKeyName').text(button.data('key-name'));
-            $('#deleteForm').attr('action', button.data('delete-url'));
+        document.getElementById('deleteModal').addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            document.getElementById('deleteKeyName').textContent = button.dataset.keyName;
+            document.getElementById('deleteForm').action = button.dataset.deleteUrl;
         });
     </script>
 </th:block>

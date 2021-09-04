@@ -4,7 +4,7 @@
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title layout:title-pattern="$CONTENT_TITLE · API Key Portal">API Key Portal</title>
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}">
     <link rel="stylesheet" th:href="@{/css/app.css}">
@@ -13,9 +13,9 @@
 <nav class="navbar navbar-expand-md navbar-dark bg-dark mb-4">
     <div class="container">
         <a class="navbar-brand" th:href="@{/}">API Key Portal</a>
-        <div class="ml-auto d-flex align-items-center" sec:authorize="isAuthenticated()">
-            <span class="navbar-text mr-3" sec:authentication="name">admin</span>
-            <form th:action="@{/logout}" method="post" class="form-inline">
+        <div class="ms-auto d-flex align-items-center" sec:authorize="isAuthenticated()">
+            <span class="navbar-text me-3" sec:authentication="name">admin</span>
+            <form th:action="@{/logout}" method="post">
                 <button type="submit" class="btn btn-sm btn-outline-light">Sign out</button>
             </form>
         </div>
@@ -25,15 +25,11 @@
 <div class="container" th:if="${success != null or error != null}">
     <div class="alert alert-success alert-dismissible fade show" role="alert" th:if="${success != null}">
         <span th:text="${success}">Saved.</span>
-        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-        </button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
     <div class="alert alert-danger alert-dismissible fade show" role="alert" th:if="${error != null}">
         <span th:text="${error}">Something went wrong.</span>
-        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-        </button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 </div>
 
@@ -41,7 +37,6 @@
     <p>Page content goes here.</p>
 </main>
 
-<script th:src="@{/webjars/jquery/jquery.min.js}"></script>
 <script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
 <th:block layout:fragment="scripts"></th:block>
 </body>

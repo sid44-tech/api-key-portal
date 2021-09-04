@@ -14,55 +14,55 @@
             <form th:action="${form.new} ? @{/keys} : @{/keys/{id}(id=${form.id})}"
                   th:object="${form}" method="post" novalidate>
                 <input type="hidden" th:field="*{id}">
-                <div class="form-row">
-                    <div class="form-group col-md-6">
-                        <label for="serviceName">Service</label>
+                <div class="row">
+                    <div class="mb-3 col-md-6">
+                        <label class="form-label" for="serviceName">Service</label>
                         <input type="text" class="form-control" th:field="*{serviceName}"
                                th:errorclass="is-invalid" placeholder="e.g. GitHub" maxlength="100" required>
                         <div class="invalid-feedback" th:errors="*{serviceName}"></div>
                     </div>
-                    <div class="form-group col-md-6">
-                        <label for="name">Name</label>
+                    <div class="mb-3 col-md-6">
+                        <label class="form-label" for="name">Name</label>
                         <input type="text" class="form-control" th:field="*{name}"
                                th:errorclass="is-invalid" placeholder="e.g. CI deploy token" maxlength="100" required>
                         <div class="invalid-feedback" th:errors="*{name}"></div>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="keyValue">Key value</label>
-                    <textarea class="form-control text-monospace" th:field="*{keyValue}" rows="3"
+                <div class="mb-3">
+                    <label class="form-label" for="keyValue">Key value</label>
+                    <textarea class="form-control font-monospace" th:field="*{keyValue}" rows="3"
                               th:classappend="${#fields.hasErrors('keyValue') or #fields.hasErrors('keyValuePresentForNewKey')} ? 'is-invalid'"
                               autocomplete="off" spellcheck="false" th:required="${form.new}"></textarea>
-                    <small class="form-text text-muted" th:unless="${form.new}">
+                    <small class="form-text" th:unless="${form.new}">
                         Leave blank to keep the current value.
                     </small>
                     <div class="invalid-feedback" th:errors="*{keyValue}"></div>
                     <div class="invalid-feedback" th:errors="*{keyValuePresentForNewKey}"></div>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group col-md-6">
-                        <label for="createdOn">Created on</label>
+                <div class="row">
+                    <div class="mb-3 col-md-6">
+                        <label class="form-label" for="createdOn">Created on</label>
                         <input type="date" class="form-control" th:field="*{createdOn}" th:errorclass="is-invalid" required>
                         <div class="invalid-feedback" th:errors="*{createdOn}"></div>
                     </div>
-                    <div class="form-group col-md-6">
-                        <label for="expiresOn">Expires on</label>
+                    <div class="mb-3 col-md-6">
+                        <label class="form-label" for="expiresOn">Expires on</label>
                         <input type="date" class="form-control" th:field="*{expiresOn}"
                                th:classappend="${#fields.hasErrors('expiresOn') or #fields.hasErrors('expiresOnAfterCreatedOn')} ? 'is-invalid'">
-                        <small class="form-text text-muted">Leave blank if the key doesn't expire.</small>
+                        <small class="form-text">Leave blank if the key doesn't expire.</small>
                         <div class="invalid-feedback" th:errors="*{expiresOn}"></div>
                         <div class="invalid-feedback" th:errors="*{expiresOnAfterCreatedOn}"></div>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="notes">Notes</label>
+                <div class="mb-3">
+                    <label class="form-label" for="notes">Notes</label>
                     <textarea class="form-control" th:field="*{notes}" rows="3" maxlength="1000"
                               th:errorclass="is-invalid"
                               placeholder="Scopes, where it's used, how to rotate it..."></textarea>
-                    <small class="form-text text-muted">Notes are not encrypted, so don't put secrets here.</small>
+                    <small class="form-text">Notes are not encrypted, so don't put secrets here.</small>
                     <div class="invalid-feedback" th:errors="*{notes}"></div>
                 </div>
 
