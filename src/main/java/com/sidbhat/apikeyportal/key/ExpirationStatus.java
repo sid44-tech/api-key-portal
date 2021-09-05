@@ -4,10 +4,10 @@ import java.time.LocalDate;
 
 public enum ExpirationStatus {
 
-    NEVER("Never expires", "secondary"),
-    ACTIVE("Active", "success"),
-    EXPIRING_SOON("Expiring soon", "warning"),
-    EXPIRED("Expired", "danger");
+    NEVER("Never expires", "bg-secondary"),
+    ACTIVE("Active", "bg-success"),
+    EXPIRING_SOON("Expiring soon", "bg-warning text-dark"),
+    EXPIRED("Expired", "bg-danger");
 
     /** Keys expiring within this many days are flagged as expiring soon. */
     public static final int EXPIRING_SOON_DAYS = 30;
@@ -37,7 +37,7 @@ public enum ExpirationStatus {
         return label;
     }
 
-    /** Bootstrap contextual class, e.g. {@code warning} for {@code badge-warning}. */
+    /** Bootstrap classes for the status badge, e.g. {@code bg-warning text-dark}. */
     public String getBadgeClass() {
         return badgeClass;
     }
