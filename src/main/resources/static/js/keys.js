@@ -14,12 +14,19 @@
             });
     }
 
-    function flash(button, message) {
-        var original = button.textContent;
-        button.textContent = message;
+    function setIcon(button, icon, label) {
+        button.querySelector('.bi').className = 'bi ' + icon;
+        button.querySelector('.visually-hidden').textContent = label;
+        button.title = label;
+    }
+
+    function flash(button, icon, label) {
+        var originalIcon = button.querySelector('.bi').className.replace('bi ', '');
+        var originalLabel = button.title;
+        setIcon(button, icon, label);
         button.disabled = true;
         setTimeout(function () {
-            button.textContent = original;
+            setIcon(button, originalIcon, originalLabel);
             button.disabled = false;
         }, 1500);
     }
@@ -31,7 +38,7 @@
         if (button.dataset.revealed === 'true') {
             text.textContent = button.dataset.masked;
             button.dataset.revealed = 'false';
-            button.textContent = 'Show';
+            setIcon(button, 'bi-eye', 'Show value');
             return;
         }
 
@@ -40,7 +47,7 @@
                 button.dataset.masked = text.textContent;
                 text.textContent = value;
                 button.dataset.revealed = 'true';
-                button.textContent = 'Hide';
+                setIcon(button, 'bi-eye-slash', 'Hide value');
             })
             .catch(function (err) {
                 console.error(err);
@@ -50,7 +57,7 @@
 
     function copy(button) {
         if (!navigator.clipboard) {
-            flash(button, 'Not supported');
+            flash(button, 'bi-x-lg', 'Clipboard not supported');
             return;
         }
         fetchValue(button.dataset.valueUrl)
@@ -58,11 +65,11 @@
                 return navigator.clipboard.writeText(value);
             })
             .then(function () {
-                flash(button, 'Copied!');
+                flash(button, 'bi-check2', 'Copied!');
             })
             .catch(function (err) {
                 console.error(err);
-                flash(button, 'Failed');
+                flash(button, 'bi-x-lg', 'Copy failed');
             });
     }
 
