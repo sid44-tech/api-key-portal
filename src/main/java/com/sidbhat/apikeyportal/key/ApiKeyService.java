@@ -1,5 +1,6 @@
 package com.sidbhat.apikeyportal.key;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -53,6 +54,17 @@ public class ApiKeyService {
 
     public ApiKey getById(Long id) {
         return repository.findById(id).orElseThrow(() -> new ApiKeyNotFoundException(id));
+    }
+
+    /**
+     * Returns the decrypted value of a key and records that it was revealed.
+     */
+    @Transactional
+    public String revealValue(Long id, String revealedBy) {
+        ApiKey key = getById(id);
+        repository.markRevealed(id, Instant.now());
+        log.info("Value of {} revealed by {}", key, revealedBy);
+        return key.getKeyValue();
     }
 
     @Transactional

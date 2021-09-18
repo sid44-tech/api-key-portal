@@ -73,9 +73,10 @@ class ApiKeyLifecycleIntegrationTest {
                 .andExpect(content().string(containsString("Prod secret")))
                 .andExpect(content().string(not(containsString("sk_live_0123456789abcdef"))));
 
-        // revealed on demand
+        // revealed on demand, and the reveal is recorded
         mvc.perform(get("/keys/{id}/value", id))
                 .andExpect(jsonPath("$.value").value("sk_live_0123456789abcdef"));
+        assertThat(repository.findById(id).orElseThrow().getLastRevealedAt()).isNotNull();
 
         // edit without touching the value
         mvc.perform(post("/keys/{id}", id).with(csrf())

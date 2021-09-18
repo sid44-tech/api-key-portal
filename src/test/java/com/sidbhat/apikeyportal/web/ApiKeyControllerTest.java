@@ -136,8 +136,7 @@ class ApiKeyControllerTest {
     @Test
     @WithMockUser
     void valueEndpointReturnsDecryptedValueAndIsNotCached() throws Exception {
-        when(apiKeyService.getById(eq(1L))).thenReturn(
-                new ApiKey("CI", "GitHub", "ghp_abc", LocalDate.now(), null));
+        when(apiKeyService.revealValue(eq(1L), eq("user"))).thenReturn("ghp_abc");
 
         mvc.perform(get("/keys/1/value"))
                 .andExpect(status().isOk())

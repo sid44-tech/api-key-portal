@@ -2,6 +2,7 @@ package com.sidbhat.apikeyportal.key;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Instant;
 import java.time.LocalDate;
 
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,21 @@ class ApiKeyRepositoryTest {
         assertThat(saved.getId()).isNotNull();
         assertThat(saved.getAddedAt()).isNotNull();
         assertThat(saved.getUpdatedAt()).isNotNull();
+    }
+
+    @Test
+    void markRevealedDoesNotTouchUpdatedAt() {
+        ApiKey saved = repository.save(new ApiKey("Prod", "Stripe", "sk_1", LocalDate.now(), null));
+        entityManager.flush();
+        Instant updatedAt = saved.getUpdatedAt();
+        Instant revealedAt = Instant.parse("2021-09-18T12:00:00Z");
+
+        repository.markRevealed(saved.getId(), revealedAt);
+        entityManager.clear();
+
+        ApiKey reloaded = repository.findById(saved.getId()).orElseThrow();
+        assertThat(reloaded.getLastRevealedAt()).isEqualTo(revealedAt);
+        assertThat(reloaded.getUpdatedAt()).isEqualTo(updatedAt);
     }
 
     @Test

@@ -61,6 +61,12 @@
 
                 <dt class="col-sm-3">Last updated</dt>
                 <dd class="col-sm-9" th:text="${#temporals.format(key.updatedAt, 'MMMM d, yyyy h:mm a')}">-</dd>
+
+                <dt class="col-sm-3">Last revealed</dt>
+                <dd class="col-sm-9"
+                    th:text="${key.lastRevealedAt != null ? #temporals.format(key.lastRevealedAt, 'MMMM d, yyyy h:mm a') : 'Never'}">
+                    Never
+                </dd>
             </dl>
         </div>
         <div class="card-footer text-end">

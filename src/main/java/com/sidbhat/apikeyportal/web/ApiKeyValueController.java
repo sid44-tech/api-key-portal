@@ -1,5 +1,6 @@
 package com.sidbhat.apikeyportal.web;
 
+import java.security.Principal;
 import java.util.Map;
 
 import org.springframework.http.CacheControl;
@@ -24,9 +25,9 @@ public class ApiKeyValueController {
     }
 
     @GetMapping("/keys/{id}/value")
-    public ResponseEntity<Map<String, String>> value(@PathVariable Long id) {
+    public ResponseEntity<Map<String, String>> value(@PathVariable Long id, Principal principal) {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
-                .body(Map.of("value", apiKeyService.getById(id).getKeyValue()));
+                .body(Map.of("value", apiKeyService.revealValue(id, principal.getName())));
     }
 }

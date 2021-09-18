@@ -64,6 +64,10 @@ public class ApiKey {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    /** Set by {@link ApiKeyRepository#markRevealed} only, so it doesn't count as a modification. */
+    @Column(name = "last_revealed_at", insertable = false, updatable = false)
+    private Instant lastRevealedAt;
+
     protected ApiKey() {
         // for JPA
     }
@@ -157,6 +161,10 @@ public class ApiKey {
 
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    public Instant getLastRevealedAt() {
+        return lastRevealedAt;
     }
 
     @Override
