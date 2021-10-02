@@ -73,6 +73,28 @@
             });
     }
 
+    var deleteModal = document.getElementById('deleteModal');
+    if (deleteModal) {
+        deleteModal.addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            document.getElementById('deleteKeyName').textContent = button.dataset.keyName;
+            document.getElementById('deleteForm').action = button.dataset.deleteUrl;
+        });
+    }
+
+    document.querySelectorAll('.js-autosubmit').forEach(function (select) {
+        select.addEventListener('change', function () {
+            select.form.submit();
+        });
+    });
+
+    document.addEventListener('submit', function (event) {
+        var form = event.target.closest('.js-confirm');
+        if (form && !window.confirm(form.dataset.confirm)) {
+            event.preventDefault();
+        }
+    });
+
     document.addEventListener('click', function (event) {
         var revealButton = event.target.closest('.js-reveal');
         if (revealButton) {

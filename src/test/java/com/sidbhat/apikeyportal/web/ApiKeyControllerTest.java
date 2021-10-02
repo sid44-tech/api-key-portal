@@ -71,6 +71,19 @@ class ApiKeyControllerTest {
 
     @Test
     @WithMockUser
+    void sendsContentSecurityPolicy() throws Exception {
+        when(apiKeyService.search(null, null, ApiKeySort.SERVICE, 0)).thenReturn(new PageImpl<>(List.of()));
+        when(apiKeyService.getSummary()).thenReturn(KeySummary.of(List.of()));
+
+        mvc.perform(get("/keys"))
+                .andExpect(header().string("Content-Security-Policy",
+                        org.hamcrest.Matchers.containsString("script-src 'self'")))
+                .andExpect(header().string("Referrer-Policy", "same-origin"))
+                .andExpect(header().string("X-Frame-Options", "DENY"));
+    }
+
+    @Test
+    @WithMockUser
     void createRedirectsToListOnSuccess() throws Exception {
         when(apiKeyService.create(any()))
                 .thenReturn(new ApiKey("CI", "GitHub", "ghp_abc", LocalDate.now(), null));

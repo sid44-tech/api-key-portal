@@ -11,11 +11,23 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 
 @Configuration
 @EnableWebSecurity
 @EnableConfigurationProperties(SecurityProperties.class)
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
+
+    /** No inline scripts or styles; everything is served from this app. */
+    static final String CONTENT_SECURITY_POLICY = "default-src 'self'; "
+            + "script-src 'self'; "
+            + "style-src 'self'; "
+            + "img-src 'self' data:; "
+            + "font-src 'self'; "
+            + "object-src 'none'; "
+            + "base-uri 'self'; "
+            + "form-action 'self'; "
+            + "frame-ancestors 'none'";
 
     @Override
     protected void configure(HttpSecurity http) throws Exception {
@@ -29,7 +41,11 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                         .permitAll())
                 .logout(logout -> logout
                         .logoutSuccessUrl("/login?logout")
-                        .permitAll());
+                        .permitAll())
+                .headers(headers -> headers
+                        .contentSecurityPolicy(CONTENT_SECURITY_POLICY)
+                        .and()
+                        .referrerPolicy(ReferrerPolicy.SAME_ORIGIN));
     }
 
     @Bean

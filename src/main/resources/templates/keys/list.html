@@ -49,7 +49,7 @@
         </div>
         <div class="col-md-3">
             <label class="visually-hidden" for="service">Service</label>
-            <select class="form-select" id="service" name="service" onchange="this.form.submit()">
+            <select class="form-select js-autosubmit" id="service" name="service">
                 <option value="">All services</option>
                 <option th:each="s : ${services}" th:value="${s}" th:text="${s}"
                         th:selected="${s == service}">GitHub</option>
@@ -57,7 +57,7 @@
         </div>
         <div class="col-md-3">
             <label class="visually-hidden" for="sort">Sort by</label>
-            <select class="form-select" id="sort" name="sort" onchange="this.form.submit()">
+            <select class="form-select js-autosubmit" id="sort" name="sort">
                 <option th:each="s : ${sorts}" th:value="${s}" th:text="${'Sort: ' + s.label}"
                         th:selected="${s == sort}">Sort: Service</option>
             </select>
@@ -161,13 +161,6 @@
 
 <th:block layout:fragment="scripts">
     <script th:src="@{/js/keys.js}"></script>
-    <script>
-        document.getElementById('deleteModal').addEventListener('show.bs.modal', function (event) {
-            var button = event.relatedTarget;
-            document.getElementById('deleteKeyName').textContent = button.dataset.keyName;
-            document.getElementById('deleteForm').action = button.dataset.deleteUrl;
-        });
-    </script>
 </th:block>
 </body>
 </html>
