@@ -9,7 +9,7 @@ public enum ExpirationStatus {
     EXPIRING_SOON("Expiring soon", "bg-warning text-dark"),
     EXPIRED("Expired", "bg-danger");
 
-    /** Keys expiring within this many days are flagged as expiring soon. */
+    /** Keys expiring within this many days (inclusive) are flagged as expiring soon. */
     public static final int EXPIRING_SOON_DAYS = 30;
 
     private final String label;
@@ -27,7 +27,7 @@ public enum ExpirationStatus {
         if (!expiresOn.isAfter(today)) {
             return EXPIRED;
         }
-        if (expiresOn.isBefore(today.plusDays(EXPIRING_SOON_DAYS))) {
+        if (!expiresOn.isAfter(today.plusDays(EXPIRING_SOON_DAYS))) {
             return EXPIRING_SOON;
         }
         return ACTIVE;

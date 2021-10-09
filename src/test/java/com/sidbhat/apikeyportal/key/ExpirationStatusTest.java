@@ -31,6 +31,23 @@ class ExpirationStatusTest {
     }
 
     @Test
+    void expiringTomorrowIsExpiringSoon() {
+        assertThat(ExpirationStatus.of(TODAY.plusDays(1), TODAY)).isEqualTo(ExpirationStatus.EXPIRING_SOON);
+    }
+
+    @Test
+    void expiringExactlyAtEndOfWarningWindowIsExpiringSoon() {
+        assertThat(ExpirationStatus.of(TODAY.plusDays(ExpirationStatus.EXPIRING_SOON_DAYS), TODAY))
+                .isEqualTo(ExpirationStatus.EXPIRING_SOON);
+    }
+
+    @Test
+    void expiringDayAfterWarningWindowIsActive() {
+        assertThat(ExpirationStatus.of(TODAY.plusDays(ExpirationStatus.EXPIRING_SOON_DAYS + 1), TODAY))
+                .isEqualTo(ExpirationStatus.ACTIVE);
+    }
+
+    @Test
     void farFutureIsActive() {
         assertThat(ExpirationStatus.of(TODAY.plusDays(90), TODAY)).isEqualTo(ExpirationStatus.ACTIVE);
     }
