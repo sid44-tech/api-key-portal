@@ -11,7 +11,7 @@
 
     <groupId>com.sidbhat</groupId>
     <artifactId>api-key-portal</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>api-key-portal</name>
     <description>Portal for managing API and access keys</description>
 
