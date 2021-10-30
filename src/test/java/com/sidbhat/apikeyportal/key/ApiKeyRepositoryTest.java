@@ -58,16 +58,16 @@ class ApiKeyRepositoryTest {
 
     @Test
     void storesKeyValueEncrypted() {
-        ApiKey saved = repository.save(new ApiKey("Prod", "Stripe", "sk_live_secret", LocalDate.now(), null));
+        ApiKey saved = repository.save(new ApiKey("Prod", "Stripe", "fake-secret-value", LocalDate.now(), null));
         entityManager.flush();
         entityManager.clear();
 
         String raw = jdbcTemplate.queryForObject("select key_value from api_key where id = ?", String.class,
                 saved.getId());
 
-        assertThat(raw).isNotBlank().doesNotContain("sk_live_secret");
+        assertThat(raw).isNotBlank().doesNotContain("fake-secret-value");
         assertThat(repository.findById(saved.getId()))
-                .hasValueSatisfying(key -> assertThat(key.getKeyValue()).isEqualTo("sk_live_secret"));
+                .hasValueSatisfying(key -> assertThat(key.getKeyValue()).isEqualTo("fake-secret-value"));
     }
 
     @Test

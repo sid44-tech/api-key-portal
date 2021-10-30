@@ -1,7 +1,0 @@
-# Local development profile. Secrets come from the environment.
-portal:
-  security:
-    # BCrypt hash of the login password
-    password-hash: ${PORTAL_PASSWORD_HASH:}
-  encryption:
-    key: ${PORTAL_ENCRYPTION_KEY:}

@@ -3,13 +3,15 @@ version: "3.8"
 # Local Postgres for running the app with the "postgres" profile:
 #   docker-compose up -d
 #   ./mvnw spring-boot:run -Dspring-boot.run.profiles=postgres
+#
+# Credentials are read from .env (see .env.example).
 services:
   postgres:
     image: postgres:13.3
     environment:
       POSTGRES_DB: keyportal
-      POSTGRES_USER: keyportal
-      POSTGRES_PASSWORD: ${PORTAL_DB_PASSWORD:?set PORTAL_DB_PASSWORD}
+      POSTGRES_USER: ${PORTAL_DB_USERNAME:-keyportal}
+      POSTGRES_PASSWORD: ${PORTAL_DB_PASSWORD:?set PORTAL_DB_PASSWORD in .env}
     ports:
       - "5432:5432"
     volumes:

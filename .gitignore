@@ -37,3 +37,6 @@ build/
 
 ### Local data ###
 data/
+
+### Local secrets ###
+.env

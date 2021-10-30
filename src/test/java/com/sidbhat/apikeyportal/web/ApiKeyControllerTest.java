@@ -57,7 +57,7 @@ class ApiKeyControllerTest {
     @Test
     @WithMockUser
     void listsKeysWithoutRenderingValues() throws Exception {
-        List<ApiKey> keys = List.of(new ApiKey("CI", "GitHub", "ghp_supersecretvalue1234", LocalDate.now(), null));
+        List<ApiKey> keys = List.of(new ApiKey("CI", "GitHub", "fake-github-token-1234", LocalDate.now(), null));
         when(apiKeyService.search(null, null, ApiKeySort.SERVICE, 0)).thenReturn(new PageImpl<>(keys));
         when(apiKeyService.getSummary()).thenReturn(KeySummary.of(keys));
 
@@ -66,7 +66,7 @@ class ApiKeyControllerTest {
                 .andExpect(view().name("keys/list"))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("GitHub")))
                 .andExpect(content().string(org.hamcrest.Matchers.not(
-                        org.hamcrest.Matchers.containsString("ghp_supersecretvalue1234"))));
+                        org.hamcrest.Matchers.containsString("fake-github-token-1234"))));
     }
 
     @Test

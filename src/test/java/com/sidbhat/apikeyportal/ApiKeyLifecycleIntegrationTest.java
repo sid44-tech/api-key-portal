@@ -48,7 +48,7 @@ class ApiKeyLifecycleIntegrationTest {
 
     @Test
     void logsInWithConfiguredCredentials() throws Exception {
-        mvc.perform(formLogin().user("admin").password("dev-password")).andExpect(authenticated());
+        mvc.perform(formLogin().user("admin").password("test-password")).andExpect(authenticated());
         mvc.perform(formLogin().user("admin").password("wrong")).andExpect(unauthenticated());
     }
 
@@ -58,7 +58,7 @@ class ApiKeyLifecycleIntegrationTest {
         mvc.perform(post("/keys").with(csrf())
                         .param("serviceName", "Stripe")
                         .param("name", "Prod secret")
-                        .param("keyValue", "sk_live_0123456789abcdef")
+                        .param("keyValue", "fake-stripe-key-0123456789")
                         .param("createdOn", "2021-08-01"))
                 .andExpect(status().is3xxRedirection());
 
@@ -66,16 +66,16 @@ class ApiKeyLifecycleIntegrationTest {
 
         // stored encrypted
         String raw = jdbcTemplate.queryForObject("select key_value from api_key where id = ?", String.class, id);
-        assertThat(raw).doesNotContain("sk_live");
+        assertThat(raw).doesNotContain("fake-stripe-key");
 
         // listed, but value not rendered
         mvc.perform(get("/keys"))
                 .andExpect(content().string(containsString("Prod secret")))
-                .andExpect(content().string(not(containsString("sk_live_0123456789abcdef"))));
+                .andExpect(content().string(not(containsString("fake-stripe-key-0123456789"))));
 
         // revealed on demand, and the reveal is recorded
         mvc.perform(get("/keys/{id}/value", id))
-                .andExpect(jsonPath("$.value").value("sk_live_0123456789abcdef"));
+                .andExpect(jsonPath("$.value").value("fake-stripe-key-0123456789"));
         assertThat(repository.findById(id).orElseThrow().getLastRevealedAt()).isNotNull();
 
         // edit without touching the value
@@ -89,7 +89,7 @@ class ApiKeyLifecycleIntegrationTest {
                 .andExpect(status().is3xxRedirection());
 
         mvc.perform(get("/keys/{id}/value", id))
-                .andExpect(jsonPath("$.value").value("sk_live_0123456789abcdef"));
+                .andExpect(jsonPath("$.value").value("fake-stripe-key-0123456789"));
         mvc.perform(get("/keys/{id}", id))
                 .andExpect(content().string(containsString("Prod secret (rotated)")));
 

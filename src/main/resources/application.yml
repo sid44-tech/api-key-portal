@@ -1,10 +1,6 @@
 spring:
   application:
     name: api-key-portal
-  profiles:
-    # Used when no profile is explicitly activated. Anything real should run with
-    # its own profile (e.g. "postgres") and supply secrets through the environment.
-    default: dev
   datasource:
     url: jdbc:h2:file:./data/keyportal
     username: sa
@@ -25,10 +21,12 @@ server:
     include-stacktrace: never
     include-message: never
 
+# Secrets come from environment variables or a local .env file (see .env.example).
+# The app refuses to start if they're missing.
 portal:
   security:
-    username: ${PORTAL_USERNAME:admin}
-    password-hash: ${PORTAL_PASSWORD_HASH:}
+    username: ${env.PORTAL_USERNAME:admin}
+    password-hash: ${env.PORTAL_PASSWORD_HASH:}
   encryption:
     # Base64 encoded 256-bit key. Generate one with: openssl rand -base64 32
-    key: ${PORTAL_ENCRYPTION_KEY:}
+    key: ${env.PORTAL_ENCRYPTION_KEY:}

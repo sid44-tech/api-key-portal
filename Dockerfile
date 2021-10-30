@@ -20,9 +20,8 @@ COPY --from=build /workspace/target/api-key-portal-*.jar app.jar
 RUN mkdir /app/data && chown portal:portal /app/data
 USER portal
 
-# Don't fall back to the dev profile's throwaway secrets inside a container.
-# PORTAL_ENCRYPTION_KEY and PORTAL_PASSWORD_HASH must be provided.
-ENV SPRING_PROFILES_ACTIVE=prod
+# PORTAL_ENCRYPTION_KEY and PORTAL_PASSWORD_HASH must be provided at runtime,
+# e.g. docker run --env-file .env. .env is never copied into the image.
 
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

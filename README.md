@@ -14,19 +14,23 @@ Built with Java 11, Spring Boot 2.5, Spring Security, Spring Data JPA, Flyway, T
 
 Requires JDK 11.
 
-```bash
-./mvnw spring-boot:run
-```
+1. Copy `.env.example` to `.env` and fill in the values (see [Configuration](#configuration)).
+   `.env` is git-ignored; never commit it.
+2. Start the app:
 
-Then open <http://localhost:8080> and sign in with your configured username and password.
+   ```bash
+   ./mvnw spring-boot:run
+   ```
 
-With no profile active the app uses the `dev` profile (`application-dev.yml`). That profile has a
-**throwaway** encryption key and password and stores data in an H2 file database under `./data`.
-Don't put real keys in a dev instance.
+3. Open <http://localhost:8080> and sign in with the username and password from your `.env`.
+
+By default data is stored in an H2 file database under `./data`.
 
 ## Configuration
 
-Outside the `dev` profile the following must be set, otherwise the app refuses to start:
+Secrets are read from environment variables, or from a `.env` file in the working directory
+(loaded with [spring-dotenv](https://github.com/paulschwarz/spring-dotenv)). Real environment
+variables take precedence over `.env`. The app refuses to start if the required ones are missing:
 
 | Environment variable    | Description                                                         |
 |-------------------------|---------------------------------------------------------------------|
@@ -53,14 +57,14 @@ The `postgres` profile switches to PostgreSQL:
 | `PORTAL_DB_USERNAME` | `keyportal`                                 |
 | `PORTAL_DB_PASSWORD` | none, required                              |
 
-A local database is available through Docker Compose:
+A local database is available through Docker Compose, which reads its credentials from the same `.env`:
 
 ```bash
 docker-compose up -d
 ```
 
 ```bash
-PORTAL_ENCRYPTION_KEY=... PORTAL_PASSWORD_HASH=... ./mvnw spring-boot:run -Dspring-boot.run.profiles=postgres
+./mvnw spring-boot:run -Dspring-boot.run.profiles=postgres
 ```
 
 Flyway manages the schema (`src/main/resources/db/migration`).
@@ -72,21 +76,20 @@ docker build -t api-key-portal .
 ```
 
 ```bash
-docker run -p 8080:8080 \
-  -e PORTAL_ENCRYPTION_KEY=... \
-  -e PORTAL_PASSWORD_HASH=... \
-  -v keyportal-data:/app/data \
-  api-key-portal
+docker run -p 8080:8080 --env-file .env -v keyportal-data:/app/data api-key-portal
 ```
 
-The image runs with the `prod` profile, so it never falls back to the dev secrets. Add
-`-e SPRING_PROFILES_ACTIVE=prod,postgres` and the `PORTAL_DB_*` variables to use Postgres.
+`.env` is excluded from the build context, so secrets are never baked into the image. Add
+`-e SPRING_PROFILES_ACTIVE=postgres` to use Postgres.
 
 ## Tests
 
 ```bash
 ./mvnw verify
 ```
+
+Tests use an in-memory database and test-only credentials from `src/test/resources/application.properties`,
+so they don't need a `.env`.
 
 The coverage report is written to `target/site/jacoco/index.html`.
 
