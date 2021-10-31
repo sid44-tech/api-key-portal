@@ -102,3 +102,7 @@ The coverage report is written to `target/site/jacoco/index.html`.
   `Referrer-Policy: same-origin`.
 - Notes are **not** encrypted. Don't store secrets in them.
 - Run it behind HTTPS (e.g. a reverse proxy) if it's reachable from anywhere other than localhost.
+
+## License
+
+[MIT](LICENSE) © 2021 Sid Bhat
