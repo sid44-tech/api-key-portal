@@ -103,6 +103,20 @@ The coverage report is written to `target/site/jacoco/index.html`.
 - Notes are **not** encrypted. Don't store secrets in them.
 - Run it behind HTTPS (e.g. a reverse proxy) if it's reachable from anywhere other than localhost.
 
+## To do
+
+- Upgrade to the latest Spring Boot version
+- Upgrade Java to the latest LTS version
+- Upgrade the project to use a local SQLite DB instead of H2
+- Update the Docker image to a more recent base image
+- Add 2-factor auth to login
+- Add better logging and error handling to the app
+- Build a deployment pipeline in GitHub
+- Add alerts for keys about to expire
+- Add ability to generate new keys directly from the portal
+- Add a dark mode (auto) feature
+- Update the UI to be more responsive on mobile
+
 ## License
 
 [MIT](LICENSE) © 2021 Sid Bhat
