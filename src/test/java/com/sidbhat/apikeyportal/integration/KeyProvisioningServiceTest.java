@@ -1,0 +1,197 @@
+package com.sidbhat.apikeyportal.integration;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.time.Instant;
+import java.time.LocalDate;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.web.client.RestClientResponseException;
+
+import com.sidbhat.apikeyportal.integration.azure.AzureGraphClient;
+import com.sidbhat.apikeyportal.integration.azure.AzureGraphClient.CreatedApplication;
+import com.sidbhat.apikeyportal.integration.azure.AzureGraphClient.CreatedSecret;
+import com.sidbhat.apikeyportal.key.ApiKey;
+import com.sidbhat.apikeyportal.key.ApiKeyDetails;
+import com.sidbhat.apikeyportal.key.ApiKeyService;
+
+@ExtendWith(MockitoExtension.class)
+class KeyProvisioningServiceTest {
+
+    @Mock
+    private ServiceIntegrationService integrations;
+
+    @Mock
+    private AzureGraphClient graphClient;
+
+    @Mock
+    private ApiKeyService apiKeyService;
+
+    private KeyProvisioningService service;
+
+    private final ServiceIntegration integration = new ServiceIntegration(ServiceProvider.AZURE_AD, "Azure AD",
+            "tenant-1", "portal-client", "portal-secret");
+
+    @BeforeEach
+    void setUp() {
+        // zero-length backoffs so retry paths run instantly in tests
+        service = new KeyProvisioningService(integrations, graphClient, apiKeyService, new long[] {0, 0});
+    }
+
+    /** The bogus 403 Graph returns when a replica hasn't seen the new app registration yet. */
+    private static ProvisioningException replicationLag() {
+        return new ProvisioningException(
+                "Could not create the service principal (HTTP 403): the backing application ... must in the local tenant",
+                new RestClientResponseException("403", HttpStatusCode.valueOf(403), "Forbidden", null, null, null));
+    }
+
+    @Test
+    void provisionsClientAndStoresSecretAsKey() {
+        when(integrations.getById(7L)).thenReturn(integration);
+        when(graphClient.acquireToken("tenant-1", "portal-client", "portal-secret")).thenReturn("tok");
+        when(graphClient.createApplication("tok", "Reporting service"))
+                .thenReturn(new CreatedApplication("obj-1", "new-client-id"));
+        when(graphClient.addPassword(eq("tok"), eq("obj-1"), eq("Reporting service"), any(Instant.class)))
+                .thenReturn(new CreatedSecret("generated-secret", "2027-04-27T12:00:00Z"));
+        when(apiKeyService.create(any())).thenAnswer(inv -> new ApiKey("Reporting service", "Azure AD",
+                "generated-secret", LocalDate.now(), LocalDate.of(2027, 4, 27)));
+
+        service.provision(7L, "  Reporting service ", SecretValidity.DAYS_180, "for the dashboards");
+
+        verify(graphClient).createServicePrincipal("tok", "new-client-id");
+        verify(integrations).markVerified(integration);
+
+        ArgumentCaptor<ApiKeyDetails> details = ArgumentCaptor.forClass(ApiKeyDetails.class);
+        verify(apiKeyService).create(details.capture());
+        assertThat(details.getValue().getName()).isEqualTo("Reporting service");
+        assertThat(details.getValue().getServiceName()).isEqualTo("Azure AD");
+        assertThat(details.getValue().getKeyValue()).isEqualTo("generated-secret");
+        assertThat(details.getValue().getCreatedOn()).isEqualTo(LocalDate.now());
+        assertThat(details.getValue().getExpiresOn()).isEqualTo(LocalDate.of(2027, 4, 27));
+        assertThat(details.getValue().getNotes())
+                .contains("for the dashboards")
+                .contains("Client ID: new-client-id")
+                .contains("Tenant ID: tenant-1")
+                .contains("object ID: obj-1");
+    }
+
+    @Test
+    void fallsBackToRequestedExpiryWhenResponseOmitsIt() {
+        when(integrations.getById(7L)).thenReturn(integration);
+        when(graphClient.acquireToken(anyString(), anyString(), anyString())).thenReturn("tok");
+        when(graphClient.createApplication(anyString(), anyString()))
+                .thenReturn(new CreatedApplication("obj-1", "new-client-id"));
+        when(graphClient.addPassword(anyString(), anyString(), anyString(), any(Instant.class)))
+                .thenReturn(new CreatedSecret("generated-secret", null));
+        when(apiKeyService.create(any())).thenAnswer(inv -> new ApiKey("n", "s", "v", LocalDate.now(), null));
+
+        service.provision(7L, "Reporting service", SecretValidity.DAYS_90, null);
+
+        ArgumentCaptor<ApiKeyDetails> details = ArgumentCaptor.forClass(ApiKeyDetails.class);
+        verify(apiKeyService).create(details.capture());
+        assertThat(details.getValue().getExpiresOn())
+                .isBetween(LocalDate.now().plusDays(89), LocalDate.now().plusDays(91));
+    }
+
+    @Test
+    void retriesServicePrincipalCreationAfterReplicationLag() {
+        when(integrations.getById(7L)).thenReturn(integration);
+        when(graphClient.acquireToken(anyString(), anyString(), anyString())).thenReturn("tok");
+        when(graphClient.createApplication(anyString(), anyString()))
+                .thenReturn(new CreatedApplication("obj-1", "new-client-id"));
+        doThrow(replicationLag()).doThrow(replicationLag()).doNothing()
+                .when(graphClient).createServicePrincipal("tok", "new-client-id");
+        when(graphClient.addPassword(anyString(), anyString(), anyString(), any(Instant.class)))
+                .thenReturn(new CreatedSecret("generated-secret", "2027-04-27T12:00:00Z"));
+        when(apiKeyService.create(any())).thenAnswer(inv -> new ApiKey("n", "s", "v", LocalDate.now(), null));
+
+        service.provision(7L, "Reporting service", SecretValidity.DAYS_90, null);
+
+        verify(graphClient, times(3)).createServicePrincipal("tok", "new-client-id");
+        verify(apiKeyService).create(any());
+        verify(graphClient, never()).deleteApplication(anyString(), anyString());
+    }
+
+    @Test
+    void cleansUpAppRegistrationWhenRetriesAreExhausted() {
+        when(integrations.getById(7L)).thenReturn(integration);
+        when(graphClient.acquireToken(anyString(), anyString(), anyString())).thenReturn("tok");
+        when(graphClient.createApplication(anyString(), anyString()))
+                .thenReturn(new CreatedApplication("obj-1", "new-client-id"));
+        doThrow(replicationLag()).when(graphClient).createServicePrincipal("tok", "new-client-id");
+
+        assertThatThrownBy(() -> service.provision(7L, "Reporting service", SecretValidity.DAYS_90, null))
+                .isInstanceOf(ProvisioningException.class)
+                .hasMessageContaining("service principal")
+                .hasMessageContaining("removed from Azure");
+
+        // two configured retries = three attempts in total
+        verify(graphClient, times(3)).createServicePrincipal("tok", "new-client-id");
+        verify(graphClient).deleteApplication("tok", "obj-1");
+        verify(apiKeyService, never()).create(any());
+    }
+
+    @Test
+    void doesNotRetryNonReplicationErrorsButStillCleansUp() {
+        when(integrations.getById(7L)).thenReturn(integration);
+        when(graphClient.acquireToken(anyString(), anyString(), anyString())).thenReturn("tok");
+        when(graphClient.createApplication(anyString(), anyString()))
+                .thenReturn(new CreatedApplication("obj-1", "new-client-id"));
+        doThrow(new ProvisioningException("Could not create the service principal (HTTP 400): bad request",
+                new RestClientResponseException("400", HttpStatusCode.valueOf(400), "Bad Request", null, null, null)))
+                .when(graphClient).createServicePrincipal("tok", "new-client-id");
+
+        assertThatThrownBy(() -> service.provision(7L, "Reporting service", SecretValidity.DAYS_90, null))
+                .isInstanceOf(ProvisioningException.class);
+
+        verify(graphClient, times(1)).createServicePrincipal("tok", "new-client-id");
+        verify(graphClient).deleteApplication("tok", "obj-1");
+        verify(apiKeyService, never()).create(any());
+    }
+
+    @Test
+    void reportsLeftoverWhenCleanupAlsoFails() {
+        when(integrations.getById(7L)).thenReturn(integration);
+        when(graphClient.acquireToken(anyString(), anyString(), anyString())).thenReturn("tok");
+        when(graphClient.createApplication(anyString(), anyString()))
+                .thenReturn(new CreatedApplication("obj-1", "new-client-id"));
+        doThrow(replicationLag()).when(graphClient).createServicePrincipal("tok", "new-client-id");
+        doThrow(new ProvisioningException("Could not delete the app registration (HTTP 403)"))
+                .when(graphClient).deleteApplication("tok", "obj-1");
+
+        assertThatThrownBy(() -> service.provision(7L, "Reporting service", SecretValidity.DAYS_90, null))
+                .isInstanceOf(ProvisioningException.class)
+                .hasMessageContaining("left in Azure")
+                .hasMessageContaining("new-client-id");
+
+        verify(apiKeyService, never()).create(any());
+    }
+
+    @Test
+    void doesNotStoreAnythingWhenProviderCallFails() {
+        when(integrations.getById(7L)).thenReturn(integration);
+        when(graphClient.acquireToken(anyString(), anyString(), anyString())).thenReturn("tok");
+        when(graphClient.createApplication(anyString(), anyString()))
+                .thenThrow(new ProvisioningException("Could not create the app registration (HTTP 403)"));
+
+        assertThatThrownBy(() -> service.provision(7L, "Reporting service", SecretValidity.DAYS_90, null))
+                .isInstanceOf(ProvisioningException.class);
+
+        verify(apiKeyService, never()).create(any());
+    }
+}

@@ -31,6 +31,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.sidbhat.apikeyportal.integration.ServiceIntegrationService;
 import com.sidbhat.apikeyportal.key.ApiKey;
 import com.sidbhat.apikeyportal.key.ApiKeyDetails;
 import com.sidbhat.apikeyportal.key.ApiKeyNotFoundException;
@@ -48,6 +49,9 @@ class ApiKeyControllerTest {
 
     @MockitoBean
     private ApiKeyService apiKeyService;
+
+    @MockitoBean
+    private ServiceIntegrationService integrationService;
 
     @Test
     void redirectsAnonymousUsersToLogin() throws Exception {

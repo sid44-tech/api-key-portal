@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Create key in provider</title>
+</head>
+<body>
+<main layout:fragment="content">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <h1 class="h3 mb-2">Create a key in <span th:text="${integration.name}">Azure AD</span></h1>
+            <p class="text-muted mb-4">
+                The portal will register a new client in tenant
+                <code th:text="${integration.tenantId}">tenant</code>, generate a client secret for it, and store
+                the secret here encrypted. You never have to touch the Azure portal or copy anything.
+            </p>
+
+            <form th:action="@{/keys/provision}" th:object="${form}" method="post" novalidate>
+                <input type="hidden" th:field="*{integrationId}">
+
+                <div class="alert alert-danger d-flex align-items-start" th:if="${#fields.hasGlobalErrors()}">
+                    <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>
+                    <div>
+                        <strong>Could not create the key.</strong>
+                        <div th:each="err : ${#fields.globalErrors()}" th:text="${err}">Error</div>
+                        <div class="small text-muted mt-1">Nothing was stored locally.</div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="name">Name</label>
+                    <input type="text" class="form-control" th:field="*{name}" th:errorclass="is-invalid"
+                           placeholder="e.g. Reporting service" maxlength="100" required>
+                    <small class="form-text">Used as the app registration's display name in Azure and as the
+                        key name here.</small>
+                    <div class="invalid-feedback" th:errors="*{name}"></div>
+                </div>
+
+                <div class="mb-3 col-md-6">
+                    <label class="form-label" for="validity">Secret valid for</label>
+                    <select class="form-select" th:field="*{validity}" th:errorclass="is-invalid">
+                        <option th:each="v : ${validities}" th:value="${v}" th:text="${v.label}">180 days</option>
+                    </select>
+                    <small class="form-text">The expiry is set in Azure and tracked here, so you'll see it
+                        coming up for renewal.</small>
+                    <div class="invalid-feedback" th:errors="*{validity}"></div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label" for="notes">Notes</label>
+                    <textarea class="form-control" th:field="*{notes}" rows="3" maxlength="700"
+                              th:errorclass="is-invalid"
+                              placeholder="What this client is for..."></textarea>
+                    <small class="form-text">The client ID and tenant ID are appended automatically.
+                        Notes are not encrypted.</small>
+                    <div class="invalid-feedback" th:errors="*{notes}"></div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-stars me-1" aria-hidden="true"></i>
+                    Create in <span th:text="${integration.name}">Azure AD</span>
+                </button>
+                <a th:href="@{/keys/new}" class="btn btn-link">Cancel</a>
+                <p class="text-muted small mt-2 mb-0">This usually takes a few seconds; Azure occasionally
+                    needs up to half a minute while the new registration propagates.</p>
+            </form>
+        </div>
+    </div>
+</main>
+</body>
+</html>

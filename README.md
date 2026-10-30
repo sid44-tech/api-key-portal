@@ -5,6 +5,8 @@ A small self-hosted web portal for keeping track of the API and access keys I us
 - See every key in one place, with the service it belongs to, when it was created and when it expires
 - Reveal or copy a key's value on demand. Values are never rendered into pages.
 - Add, edit and delete keys
+- Create keys directly in a connected service provider (Microsoft Azure AD) and capture the
+  generated secret automatically
 - Search, filter by service, sort by expiry, and see at a glance what has expired or is about to
 - Key values are encrypted at rest with AES-256-GCM
 
@@ -72,6 +74,28 @@ docker-compose up -d
 
 Flyway manages the schema (`src/main/resources/db/migration`).
 
+## Service integrations
+
+Instead of pasting keys in by hand, the portal can create them for you in a connected provider.
+Currently supported: **Microsoft Azure AD (Entra ID)** — creating a key registers a new
+application in your tenant, creates its service principal, generates a client secret via
+Microsoft Graph, and stores the secret encrypted locally. Azure shows a generated secret exactly
+once; the portal captures it in that moment, so it's never displayed or copied manually.
+
+Setup is one-time per tenant under **Integrations → Connect Microsoft Azure AD**. The page walks
+through it step by step: register an app for the portal, grant it the Microsoft Graph application
+permission `Application.ReadWrite.OwnedBy` (least privilege — it can only manage app registrations
+it created itself) with admin consent, create a client secret, and paste the tenant ID, client ID
+and secret into the guided form. The portal verifies the credentials against Azure before saving
+them, encrypted, in the local database.
+
+Once connected, the **Add key** screen offers "create it in a connected service": pick the
+integration, name the client, choose how long the secret should live, done. The secret's Azure-side
+expiry is tracked like any other key's.
+
+> The integration credential can create new credentials in your tenant, which makes it the most
+> sensitive value the portal stores. It is encrypted at rest and never rendered back into a page.
+
 ## Docker
 
 ```bash
@@ -115,7 +139,7 @@ The coverage report is written to `target/site/jacoco/index.html`.
 - Add better logging and error handling to the app
 - Build a deployment pipeline in GitHub
 - Add alerts for keys about to expire
-- Add ability to generate new keys directly from the portal
+- Add more service integrations (GitHub, AWS, Stripe) for generating keys from the portal
 - Add a dark mode (auto) feature
 - Update the UI to be more responsive on mobile
 

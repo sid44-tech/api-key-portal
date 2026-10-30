@@ -9,3 +9,21 @@ body {
 .notes {
     white-space: pre-line;
 }
+
+/* Numbered circles on the integration setup walk-through */
+.step-number {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background-color: var(--bs-primary);
+    color: #fff;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.integration-blurb {
+    max-width: 36rem;
+}

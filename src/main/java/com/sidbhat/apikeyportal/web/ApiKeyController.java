@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import com.sidbhat.apikeyportal.integration.ServiceIntegrationService;
 import com.sidbhat.apikeyportal.key.ApiKey;
 import com.sidbhat.apikeyportal.key.ApiKeyService;
 import com.sidbhat.apikeyportal.key.ApiKeySort;
@@ -23,9 +24,11 @@ import com.sidbhat.apikeyportal.key.ApiKeySort;
 public class ApiKeyController {
 
     private final ApiKeyService apiKeyService;
+    private final ServiceIntegrationService integrationService;
 
-    public ApiKeyController(ApiKeyService apiKeyService) {
+    public ApiKeyController(ApiKeyService apiKeyService, ServiceIntegrationService integrationService) {
         this.apiKeyService = apiKeyService;
+        this.integrationService = integrationService;
     }
 
     @GetMapping
@@ -54,6 +57,8 @@ public class ApiKeyController {
     @GetMapping("/new")
     public String newKey(Model model) {
         model.addAttribute("form", new ApiKeyForm());
+        // offers "create it in the provider instead" when integrations are set up
+        model.addAttribute("integrations", integrationService.findAll());
         return "keys/form";
     }
 

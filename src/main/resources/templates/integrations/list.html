@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Service integrations</title>
+</head>
+<body>
+<main layout:fragment="content">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h1 class="h3 mb-0">Service integrations</h1>
+    </div>
+    <p class="text-muted mb-4">
+        Connect a service provider once, and the portal can create new credentials in it for you:
+        no more copy-pasting keys out of a cloud console.
+    </p>
+
+    <div th:if="${#lists.isEmpty(integrations)}" class="card text-center">
+        <div class="card-body py-5">
+            <p class="display-6 mb-2"><i class="bi bi-plug"></i></p>
+            <h2 class="h5">No integrations yet</h2>
+            <p class="text-muted mx-auto integration-blurb">
+                Set one up and the <strong>Add key</strong> screen gains a "create it in the provider"
+                option that registers the client and captures the generated secret automatically.
+                A guided walk-through covers the one-time setup.
+            </p>
+            <a th:href="@{/integrations/new(provider='AZURE_AD')}" class="btn btn-primary">
+                <i class="bi bi-microsoft me-1"></i> Connect Microsoft Azure AD
+            </a>
+        </div>
+    </div>
+
+    <th:block th:unless="${#lists.isEmpty(integrations)}">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Provider</th>
+                    <th scope="col">Tenant</th>
+                    <th scope="col">Client ID</th>
+                    <th scope="col">Last verified</th>
+                    <th scope="col" class="text-end">Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="integration : ${integrations}">
+                    <td th:text="${integration.name}">Azure AD</td>
+                    <td><i th:class="'bi me-1 ' + ${integration.provider.icon}" aria-hidden="true"></i>
+                        <span th:text="${integration.provider.label}">Microsoft Azure AD</span></td>
+                    <td><code th:text="${integration.tenantId}">tenant</code></td>
+                    <td><code th:text="${integration.clientId}">client</code></td>
+                    <td th:text="${integration.lastVerifiedAt != null
+                            ? #temporals.format(integration.lastVerifiedAt.atZone(T(java.time.ZoneId).systemDefault()), 'MMM d, yyyy HH:mm')
+                            : 'Never'}">Never</td>
+                    <td class="text-end">
+                        <form th:action="@{/integrations/{id}/test(id=${integration.id})}" method="post" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary" title="Test connection">
+                                <i class="bi bi-arrow-repeat" aria-hidden="true"></i> Test
+                            </button>
+                        </form>
+                        <button type="button" class="btn btn-sm btn-outline-danger" title="Remove"
+                                data-bs-toggle="modal" data-bs-target="#deleteModal"
+                                th:attr="data-key-name=${integration.name},data-delete-url=@{/integrations/{id}/delete(id=${integration.id})}">
+                            <i class="bi bi-trash" aria-hidden="true"></i><span class="visually-hidden">Remove</span>
+                        </button>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <form th:action="@{/integrations/new}" method="get" class="row g-2 align-items-end mt-2">
+            <div class="col-auto">
+                <label class="form-label" for="provider">Add another integration</label>
+                <select class="form-select" id="provider" name="provider">
+                    <option th:each="p : ${providers}" th:value="${p.name()}" th:text="${p.label}">Azure AD</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-outline-primary">Continue</button>
+            </div>
+        </form>
+
+        <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form method="post" id="deleteForm">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="deleteModalLabel">Remove integration?</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="mb-0">The stored credentials for <strong id="deleteKeyName"></strong> will be
+                                permanently removed from this portal. Nothing is changed in the provider, and keys
+                                already created through it stay.</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-danger">Remove</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </th:block>
+</main>
+
+<th:block layout:fragment="scripts">
+    <script th:src="@{/js/keys.js}"></script>
+</th:block>
+</body>
+</html>
