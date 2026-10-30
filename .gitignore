@@ -37,6 +37,7 @@ build/
 
 ### Local data ###
 data/
+keyportal.db*
 
 ### Local secrets ###
 .env

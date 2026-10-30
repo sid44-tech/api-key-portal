@@ -24,7 +24,9 @@ Requires JDK 25.
 
 3. Open <http://localhost:8080> and sign in with the username and password from your `.env`.
 
-By default data is stored in an H2 file database under `./data`.
+By default data is stored in a SQLite database at `./keyportal.db` (created automatically on
+first start, reused on subsequent starts). Set `PORTAL_DB_PATH` to keep it somewhere else,
+e.g. `PORTAL_DB_PATH=/var/lib/keyportal/keyportal.db`.
 
 ## Configuration
 
@@ -37,6 +39,7 @@ variables take precedence over `.env`. The app refuses to start if the required 
 | `PORTAL_ENCRYPTION_KEY` | Base64 encoded 256-bit AES key. Generate with `openssl rand -base64 32` |
 | `PORTAL_PASSWORD_HASH`  | BCrypt hash of the login password                                   |
 | `PORTAL_USERNAME`       | Login username (default `admin`)                                    |
+| `PORTAL_DB_PATH`        | SQLite database file location (default `./keyportal.db`)            |
 
 One way to generate a BCrypt hash:
 
@@ -79,6 +82,9 @@ docker build -t api-key-portal .
 docker run -p 8080:8080 --env-file .env -v keyportal-data:/app/data api-key-portal
 ```
 
+The image sets `PORTAL_DB_PATH=/app/data/keyportal.db`, so the SQLite database lives on the
+`keyportal-data` volume and survives container rebuilds.
+
 `.env` is excluded from the build context, so secrets are never baked into the image. Add
 `-e SPRING_PROFILES_ACTIVE=postgres` to use Postgres.
 
@@ -88,8 +94,8 @@ docker run -p 8080:8080 --env-file .env -v keyportal-data:/app/data api-key-port
 ./mvnw verify
 ```
 
-Tests use an in-memory database and test-only credentials from `src/test/resources/application.properties`,
-so they don't need a `.env`.
+Tests use a throwaway SQLite database under `target/` and test-only credentials from
+`src/test/resources/application.properties`, so they don't need a `.env`.
 
 The coverage report is written to `target/site/jacoco/index.html`.
 
@@ -105,7 +111,6 @@ The coverage report is written to `target/site/jacoco/index.html`.
 
 ## To do
 
-- Upgrade the project to use a local SQLite DB instead of H2
 - Add 2-factor auth to login
 - Add better logging and error handling to the app
 - Build a deployment pipeline in GitHub

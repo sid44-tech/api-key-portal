@@ -53,7 +53,9 @@ class ApiKeyRepositoryTest {
 
         ApiKey reloaded = repository.findById(saved.getId()).orElseThrow();
         assertThat(reloaded.getLastRevealedAt()).isEqualTo(revealedAt);
-        assertThat(reloaded.getUpdatedAt()).isEqualTo(updatedAt);
+        // SQLite stores timestamps with millisecond precision, so compare at that granularity
+        assertThat(reloaded.getUpdatedAt().truncatedTo(java.time.temporal.ChronoUnit.MILLIS))
+                .isEqualTo(updatedAt.truncatedTo(java.time.temporal.ChronoUnit.MILLIS));
     }
 
     @Test

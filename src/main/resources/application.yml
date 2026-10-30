@@ -2,13 +2,23 @@ spring:
   application:
     name: api-key-portal
   datasource:
-    url: jdbc:h2:file:./data/keyportal
-    username: sa
-    password:
+    # SQLite file in the project folder; set PORTAL_DB_PATH to store it elsewhere.
+    # The file is created on first start and reused afterwards. WAL + busy_timeout
+    # let the connection pool handle concurrent requests against the single file.
+    url: jdbc:sqlite:${PORTAL_DB_PATH:keyportal.db}?journal_mode=WAL&busy_timeout=5000
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: validate
+      # Flyway owns the schema. Hibernate's validator can't reconcile SQLite's
+      # INTEGER rowid keys with bigint, so validation stays off for SQLite
+      # (the postgres profile turns it back on).
+      ddl-auto: none
+    properties:
+      hibernate:
+        dialect: org.hibernate.community.dialect.SQLiteDialect
+  flyway:
+    # db/migration/sqlite or db/migration/postgresql, picked by the driver in use
+    locations: classpath:db/migration/{vendor}
 
 server:
   port: 8080

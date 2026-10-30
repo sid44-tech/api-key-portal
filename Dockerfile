@@ -23,5 +23,8 @@ USER portal
 # PORTAL_ENCRYPTION_KEY and PORTAL_PASSWORD_HASH must be provided at runtime,
 # e.g. docker run --env-file .env. .env is never copied into the image.
 
+# Keep the SQLite database on the /app/data volume rather than the container layer
+ENV PORTAL_DB_PATH=/app/data/keyportal.db
+
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
