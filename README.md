@@ -5,8 +5,10 @@ A small self-hosted web portal for keeping track of the API and access keys I us
 - See every key in one place, with the service it belongs to, when it was created and when it expires
 - Reveal or copy a key's value on demand. Values are never rendered into pages.
 - Add, edit and delete keys
-- Create keys directly in a connected service provider (Microsoft Azure AD) and capture the
-  generated secret automatically
+- Create keys directly in a connected service provider (Microsoft Azure AD, Google Cloud) and
+  capture the generated secret automatically
+- Guided walk-throughs for providers whose keys must be created by hand (GitHub, Anthropic),
+  with the pasted key verified live against the provider before it's stored
 - Search, filter by service, sort by expiry, and see at a glance what has expired or is about to
 - Key values are encrypted at rest with AES-256-GCM
 
@@ -77,24 +79,38 @@ Flyway manages the schema (`src/main/resources/db/migration`).
 ## Service integrations
 
 Instead of pasting keys in by hand, the portal can create them for you in a connected provider.
-Currently supported: **Microsoft Azure AD (Entra ID)** — creating a key registers a new
-application in your tenant, creates its service principal, generates a client secret via
-Microsoft Graph, and stores the secret encrypted locally. Azure shows a generated secret exactly
-once; the portal captures it in that moment, so it's never displayed or copied manually.
 
-Setup is one-time per tenant under **Integrations → Connect Microsoft Azure AD**. The page walks
-through it step by step: register an app for the portal, grant it the Microsoft Graph application
-permission `Application.ReadWrite.OwnedBy` (least privilege — it can only manage app registrations
-it created itself) with admin consent, create a client secret, and paste the tenant ID, client ID
-and secret into the guided form. The portal verifies the credentials against Azure before saving
-them, encrypted, in the local database.
+**Microsoft Azure AD (Entra ID)** — creating a key registers a new application in your tenant,
+creates its service principal, generates a client secret via Microsoft Graph, and stores the
+secret encrypted locally. Azure shows a generated secret exactly once; the portal captures it in
+that moment, so it's never displayed or copied manually. Setup is one-time per tenant under
+**Integrations → Connect Microsoft Azure AD**: register an app for the portal, grant it the
+Microsoft Graph application permission `Application.ReadWrite.OwnedBy` (least privilege — it can
+only manage app registrations it created itself) with admin consent, create a client secret, and
+paste the tenant ID, client ID and secret into the guided form.
 
-Once connected, the **Add key** screen offers "create it in a connected service": pick the
-integration, name the client, choose how long the secret should live, done. The secret's Azure-side
-expiry is tracked like any other key's.
+**Google Cloud** — creating a key makes a new service account in your project and generates a
+JSON key for it via the IAM API, stored encrypted locally. Setup is one-time per project under
+**Integrations → Connect Google Cloud**: enable the IAM API, create a service account for the
+portal with the *Service Account Admin* and *Service Account Key Admin* roles, and paste its JSON
+key into the guided form.
 
-> The integration credential can create new credentials in your tenant, which makes it the most
-> sensitive value the portal stores. It is encrypted at rest and never rendered back into a page.
+In both cases the portal verifies the credentials against the provider before saving them,
+encrypted, in the local database. Once connected, the **Add key** screen offers "create it in a
+connected service": pick the integration, name the client, done. Provider-side expiry (where the
+provider has one) is tracked like any other key's.
+
+### Guided walk-throughs (GitHub, Anthropic)
+
+Some providers have no API for creating keys — GitHub personal access tokens and Anthropic API
+keys can only be created by hand in their consoles. For those, the **Add key** screen offers
+guided walk-throughs instead: step-by-step instructions with deep links, then the portal verifies
+the pasted key live against the provider before storing it (and, for GitHub, reads the token's
+expiry and scopes from the verification response automatically). A saved key is therefore known
+to have worked at least once.
+
+> An integration credential can create new credentials in your tenant/project, which makes it the
+> most sensitive value the portal stores. It is encrypted at rest and never rendered back into a page.
 
 ## Docker
 
@@ -139,7 +155,7 @@ The coverage report is written to `target/site/jacoco/index.html`.
 - Add better logging and error handling to the app
 - Build a deployment pipeline in GitHub
 - Add alerts for keys about to expire
-- Add more service integrations (GitHub, AWS, Stripe) for generating keys from the portal
+- Add more service integrations (AWS, Stripe) for generating keys from the portal
 - Add a dark mode (auto) feature
 - Update the UI to be more responsive on mobile
 

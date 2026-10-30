@@ -26,6 +26,8 @@ import org.springframework.web.client.RestClientResponseException;
 import com.sidbhat.apikeyportal.integration.azure.AzureGraphClient;
 import com.sidbhat.apikeyportal.integration.azure.AzureGraphClient.CreatedApplication;
 import com.sidbhat.apikeyportal.integration.azure.AzureGraphClient.CreatedSecret;
+import com.sidbhat.apikeyportal.integration.google.GoogleIamClient;
+import com.sidbhat.apikeyportal.integration.google.GoogleIamClient.CreatedServiceAccount;
 import com.sidbhat.apikeyportal.key.ApiKey;
 import com.sidbhat.apikeyportal.key.ApiKeyDetails;
 import com.sidbhat.apikeyportal.key.ApiKeyService;
@@ -40,6 +42,9 @@ class KeyProvisioningServiceTest {
     private AzureGraphClient graphClient;
 
     @Mock
+    private GoogleIamClient googleIamClient;
+
+    @Mock
     private ApiKeyService apiKeyService;
 
     private KeyProvisioningService service;
@@ -50,7 +55,8 @@ class KeyProvisioningServiceTest {
     @BeforeEach
     void setUp() {
         // zero-length backoffs so retry paths run instantly in tests
-        service = new KeyProvisioningService(integrations, graphClient, apiKeyService, new long[] {0, 0});
+        service = new KeyProvisioningService(integrations, graphClient, googleIamClient, apiKeyService,
+                new long[] {0, 0});
     }
 
     /** The bogus 403 Graph returns when a replica hasn't seen the new app registration yet. */
@@ -180,6 +186,70 @@ class KeyProvisioningServiceTest {
                 .hasMessageContaining("new-client-id");
 
         verify(apiKeyService, never()).create(any());
+    }
+
+    private final ServiceIntegration googleIntegration = new ServiceIntegration(ServiceProvider.GOOGLE_CLOUD,
+            "Google Cloud", "my-project", "portal@my-project.iam.gserviceaccount.com", "-----BEGIN PRIVATE KEY-----");
+
+    @Test
+    void provisionsGoogleServiceAccountAndStoresKeyJson() {
+        when(integrations.getById(9L)).thenReturn(googleIntegration);
+        when(googleIamClient.acquireToken("portal@my-project.iam.gserviceaccount.com", "-----BEGIN PRIVATE KEY-----"))
+                .thenReturn("gtok");
+        when(googleIamClient.createServiceAccount(eq("gtok"), eq("my-project"), anyString(), eq("Reporting service")))
+                .thenReturn(new CreatedServiceAccount("reporting@my-project.iam.gserviceaccount.com", "123"));
+        when(googleIamClient.createServiceAccountKey("gtok", "my-project",
+                "reporting@my-project.iam.gserviceaccount.com")).thenReturn("{\"type\":\"service_account\"}");
+        when(apiKeyService.create(any())).thenAnswer(inv -> new ApiKey("Reporting service", "Google Cloud",
+                "{\"type\":\"service_account\"}", LocalDate.now(), null));
+
+        service.provision(9L, " Reporting service ", SecretValidity.DAYS_180, "for the dashboards");
+
+        verify(integrations).markVerified(googleIntegration);
+        ArgumentCaptor<ApiKeyDetails> details = ArgumentCaptor.forClass(ApiKeyDetails.class);
+        verify(apiKeyService).create(details.capture());
+        assertThat(details.getValue().getName()).isEqualTo("Reporting service");
+        assertThat(details.getValue().getServiceName()).isEqualTo("Google Cloud");
+        assertThat(details.getValue().getKeyValue()).isEqualTo("{\"type\":\"service_account\"}");
+        assertThat(details.getValue().getExpiresOn()).isNull();
+        assertThat(details.getValue().getNotes())
+                .contains("for the dashboards")
+                .contains("reporting@my-project.iam.gserviceaccount.com")
+                .contains("Project: my-project");
+    }
+
+    @Test
+    void cleansUpGoogleServiceAccountWhenKeyCreationFails() {
+        when(integrations.getById(9L)).thenReturn(googleIntegration);
+        when(googleIamClient.acquireToken(anyString(), anyString())).thenReturn("gtok");
+        when(googleIamClient.createServiceAccount(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(new CreatedServiceAccount("reporting@my-project.iam.gserviceaccount.com", "123"));
+        when(googleIamClient.createServiceAccountKey(anyString(), anyString(), anyString()))
+                .thenThrow(new ProvisioningException("Could not create the service account key (HTTP 400)",
+                        new RestClientResponseException("400", HttpStatusCode.valueOf(400), "Bad Request",
+                                null, null, null)));
+
+        assertThatThrownBy(() -> service.provision(9L, "Reporting service", SecretValidity.DAYS_90, null))
+                .isInstanceOf(ProvisioningException.class)
+                .hasMessageContaining("removed from Google Cloud");
+
+        verify(googleIamClient).deleteServiceAccount("gtok", "my-project",
+                "reporting@my-project.iam.gserviceaccount.com");
+        verify(apiKeyService, never()).create(any());
+    }
+
+    @Test
+    void derivesValidGoogleAccountIds() {
+        assertThat(KeyProvisioningService.googleAccountId("Reporting Service!"))
+                .matches("[a-z][a-z0-9-]{5,29}")
+                .startsWith("reporting-service");
+        assertThat(KeyProvisioningService.googleAccountId("42 crunchers"))
+                .matches("[a-z][a-z0-9-]{5,29}");
+        assertThat(KeyProvisioningService.googleAccountId("x"))
+                .matches("[a-z][a-z0-9-]{5,29}");
+        assertThat(KeyProvisioningService.googleAccountId(
+                "a very long display name that exceeds the thirty character limit"))
+                .matches("[a-z][a-z0-9-]{5,29}");
     }
 
     @Test

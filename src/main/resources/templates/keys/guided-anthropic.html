@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Add an Anthropic API key</title>
+</head>
+<body>
+<main layout:fragment="content">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a th:href="@{/keys/new}">Add key</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Anthropic API key</li>
+                </ol>
+            </nav>
+
+            <h1 class="h3 mb-2"><i class="bi bi-robot me-2" aria-hidden="true"></i>Add an Anthropic API key</h1>
+            <p class="text-muted mb-4">
+                Anthropic API keys can only be created by hand in the Anthropic console - there is no API for it.
+                This walk-through covers the manual steps; afterwards the portal verifies the pasted key live
+                against the Anthropic API (a free call, no tokens billed) and stores it encrypted.
+            </p>
+
+            <form th:action="@{/keys/guided/anthropic}" th:object="${form}" method="post" novalidate>
+
+                <div class="alert alert-danger d-flex align-items-start" th:if="${#fields.hasGlobalErrors()}">
+                    <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>
+                    <div>
+                        <strong>Anthropic did not accept the key.</strong>
+                        <div th:each="err : ${#fields.globalErrors()}" th:text="${err}">Error</div>
+                        <div class="small text-muted mt-1">Nothing was stored locally.</div>
+                    </div>
+                </div>
+
+                <!-- Step 1 -->
+                <div class="card mb-3 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">1</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Create a key in the Anthropic console</h2>
+                            <ol class="mb-3">
+                                <li>Open the API keys page with the button below and sign in.</li>
+                                <li>Press <strong>Create key</strong>.</li>
+                                <li>Give it a descriptive name and, if you use workspaces, pick the right one -
+                                    keys are scoped to a workspace and its spend limits.</li>
+                                <li>Press <strong>Create</strong>.</li>
+                            </ol>
+                            <a href="https://console.anthropic.com/settings/keys"
+                               target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>
+                                Open "API keys" in the Anthropic console
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="card mb-3 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">2</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Copy the key and paste it here</h2>
+                            <p>The console shows the key (it starts with <code>sk-ant-</code>) exactly once,
+                                right after creating it. Copy it and paste it below.</p>
+                            <div class="mb-2">
+                                <label class="form-label" for="keyValue">API key</label>
+                                <input type="password" class="form-control font-monospace" th:field="*{keyValue}"
+                                       th:errorclass="is-invalid" autocomplete="off" spellcheck="false" maxlength="4096">
+                                <div class="invalid-feedback" th:errors="*{keyValue}"></div>
+                            </div>
+                            <p class="text-muted small mb-0">
+                                <i class="bi bi-lock-fill me-1" aria-hidden="true"></i>
+                                Stored encrypted (AES-256-GCM). The portal verifies it against the Anthropic API
+                                before saving, so typos surface right here.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="card mb-4 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">3</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Name it and save</h2>
+                            <div class="row">
+                                <div class="mb-3 col-md-6">
+                                    <label class="form-label" for="name">Key name</label>
+                                    <input type="text" class="form-control" th:field="*{name}"
+                                           th:errorclass="is-invalid" placeholder="e.g. Claude integration"
+                                           maxlength="100" required>
+                                    <div class="invalid-feedback" th:errors="*{name}"></div>
+                                </div>
+                                <div class="mb-3 col-md-6">
+                                    <label class="form-label" for="expiresOn">Expires on</label>
+                                    <input type="date" class="form-control" th:field="*{expiresOn}"
+                                           th:errorclass="is-invalid">
+                                    <small class="form-text">Anthropic keys don't expire on their own; set a date
+                                        if you want a rotation reminder.</small>
+                                    <div class="invalid-feedback" th:errors="*{expiresOn}"></div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="notes">Notes</label>
+                                <textarea class="form-control" th:field="*{notes}" rows="2" maxlength="700"
+                                          th:errorclass="is-invalid"
+                                          placeholder="Which workspace, where it's used..."></textarea>
+                                <small class="form-text">Notes are not encrypted.</small>
+                                <div class="invalid-feedback" th:errors="*{notes}"></div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-patch-check me-1" aria-hidden="true"></i> Verify &amp; save
+                            </button>
+                            <a th:href="@{/keys/new}" class="btn btn-link">Cancel</a>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+</body>
+</html>

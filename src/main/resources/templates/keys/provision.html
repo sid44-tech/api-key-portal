@@ -10,10 +10,15 @@
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <h1 class="h3 mb-2">Create a key in <span th:text="${integration.name}">Azure AD</span></h1>
-            <p class="text-muted mb-4">
+            <p class="text-muted mb-4" th:if="${integration.provider.name() == 'AZURE_AD'}">
                 The portal will register a new client in tenant
                 <code th:text="${integration.tenantId}">tenant</code>, generate a client secret for it, and store
                 the secret here encrypted. You never have to touch the Azure portal or copy anything.
+            </p>
+            <p class="text-muted mb-4" th:if="${integration.provider.name() == 'GOOGLE_CLOUD'}">
+                The portal will create a new service account in project
+                <code th:text="${integration.tenantId}">project</code>, generate a JSON key for it, and store
+                the key here encrypted. You never have to touch the Google Cloud console or copy anything.
             </p>
 
             <form th:action="@{/keys/provision}" th:object="${form}" method="post" novalidate>
@@ -32,12 +37,14 @@
                     <label class="form-label" for="name">Name</label>
                     <input type="text" class="form-control" th:field="*{name}" th:errorclass="is-invalid"
                            placeholder="e.g. Reporting service" maxlength="100" required>
-                    <small class="form-text">Used as the app registration's display name in Azure and as the
-                        key name here.</small>
+                    <small class="form-text" th:if="${integration.provider.name() == 'AZURE_AD'}">
+                        Used as the app registration's display name in Azure and as the key name here.</small>
+                    <small class="form-text" th:if="${integration.provider.name() == 'GOOGLE_CLOUD'}">
+                        Used as the service account's display name in Google Cloud and as the key name here.</small>
                     <div class="invalid-feedback" th:errors="*{name}"></div>
                 </div>
 
-                <div class="mb-3 col-md-6">
+                <div class="mb-3 col-md-6" th:if="${integration.provider.name() == 'AZURE_AD'}">
                     <label class="form-label" for="validity">Secret valid for</label>
                     <select class="form-select" th:field="*{validity}" th:errorclass="is-invalid">
                         <option th:each="v : ${validities}" th:value="${v}" th:text="${v.label}">180 days</option>
@@ -52,8 +59,8 @@
                     <textarea class="form-control" th:field="*{notes}" rows="3" maxlength="700"
                               th:errorclass="is-invalid"
                               placeholder="What this client is for..."></textarea>
-                    <small class="form-text">The client ID and tenant ID are appended automatically.
-                        Notes are not encrypted.</small>
+                    <small class="form-text">The identifying details (client or service account) are appended
+                        automatically. Notes are not encrypted.</small>
                     <div class="invalid-feedback" th:errors="*{notes}"></div>
                 </div>
 
@@ -62,8 +69,8 @@
                     Create in <span th:text="${integration.name}">Azure AD</span>
                 </button>
                 <a th:href="@{/keys/new}" class="btn btn-link">Cancel</a>
-                <p class="text-muted small mt-2 mb-0">This usually takes a few seconds; Azure occasionally
-                    needs up to half a minute while the new registration propagates.</p>
+                <p class="text-muted small mt-2 mb-0">This usually takes a few seconds; the provider occasionally
+                    needs up to half a minute while the new identity propagates.</p>
             </form>
         </div>
     </div>

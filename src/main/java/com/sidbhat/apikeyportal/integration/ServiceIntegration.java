@@ -45,16 +45,17 @@ public class ServiceIntegration {
     @Column(nullable = false, length = 100)
     private String name;
 
-    /** Azure AD directory (tenant) ID or domain. */
+    /** Azure AD: directory (tenant) ID or domain. Google Cloud: project ID. */
     @Column(name = "tenant_id", nullable = false, length = 100)
     private String tenantId;
 
-    /** Application (client) ID of the portal's own app registration. */
+    /** Azure AD: application (client) ID of the portal's own app registration. Google Cloud: service account email. */
     @Column(name = "client_id", nullable = false, length = 100)
     private String clientId;
 
+    /** Azure AD: client secret. Google Cloud: service account private key (PEM). Encrypted at rest. */
     @Convert(converter = EncryptedStringConverter.class)
-    @Column(name = "client_secret", nullable = false, length = 2048)
+    @Column(name = "client_secret", nullable = false, length = 8192)
     private String clientSecret;
 
     @CreatedDate

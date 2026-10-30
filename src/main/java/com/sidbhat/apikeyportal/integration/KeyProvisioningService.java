@@ -6,6 +6,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
 
 import org.slf4j.Logger;
@@ -18,6 +19,8 @@ import org.springframework.web.client.RestClientResponseException;
 import com.sidbhat.apikeyportal.integration.azure.AzureGraphClient;
 import com.sidbhat.apikeyportal.integration.azure.AzureGraphClient.CreatedApplication;
 import com.sidbhat.apikeyportal.integration.azure.AzureGraphClient.CreatedSecret;
+import com.sidbhat.apikeyportal.integration.google.GoogleIamClient;
+import com.sidbhat.apikeyportal.integration.google.GoogleIamClient.CreatedServiceAccount;
 import com.sidbhat.apikeyportal.key.ApiKey;
 import com.sidbhat.apikeyportal.key.ApiKeyDetails;
 import com.sidbhat.apikeyportal.key.ApiKeyService;
@@ -46,35 +49,44 @@ public class KeyProvisioningService {
 
     private final ServiceIntegrationService integrations;
     private final AzureGraphClient graphClient;
+    private final GoogleIamClient googleIamClient;
     private final ApiKeyService apiKeyService;
     private final long[] retryDelaysSeconds;
 
     @Autowired
     public KeyProvisioningService(ServiceIntegrationService integrations, AzureGraphClient graphClient,
-            ApiKeyService apiKeyService) {
-        this(integrations, graphClient, apiKeyService, DEFAULT_RETRY_DELAYS_SECONDS);
+            GoogleIamClient googleIamClient, ApiKeyService apiKeyService) {
+        this(integrations, graphClient, googleIamClient, apiKeyService, DEFAULT_RETRY_DELAYS_SECONDS);
     }
 
     KeyProvisioningService(ServiceIntegrationService integrations, AzureGraphClient graphClient,
-            ApiKeyService apiKeyService, long[] retryDelaysSeconds) {
+            GoogleIamClient googleIamClient, ApiKeyService apiKeyService, long[] retryDelaysSeconds) {
         this.integrations = integrations;
         this.graphClient = graphClient;
+        this.googleIamClient = googleIamClient;
         this.apiKeyService = apiKeyService;
         this.retryDelaysSeconds = retryDelaysSeconds;
     }
 
     /**
-     * Creates a new client (app registration) named {@code name} in the integration's
-     * tenant, generates a client secret for it, and stores the result locally. If a
-     * step after the app registration fails for good, the registration is deleted
-     * again so nothing half-configured is left behind in the tenant.
+     * Creates a new credential named {@code name} in the integration's provider and
+     * stores the result locally. If a step after the initial create fails for good,
+     * the partially created client is deleted again so nothing half-configured is
+     * left behind in the provider.
      *
      * @throws ProvisioningException if any provider call fails
      */
     public ApiKey provision(Long integrationId, String name, SecretValidity validity, String notes) {
         ServiceIntegration integration = integrations.getById(integrationId);
-        String displayName = name.trim();
+        return switch (integration.getProvider()) {
+            case AZURE_AD -> provisionAzure(integration, name.trim(), validity, notes);
+            case GOOGLE_CLOUD -> provisionGoogle(integration, name.trim(), notes);
+        };
+    }
 
+    /** Azure: app registration + service principal + client secret. */
+    private ApiKey provisionAzure(ServiceIntegration integration, String displayName, SecretValidity validity,
+            String notes) {
         String token = graphClient.acquireToken(integration.getTenantId(), integration.getClientId(),
                 integration.getClientSecret());
         CreatedApplication application = graphClient.createApplication(token, displayName);
@@ -98,6 +110,84 @@ public class KeyProvisioningService {
         integrations.markVerified(integration);
         log.info("Provisioned {} in {} (client id {})", key, integration, application.clientId());
         return key;
+    }
+
+    /**
+     * Google Cloud: service account + JSON key. The key is the full credentials file
+     * clients authenticate with, stored encrypted as the key value. Google service
+     * account keys don't expire, so the local key has no expiry. The secret-validity
+     * choice doesn't apply here; expiry can't be set through the keys API.
+     */
+    private ApiKey provisionGoogle(ServiceIntegration integration, String displayName, String notes) {
+        String projectId = integration.getTenantId();
+        String token = googleIamClient.acquireToken(integration.getClientId(), integration.getClientSecret());
+        CreatedServiceAccount account = googleIamClient.createServiceAccount(token, projectId,
+                googleAccountId(displayName), displayName);
+
+        String keyJson;
+        try {
+            // a freshly created account can take a moment to be visible to the keys API
+            keyJson = withReplicationRetry("create service account key",
+                    () -> googleIamClient.createServiceAccountKey(token, projectId, account.email()));
+        } catch (ProvisioningException e) {
+            throw cleanUpGoogleAfterFailure(token, projectId, account, displayName, e);
+        }
+
+        ApiKey key = apiKeyService.create(new ApiKeyDetails(displayName, integration.getName(), keyJson,
+                LocalDate.now(), null, buildGoogleNotes(notes, integration, account)));
+        integrations.markVerified(integration);
+        log.info("Provisioned {} in {} (service account {})", key, integration, account.email());
+        return key;
+    }
+
+    /**
+     * Derives a valid service account ID from the display name: 6-30 chars of
+     * {@code [a-z0-9-]} starting with a letter. A random suffix keeps repeated
+     * names from colliding, since account IDs are unique per project.
+     */
+    static String googleAccountId(String displayName) {
+        String base = displayName.toLowerCase()
+                .replaceAll("[^a-z0-9-]+", "-")
+                .replaceAll("(^-+|-+$)", "");
+        if (base.isEmpty() || !Character.isLetter(base.charAt(0))) {
+            base = "key-" + base;
+        }
+        String suffix = "-" + Integer.toHexString(ThreadLocalRandom.current().nextInt(0x1000, 0x10000));
+        int maxBase = 30 - suffix.length();
+        if (base.length() > maxBase) {
+            base = base.substring(0, maxBase).replaceAll("-+$", "");
+        }
+        return base + suffix;
+    }
+
+    /** Best-effort removal of the service account created earlier in a failed run. */
+    private ProvisioningException cleanUpGoogleAfterFailure(String token, String projectId,
+            CreatedServiceAccount account, String displayName, ProvisioningException failure) {
+        try {
+            googleIamClient.deleteServiceAccount(token, projectId, account.email());
+            log.info("Cleaned up service account '{}' ({}) after failed provisioning", displayName, account.email());
+            return new ProvisioningException(failure.getMessage()
+                    + " The partially created service account was removed from Google Cloud again.", failure);
+        } catch (RuntimeException cleanupFailure) {
+            log.warn("Could not clean up service account '{}' ({}) after failed provisioning: {}", displayName,
+                    account.email(), cleanupFailure.getMessage());
+            return new ProvisioningException(failure.getMessage()
+                    + " A partially created service account \"" + account.email()
+                    + "\" was left in Google Cloud - delete it under IAM & Admin → Service accounts.", failure);
+        }
+    }
+
+    private static String buildGoogleNotes(String userNotes, ServiceIntegration integration,
+            CreatedServiceAccount account) {
+        StringBuilder notes = new StringBuilder();
+        if (StringUtils.hasText(userNotes)) {
+            notes.append(userNotes.trim()).append("\n\n");
+        }
+        notes.append("Created via the ").append(integration.getName()).append(" integration.\n")
+                .append("Service account: ").append(account.email()).append('\n')
+                .append("Project: ").append(integration.getTenantId()).append('\n')
+                .append("The key value is the full JSON credentials file. Google service account keys don't expire.");
+        return notes.toString();
     }
 
     /**

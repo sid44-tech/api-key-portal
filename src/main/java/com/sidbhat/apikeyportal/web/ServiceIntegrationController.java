@@ -17,6 +17,7 @@ import com.sidbhat.apikeyportal.integration.ProvisioningException;
 import com.sidbhat.apikeyportal.integration.ServiceIntegration;
 import com.sidbhat.apikeyportal.integration.ServiceIntegrationService;
 import com.sidbhat.apikeyportal.integration.ServiceProvider;
+import com.sidbhat.apikeyportal.integration.google.ServiceAccountKey;
 
 @Controller
 @RequestMapping("/integrations")
@@ -37,11 +38,20 @@ public class ServiceIntegrationController {
 
     @GetMapping("/new")
     public String setup(@RequestParam("provider") ServiceProvider provider, Model model) {
-        // only one provider so far; a switch belongs here once there are more
-        if (!model.containsAttribute("form")) {
-            model.addAttribute("form", new AzureIntegrationForm());
-        }
-        return "integrations/azure-setup";
+        return switch (provider) {
+            case AZURE_AD -> {
+                if (!model.containsAttribute("form")) {
+                    model.addAttribute("form", new AzureIntegrationForm());
+                }
+                yield "integrations/azure-setup";
+            }
+            case GOOGLE_CLOUD -> {
+                if (!model.containsAttribute("form")) {
+                    model.addAttribute("form", new GoogleIntegrationForm());
+                }
+                yield "integrations/google-setup";
+            }
+        };
     }
 
     @PostMapping("/azure-ad")
@@ -60,6 +70,33 @@ public class ServiceIntegrationController {
             bindingResult.reject("azure.connect.failed", e.getMessage()
                     + " Double-check the values from steps 3 and 5, and that admin consent in step 4 was granted.");
             return "integrations/azure-setup";
+        }
+    }
+
+    @PostMapping("/google-cloud")
+    public String connectGoogle(@Valid @ModelAttribute("form") GoogleIntegrationForm form,
+            BindingResult bindingResult, RedirectAttributes redirectAttributes) {
+        ServiceAccountKey key = null;
+        if (!bindingResult.hasErrors()) {
+            try {
+                key = ServiceAccountKey.parse(form.getServiceAccountJson());
+            } catch (IllegalArgumentException e) {
+                bindingResult.rejectValue("serviceAccountJson", "google.key.invalid", e.getMessage());
+            }
+        }
+        if (bindingResult.hasErrors()) {
+            return "integrations/google-setup";
+        }
+        try {
+            ServiceIntegration integration = integrationService.connect(ServiceProvider.GOOGLE_CLOUD,
+                    form.getName(), key.projectId(), key.clientEmail(), key.privateKey());
+            redirectAttributes.addFlashAttribute("success",
+                    "Connected " + integration.getName() + ". The credentials were verified and stored encrypted.");
+            return "redirect:/integrations";
+        } catch (ProvisioningException e) {
+            bindingResult.reject("google.connect.failed", e.getMessage()
+                    + " Double-check the roles from step 2 were granted and the JSON key from step 3 is current.");
+            return "integrations/google-setup";
         }
     }
 

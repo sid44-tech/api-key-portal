@@ -35,8 +35,24 @@
                     </small>
                 </div>
             </div>
-            <p class="text-muted" th:if="${form.new} and not ${#lists.isEmpty(integrations)}">
-                Or enter a key manually:</p>
+
+            <div class="card border-primary-subtle mb-4" th:if="${form.new}">
+                <div class="card-body">
+                    <h2 class="h6"><i class="bi bi-signpost me-1" aria-hidden="true"></i>
+                        Adding a GitHub token or Anthropic API key?</h2>
+                    <p class="text-muted small mb-2">Those can only be created in the provider's own console.
+                        A guided walk-through covers the steps, then the portal verifies the key against the
+                        provider before storing it.</p>
+                    <a th:href="@{/keys/guided/github}" class="btn btn-outline-primary btn-sm me-1">
+                        <i class="bi bi-github me-1" aria-hidden="true"></i> GitHub token
+                    </a>
+                    <a th:href="@{/keys/guided/anthropic}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-robot me-1" aria-hidden="true"></i> Anthropic API key
+                    </a>
+                </div>
+            </div>
+
+            <p class="text-muted" th:if="${form.new}">Or enter a key manually:</p>
 
             <form th:action="${form.new} ? @{/keys} : @{/keys/{id}(id=${form.id})}"
                   th:object="${form}" method="post" novalidate>

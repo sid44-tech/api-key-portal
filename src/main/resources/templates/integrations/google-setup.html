@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Connect Google Cloud</title>
+</head>
+<body>
+<main layout:fragment="content">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a th:href="@{/integrations}">Service integrations</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Connect Google Cloud</li>
+                </ol>
+            </nav>
+
+            <h1 class="h3 mb-2"><i class="bi bi-google me-2" aria-hidden="true"></i>Connect Google Cloud</h1>
+            <p class="text-muted mb-4">
+                A one-time setup, done in about five minutes. You'll create a service account for this portal in
+                your Google Cloud project and paste its JSON key back here. Afterwards, the portal can create
+                service accounts and keys in that project for you with a single click.
+            </p>
+
+            <form th:action="@{/integrations/google-cloud}" th:object="${form}" method="post" novalidate>
+
+                <div class="alert alert-danger d-flex align-items-start" th:if="${#fields.hasGlobalErrors()}">
+                    <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>
+                    <div>
+                        <strong>Google Cloud did not accept the connection.</strong>
+                        <div th:each="err : ${#fields.globalErrors()}" th:text="${err}">Error</div>
+                    </div>
+                </div>
+
+                <!-- Step 1 -->
+                <div class="card mb-3 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">1</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Enable the IAM API in your project</h2>
+                            <p>The portal talks to the Identity and Access Management (IAM) API to create
+                                service accounts and keys. Sign in to the Google Cloud console, pick the project
+                                you want keys created in, then enable the API:</p>
+                            <a href="https://console.cloud.google.com/apis/library/iam.googleapis.com"
+                               target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>
+                                Open the IAM API page and press "Enable"
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="card mb-3 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">2</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Create a service account for this portal</h2>
+                            <p>This is the identity the portal acts as in your project:</p>
+                            <ol class="mb-3">
+                                <li>Open the creation form with the button below (check the right project is
+                                    selected in the top bar).</li>
+                                <li>Name it <code>api-key-portal</code> (any name works) and press
+                                    <strong>Create and continue</strong>.</li>
+                                <li>Under <em>Grant this service account access to project</em>, add the roles
+                                    <strong>Service Account Admin</strong> and
+                                    <strong>Service Account Key Admin</strong>, then press <strong>Done</strong>.</li>
+                            </ol>
+                            <a href="https://console.cloud.google.com/iam-admin/serviceaccounts/create"
+                               target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>
+                                Open "Create service account" in the Google Cloud console
+                            </a>
+                            <p class="text-muted small mb-0 mt-2">
+                                <i class="bi bi-shield-check me-1" aria-hidden="true"></i>
+                                These roles only allow managing service accounts and their keys in this one
+                                project - nothing else in your Google Cloud account.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="card mb-3 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">3</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Download a JSON key and paste it here</h2>
+                            <ol class="mb-3">
+                                <li>Open your new service account from the list and switch to the
+                                    <strong>Keys</strong> tab.</li>
+                                <li>Press <strong>Add key</strong> → <strong>Create new key</strong>, keep
+                                    <strong>JSON</strong> selected and press <strong>Create</strong>.
+                                    The key file downloads automatically.</li>
+                                <li>Open the downloaded file in a text editor and paste its entire contents below,
+                                    then delete the file.</li>
+                            </ol>
+                            <div class="mb-2">
+                                <label class="form-label" for="serviceAccountJson">Service account JSON key</label>
+                                <textarea class="form-control font-monospace" th:field="*{serviceAccountJson}"
+                                          th:errorclass="is-invalid" rows="6" autocomplete="off" spellcheck="false"
+                                          placeholder='{"type": "service_account", "project_id": "...", ...}'></textarea>
+                                <div class="invalid-feedback" th:errors="*{serviceAccountJson}"></div>
+                            </div>
+                            <p class="text-muted small mb-0">
+                                <i class="bi bi-lock-fill me-1" aria-hidden="true"></i>
+                                The project ID and service account email are read from the pasted key; the private
+                                key is stored encrypted (AES-256-GCM) and never shown again in this portal either.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 4 -->
+                <div class="card mb-4 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">4</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Name it and connect</h2>
+                            <p>This name shows up in the provider dropdown on the Add key screen, and as the
+                                service name on keys created through it.</p>
+                            <div class="mb-3 col-md-6">
+                                <label class="form-label" for="name">Integration name</label>
+                                <input type="text" class="form-control" th:field="*{name}"
+                                       th:errorclass="is-invalid" maxlength="100">
+                                <div class="invalid-feedback" th:errors="*{name}"></div>
+                            </div>
+                            <p class="text-muted small">
+                                <i class="bi bi-magic me-1" aria-hidden="true"></i>
+                                The portal verifies the connection against Google Cloud before anything is saved,
+                                so typos surface right here.
+                            </p>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-plug me-1" aria-hidden="true"></i> Verify &amp; connect
+                            </button>
+                            <a th:href="@{/integrations}" class="btn btn-link">Cancel</a>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+</body>
+</html>

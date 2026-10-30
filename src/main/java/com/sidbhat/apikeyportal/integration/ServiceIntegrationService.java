@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.sidbhat.apikeyportal.integration.azure.AzureGraphClient;
+import com.sidbhat.apikeyportal.integration.google.GoogleIamClient;
 
 @Service
 public class ServiceIntegrationService {
@@ -16,10 +17,13 @@ public class ServiceIntegrationService {
 
     private final ServiceIntegrationRepository repository;
     private final AzureGraphClient graphClient;
+    private final GoogleIamClient googleIamClient;
 
-    public ServiceIntegrationService(ServiceIntegrationRepository repository, AzureGraphClient graphClient) {
+    public ServiceIntegrationService(ServiceIntegrationRepository repository, AzureGraphClient graphClient,
+            GoogleIamClient googleIamClient) {
         this.repository = repository;
         this.graphClient = graphClient;
+        this.googleIamClient = googleIamClient;
     }
 
     public List<ServiceIntegration> findAll() {
@@ -76,8 +80,12 @@ public class ServiceIntegrationService {
     }
 
     private void verifyWithProvider(ServiceIntegration integration) {
-        // acquiring a token is the cheapest call that proves tenant, client id and secret are right
-        graphClient.acquireToken(integration.getTenantId(), integration.getClientId(),
-                integration.getClientSecret());
+        // acquiring a token is the cheapest call that proves the stored credentials are right
+        switch (integration.getProvider()) {
+            case AZURE_AD -> graphClient.acquireToken(integration.getTenantId(), integration.getClientId(),
+                    integration.getClientSecret());
+            case GOOGLE_CLOUD -> googleIamClient.acquireToken(integration.getClientId(),
+                    integration.getClientSecret());
+        }
     }
 }
