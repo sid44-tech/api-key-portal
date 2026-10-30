@@ -70,8 +70,11 @@ class ServiceIntegrationControllerTest {
 
         mvc.perform(get("/integrations"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(Matchers.containsString("No integrations yet")))
-                .andExpect(content().string(Matchers.containsString("/integrations/new?provider=AZURE_AD")));
+                .andExpect(content().string(Matchers.containsString("Create a new integration")))
+                .andExpect(content().string(Matchers.containsString("/integrations/new?provider=AZURE_AD")))
+                .andExpect(content().string(Matchers.containsString("/integrations/new?provider=GOOGLE_CLOUD")))
+                .andExpect(content().string(Matchers.containsString("/keys/guided/github")))
+                .andExpect(content().string(Matchers.containsString("/keys/guided/anthropic")));
     }
 
     @Test

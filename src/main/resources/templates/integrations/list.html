@@ -11,31 +11,71 @@
         <h1 class="h3 mb-0">Service integrations</h1>
     </div>
     <p class="text-muted mb-4">
-        Connect a service provider once, and the portal can create new credentials in it for you:
-        no more copy-pasting keys out of a cloud console.
+        Connect a provider once, then create new keys from the portal with one click.
     </p>
 
-    <div th:if="${#lists.isEmpty(integrations)}" class="card text-center">
-        <div class="card-body py-5">
-            <p class="display-6 mb-2"><i class="bi bi-plug"></i></p>
-            <h2 class="h5">No integrations yet</h2>
-            <p class="text-muted mx-auto integration-blurb">
-                Set one up and the <strong>Add key</strong> screen gains a "create it in the provider"
-                option that registers the client and captures the generated secret automatically.
-                A guided walk-through covers the one-time setup.
-            </p>
-            <a th:href="@{/integrations/new(provider='AZURE_AD')}" class="btn btn-primary me-1">
-                <i class="bi bi-microsoft me-1"></i> Connect Microsoft Azure AD
-            </a>
-            <a th:href="@{/integrations/new(provider='GOOGLE_CLOUD')}" class="btn btn-primary">
-                <i class="bi bi-google me-1"></i> Connect Google Cloud
-            </a>
-            <p class="text-muted small mt-3 mb-0">
-                GitHub and Anthropic keys can't be created through an API; for those, guided walk-throughs
-                live on the <a th:href="@{/keys/new}">Add key</a> screen instead.
-            </p>
+    <th:block th:if="${#lists.isEmpty(integrations)}">
+        <h2 class="h5">Create a new integration</h2>
+        <p class="text-muted integration-blurb">
+            Connect to your service providers to simplify credential management.
+        </p>
+    </th:block>
+
+    <!-- One card per supported provider, rendered here when no integrations exist yet and
+         reused under "Add another integration" below the table otherwise. Connected providers
+         create keys through their API; guided ones walk through the manual steps and verify
+         the pasted key. -->
+    <th:block th:if="${#lists.isEmpty(integrations)}">
+    <div th:fragment="provider-cards" class="row g-3 row-cols-1 row-cols-md-2 row-cols-xl-4">
+        <div class="col">
+            <div class="card h-100 border-primary-subtle">
+                <div class="card-body d-flex flex-column text-center">
+                    <p class="display-6 mb-1"><i class="bi bi-microsoft" aria-hidden="true"></i></p>
+                    <h3 class="h6 mb-1">Microsoft Azure AD</h3>
+                    <p class="mb-2"><span class="badge text-bg-primary">Creates keys for you</span></p>
+                    <p class="text-muted small">Registers clients and generates secrets in your tenant.</p>
+                    <a th:href="@{/integrations/new(provider='AZURE_AD')}" class="btn btn-primary btn-sm mt-auto">Connect</a>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100 border-primary-subtle">
+                <div class="card-body d-flex flex-column text-center">
+                    <p class="display-6 mb-1"><i class="bi bi-google" aria-hidden="true"></i></p>
+                    <h3 class="h6 mb-1">Google Cloud</h3>
+                    <p class="mb-2"><span class="badge text-bg-primary">Creates keys for you</span></p>
+                    <p class="text-muted small">Creates service accounts and keys in your project.</p>
+                    <a th:href="@{/integrations/new(provider='GOOGLE_CLOUD')}" class="btn btn-primary btn-sm mt-auto">Connect</a>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100 bg-body-tertiary">
+                <div class="card-body d-flex flex-column text-center">
+                    <p class="display-6 mb-1"><i class="bi bi-github" aria-hidden="true"></i></p>
+                    <h3 class="h6 mb-1">GitHub</h3>
+                    <p class="mb-2"><span class="badge text-bg-secondary">Guided manual steps</span></p>
+                    <p class="text-muted small">Tokens are created on GitHub; the portal walks you through it
+                        and verifies the token.</p>
+                    <a th:href="@{/keys/guided/github}" class="btn btn-outline-secondary btn-sm mt-auto">Start walk-through</a>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100 bg-body-tertiary">
+                <div class="card-body d-flex flex-column text-center">
+                    <p class="display-6 mb-1"><i class="bi bi-robot" aria-hidden="true"></i></p>
+                    <h3 class="h6 mb-1">Anthropic</h3>
+                    <p class="mb-2"><span class="badge text-bg-secondary">Guided manual steps</span></p>
+                    <p class="text-muted small">Keys are created in the Anthropic console; the portal walks you
+                        through it and verifies the key.</p>
+                    <a th:href="@{/keys/guided/anthropic}" class="btn btn-outline-secondary btn-sm mt-auto">Start walk-through</a>
+                </div>
+            </div>
         </div>
     </div>
+    </th:block>
+
 
     <th:block th:unless="${#lists.isEmpty(integrations)}">
         <div class="table-responsive">
@@ -77,17 +117,8 @@
             </table>
         </div>
 
-        <form th:action="@{/integrations/new}" method="get" class="row g-2 align-items-end mt-2">
-            <div class="col-auto">
-                <label class="form-label" for="provider">Add another integration</label>
-                <select class="form-select" id="provider" name="provider">
-                    <option th:each="p : ${providers}" th:value="${p.name()}" th:text="${p.label}">Azure AD</option>
-                </select>
-            </div>
-            <div class="col-auto">
-                <button type="submit" class="btn btn-outline-primary">Continue</button>
-            </div>
-        </form>
+        <h2 class="h5 mt-4">Add another integration</h2>
+        <div th:replace="~{:: provider-cards}"></div>
 
         <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
             <div class="modal-dialog">

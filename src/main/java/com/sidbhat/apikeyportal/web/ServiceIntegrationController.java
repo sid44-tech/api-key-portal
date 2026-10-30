@@ -32,7 +32,6 @@ public class ServiceIntegrationController {
     @GetMapping
     public String list(Model model) {
         model.addAttribute("integrations", integrationService.findAll());
-        model.addAttribute("providers", ServiceProvider.values());
         return "integrations/list";
     }
 
