@@ -25,8 +25,8 @@ server:
 # The app refuses to start if they're missing.
 portal:
   security:
-    username: ${env.PORTAL_USERNAME:admin}
-    password-hash: ${env.PORTAL_PASSWORD_HASH:}
+    username: ${PORTAL_USERNAME:admin}
+    password-hash: ${PORTAL_PASSWORD_HASH:}
   encryption:
     # Base64 encoded 256-bit key. Generate one with: openssl rand -base64 32
-    key: ${env.PORTAL_ENCRYPTION_KEY:}
+    key: ${PORTAL_ENCRYPTION_KEY:}

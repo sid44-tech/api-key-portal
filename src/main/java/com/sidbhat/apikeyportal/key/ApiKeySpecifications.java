@@ -2,7 +2,7 @@ package com.sidbhat.apikeyportal.key;
 
 import java.util.Locale;
 
-import javax.persistence.criteria.Order;
+import jakarta.persistence.criteria.Order;
 
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
@@ -15,7 +15,7 @@ final class ApiKeySpecifications {
     /** Case-insensitive match on key name or service name. No-op for blank text. */
     static Specification<ApiKey> textContains(String text) {
         if (!StringUtils.hasText(text)) {
-            return null;
+            return Specification.unrestricted();
         }
         String pattern = "%" + text.trim().toLowerCase(Locale.ROOT) + "%";
         return (root, query, cb) -> cb.or(
@@ -26,7 +26,7 @@ final class ApiKeySpecifications {
     /** Exact match on service name. No-op for blank service. */
     static Specification<ApiKey> serviceIs(String serviceName) {
         if (!StringUtils.hasText(serviceName)) {
-            return null;
+            return Specification.unrestricted();
         }
         return (root, query, cb) -> cb.equal(root.get("serviceName"), serviceName);
     }

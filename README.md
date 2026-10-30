@@ -8,11 +8,11 @@ A small self-hosted web portal for keeping track of the API and access keys I us
 - Search, filter by service, sort by expiry, and see at a glance what has expired or is about to
 - Key values are encrypted at rest with AES-256-GCM
 
-Built with Java 11, Spring Boot 2.5, Spring Security, Spring Data JPA, Flyway, Thymeleaf and Bootstrap 5.
+Built with Java 25, Spring Boot 4.1, Spring Security, Spring Data JPA, Flyway, Thymeleaf and Bootstrap 5.
 
 ## Running locally
 
-Requires JDK 11.
+Requires JDK 25.
 
 1. Copy `.env.example` to `.env` and fill in the values (see [Configuration](#configuration)).
    `.env` is git-ignored; never commit it.
@@ -105,10 +105,7 @@ The coverage report is written to `target/site/jacoco/index.html`.
 
 ## To do
 
-- Upgrade to the latest Spring Boot version
-- Upgrade Java to the latest LTS version
 - Upgrade the project to use a local SQLite DB instead of H2
-- Update the Docker image to a more recent base image
 - Add 2-factor auth to login
 - Add better logging and error handling to the app
 - Build a deployment pipeline in GitHub

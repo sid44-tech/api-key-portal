@@ -33,9 +33,9 @@ public class ApiKeyService {
      */
     public Page<ApiKey> search(String text, String serviceName, ApiKeySort sort, int page) {
         // ordering is applied by the specification, so the PageRequest stays unsorted
-        return repository.findAll(Specification.where(ApiKeySpecifications.textContains(text))
-                        .and(ApiKeySpecifications.serviceIs(serviceName))
-                        .and(ApiKeySpecifications.orderBy(sort != null ? sort : ApiKeySort.SERVICE)),
+        return repository.findAll(Specification.allOf(ApiKeySpecifications.textContains(text),
+                        ApiKeySpecifications.serviceIs(serviceName),
+                        ApiKeySpecifications.orderBy(sort != null ? sort : ApiKeySort.SERVICE)),
                 PageRequest.of(Math.max(page, 0), PAGE_SIZE));
     }
 

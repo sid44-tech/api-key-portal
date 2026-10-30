@@ -7,7 +7,7 @@ version: "3.8"
 # Credentials are read from .env (see .env.example).
 services:
   postgres:
-    image: postgres:13.3
+    image: postgres:18
     environment:
       POSTGRES_DB: keyportal
       POSTGRES_USER: ${PORTAL_DB_USERNAME:-keyportal}

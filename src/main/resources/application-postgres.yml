@@ -1,5 +1,5 @@
 spring:
   datasource:
-    url: ${env.PORTAL_DB_URL:jdbc:postgresql://localhost:5432/keyportal}
-    username: ${env.PORTAL_DB_USERNAME:keyportal}
-    password: ${env.PORTAL_DB_PASSWORD:}
+    url: ${PORTAL_DB_URL:jdbc:postgresql://localhost:5432/keyportal}
+    username: ${PORTAL_DB_USERNAME:keyportal}
+    password: ${PORTAL_DB_PASSWORD:}

@@ -65,7 +65,7 @@ class ApiKeyServiceTest {
         when(repository.findById(1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.delete(1L)).isInstanceOf(ApiKeyNotFoundException.class);
-        verify(repository, never()).delete(any());
+        verify(repository, never()).delete(any(ApiKey.class));
     }
 
     @Test
