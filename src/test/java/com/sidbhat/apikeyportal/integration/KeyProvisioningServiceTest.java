@@ -23,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.web.client.RestClientResponseException;
 
+import com.sidbhat.apikeyportal.activity.KeyOrigin;
 import com.sidbhat.apikeyportal.integration.azure.AzureGraphClient;
 import com.sidbhat.apikeyportal.integration.azure.AzureGraphClient.CreatedApplication;
 import com.sidbhat.apikeyportal.integration.azure.AzureGraphClient.CreatedSecret;
@@ -31,6 +32,8 @@ import com.sidbhat.apikeyportal.integration.google.GoogleIamClient.CreatedServic
 import com.sidbhat.apikeyportal.key.ApiKey;
 import com.sidbhat.apikeyportal.key.ApiKeyDetails;
 import com.sidbhat.apikeyportal.key.ApiKeyService;
+import com.sidbhat.apikeyportal.user.TestUsers;
+import com.sidbhat.apikeyportal.user.UserAccount;
 
 @ExtendWith(MockitoExtension.class)
 class KeyProvisioningServiceTest {
@@ -48,6 +51,8 @@ class KeyProvisioningServiceTest {
     private ApiKeyService apiKeyService;
 
     private KeyProvisioningService service;
+
+    private final UserAccount owner = TestUsers.alex();
 
     private final ServiceIntegration integration = new ServiceIntegration(ServiceProvider.AZURE_AD, "Azure AD",
             "tenant-1", "portal-client", "portal-secret");
@@ -68,27 +73,30 @@ class KeyProvisioningServiceTest {
 
     @Test
     void provisionsClientAndStoresSecretAsKey() {
-        when(integrations.getById(7L)).thenReturn(integration);
+        when(integrations.getById(7L, owner)).thenReturn(integration);
         when(graphClient.acquireToken("tenant-1", "portal-client", "portal-secret")).thenReturn("tok");
         when(graphClient.createApplication("tok", "Reporting service"))
                 .thenReturn(new CreatedApplication("obj-1", "new-client-id"));
         when(graphClient.addPassword(eq("tok"), eq("obj-1"), eq("Reporting service"), any(Instant.class)))
                 .thenReturn(new CreatedSecret("generated-secret", "2027-04-27T12:00:00Z"));
-        when(apiKeyService.create(any())).thenAnswer(inv -> new ApiKey("Reporting service", "Azure AD",
+        when(apiKeyService.create(any(), eq(owner), any())).thenAnswer(inv -> new ApiKey("Reporting service", "Azure AD",
                 "generated-secret", LocalDate.now(), LocalDate.of(2027, 4, 27)));
 
-        service.provision(7L, "  Reporting service ", SecretValidity.DAYS_180, "for the dashboards");
+        service.provision(7L, "  Reporting service ", SecretValidity.DAYS_180, "for the dashboards", owner);
 
         verify(graphClient).createServicePrincipal("tok", "new-client-id");
         verify(integrations).markVerified(integration);
 
         ArgumentCaptor<ApiKeyDetails> details = ArgumentCaptor.forClass(ApiKeyDetails.class);
-        verify(apiKeyService).create(details.capture());
+        ArgumentCaptor<KeyOrigin> origin = ArgumentCaptor.forClass(KeyOrigin.class);
+        verify(apiKeyService).create(details.capture(), eq(owner), origin.capture());
         assertThat(details.getValue().getName()).isEqualTo("Reporting service");
         assertThat(details.getValue().getServiceName()).isEqualTo("Azure AD");
         assertThat(details.getValue().getKeyValue()).isEqualTo("generated-secret");
         assertThat(details.getValue().getCreatedOn()).isEqualTo(LocalDate.now());
         assertThat(details.getValue().getExpiresOn()).isEqualTo(LocalDate.of(2027, 4, 27));
+        // the history has to say this key was minted through the shared integration
+        assertThat(origin.getValue()).isEqualTo(KeyOrigin.provisionedBy("Azure AD"));
         assertThat(details.getValue().getNotes())
                 .contains("for the dashboards")
                 .contains("Client ID: new-client-id")
@@ -98,25 +106,26 @@ class KeyProvisioningServiceTest {
 
     @Test
     void fallsBackToRequestedExpiryWhenResponseOmitsIt() {
-        when(integrations.getById(7L)).thenReturn(integration);
+        when(integrations.getById(7L, owner)).thenReturn(integration);
         when(graphClient.acquireToken(anyString(), anyString(), anyString())).thenReturn("tok");
         when(graphClient.createApplication(anyString(), anyString()))
                 .thenReturn(new CreatedApplication("obj-1", "new-client-id"));
         when(graphClient.addPassword(anyString(), anyString(), anyString(), any(Instant.class)))
                 .thenReturn(new CreatedSecret("generated-secret", null));
-        when(apiKeyService.create(any())).thenAnswer(inv -> new ApiKey("n", "s", "v", LocalDate.now(), null));
+        when(apiKeyService.create(any(), eq(owner), any())).thenAnswer(inv -> new ApiKey("n", "s", "v", LocalDate.now(), null));
 
-        service.provision(7L, "Reporting service", SecretValidity.DAYS_90, null);
+        service.provision(7L, "Reporting service", SecretValidity.DAYS_90, null, owner);
 
         ArgumentCaptor<ApiKeyDetails> details = ArgumentCaptor.forClass(ApiKeyDetails.class);
-        verify(apiKeyService).create(details.capture());
+        ArgumentCaptor<KeyOrigin> origin = ArgumentCaptor.forClass(KeyOrigin.class);
+        verify(apiKeyService).create(details.capture(), eq(owner), origin.capture());
         assertThat(details.getValue().getExpiresOn())
                 .isBetween(LocalDate.now().plusDays(89), LocalDate.now().plusDays(91));
     }
 
     @Test
     void retriesServicePrincipalCreationAfterReplicationLag() {
-        when(integrations.getById(7L)).thenReturn(integration);
+        when(integrations.getById(7L, owner)).thenReturn(integration);
         when(graphClient.acquireToken(anyString(), anyString(), anyString())).thenReturn("tok");
         when(graphClient.createApplication(anyString(), anyString()))
                 .thenReturn(new CreatedApplication("obj-1", "new-client-id"));
@@ -124,24 +133,24 @@ class KeyProvisioningServiceTest {
                 .when(graphClient).createServicePrincipal("tok", "new-client-id");
         when(graphClient.addPassword(anyString(), anyString(), anyString(), any(Instant.class)))
                 .thenReturn(new CreatedSecret("generated-secret", "2027-04-27T12:00:00Z"));
-        when(apiKeyService.create(any())).thenAnswer(inv -> new ApiKey("n", "s", "v", LocalDate.now(), null));
+        when(apiKeyService.create(any(), eq(owner), any())).thenAnswer(inv -> new ApiKey("n", "s", "v", LocalDate.now(), null));
 
-        service.provision(7L, "Reporting service", SecretValidity.DAYS_90, null);
+        service.provision(7L, "Reporting service", SecretValidity.DAYS_90, null, owner);
 
         verify(graphClient, times(3)).createServicePrincipal("tok", "new-client-id");
-        verify(apiKeyService).create(any());
+        verify(apiKeyService).create(any(), eq(owner), any());
         verify(graphClient, never()).deleteApplication(anyString(), anyString());
     }
 
     @Test
     void cleansUpAppRegistrationWhenRetriesAreExhausted() {
-        when(integrations.getById(7L)).thenReturn(integration);
+        when(integrations.getById(7L, owner)).thenReturn(integration);
         when(graphClient.acquireToken(anyString(), anyString(), anyString())).thenReturn("tok");
         when(graphClient.createApplication(anyString(), anyString()))
                 .thenReturn(new CreatedApplication("obj-1", "new-client-id"));
         doThrow(replicationLag()).when(graphClient).createServicePrincipal("tok", "new-client-id");
 
-        assertThatThrownBy(() -> service.provision(7L, "Reporting service", SecretValidity.DAYS_90, null))
+        assertThatThrownBy(() -> service.provision(7L, "Reporting service", SecretValidity.DAYS_90, null, owner))
                 .isInstanceOf(ProvisioningException.class)
                 .hasMessageContaining("service principal")
                 .hasMessageContaining("removed from Azure");
@@ -149,12 +158,12 @@ class KeyProvisioningServiceTest {
         // two configured retries = three attempts in total
         verify(graphClient, times(3)).createServicePrincipal("tok", "new-client-id");
         verify(graphClient).deleteApplication("tok", "obj-1");
-        verify(apiKeyService, never()).create(any());
+        verify(apiKeyService, never()).create(any(), any(), any());
     }
 
     @Test
     void doesNotRetryNonReplicationErrorsButStillCleansUp() {
-        when(integrations.getById(7L)).thenReturn(integration);
+        when(integrations.getById(7L, owner)).thenReturn(integration);
         when(graphClient.acquireToken(anyString(), anyString(), anyString())).thenReturn("tok");
         when(graphClient.createApplication(anyString(), anyString()))
                 .thenReturn(new CreatedApplication("obj-1", "new-client-id"));
@@ -162,17 +171,17 @@ class KeyProvisioningServiceTest {
                 new RestClientResponseException("400", HttpStatusCode.valueOf(400), "Bad Request", null, null, null)))
                 .when(graphClient).createServicePrincipal("tok", "new-client-id");
 
-        assertThatThrownBy(() -> service.provision(7L, "Reporting service", SecretValidity.DAYS_90, null))
+        assertThatThrownBy(() -> service.provision(7L, "Reporting service", SecretValidity.DAYS_90, null, owner))
                 .isInstanceOf(ProvisioningException.class);
 
         verify(graphClient, times(1)).createServicePrincipal("tok", "new-client-id");
         verify(graphClient).deleteApplication("tok", "obj-1");
-        verify(apiKeyService, never()).create(any());
+        verify(apiKeyService, never()).create(any(), any(), any());
     }
 
     @Test
     void reportsLeftoverWhenCleanupAlsoFails() {
-        when(integrations.getById(7L)).thenReturn(integration);
+        when(integrations.getById(7L, owner)).thenReturn(integration);
         when(graphClient.acquireToken(anyString(), anyString(), anyString())).thenReturn("tok");
         when(graphClient.createApplication(anyString(), anyString()))
                 .thenReturn(new CreatedApplication("obj-1", "new-client-id"));
@@ -180,12 +189,12 @@ class KeyProvisioningServiceTest {
         doThrow(new ProvisioningException("Could not delete the app registration (HTTP 403)"))
                 .when(graphClient).deleteApplication("tok", "obj-1");
 
-        assertThatThrownBy(() -> service.provision(7L, "Reporting service", SecretValidity.DAYS_90, null))
+        assertThatThrownBy(() -> service.provision(7L, "Reporting service", SecretValidity.DAYS_90, null, owner))
                 .isInstanceOf(ProvisioningException.class)
                 .hasMessageContaining("left in Azure")
                 .hasMessageContaining("new-client-id");
 
-        verify(apiKeyService, never()).create(any());
+        verify(apiKeyService, never()).create(any(), any(), any());
     }
 
     private final ServiceIntegration googleIntegration = new ServiceIntegration(ServiceProvider.GOOGLE_CLOUD,
@@ -193,23 +202,25 @@ class KeyProvisioningServiceTest {
 
     @Test
     void provisionsGoogleServiceAccountAndStoresKeyJson() {
-        when(integrations.getById(9L)).thenReturn(googleIntegration);
+        when(integrations.getById(9L, owner)).thenReturn(googleIntegration);
         when(googleIamClient.acquireToken("portal@my-project.iam.gserviceaccount.com", "-----BEGIN PRIVATE KEY-----"))
                 .thenReturn("gtok");
         when(googleIamClient.createServiceAccount(eq("gtok"), eq("my-project"), anyString(), eq("Reporting service")))
                 .thenReturn(new CreatedServiceAccount("reporting@my-project.iam.gserviceaccount.com", "123"));
         when(googleIamClient.createServiceAccountKey("gtok", "my-project",
                 "reporting@my-project.iam.gserviceaccount.com")).thenReturn("{\"type\":\"service_account\"}");
-        when(apiKeyService.create(any())).thenAnswer(inv -> new ApiKey("Reporting service", "Google Cloud",
+        when(apiKeyService.create(any(), eq(owner), any())).thenAnswer(inv -> new ApiKey("Reporting service", "Google Cloud",
                 "{\"type\":\"service_account\"}", LocalDate.now(), null));
 
-        service.provision(9L, " Reporting service ", SecretValidity.DAYS_180, "for the dashboards");
+        service.provision(9L, " Reporting service ", SecretValidity.DAYS_180, "for the dashboards", owner);
 
         verify(integrations).markVerified(googleIntegration);
         ArgumentCaptor<ApiKeyDetails> details = ArgumentCaptor.forClass(ApiKeyDetails.class);
-        verify(apiKeyService).create(details.capture());
+        ArgumentCaptor<KeyOrigin> origin = ArgumentCaptor.forClass(KeyOrigin.class);
+        verify(apiKeyService).create(details.capture(), eq(owner), origin.capture());
         assertThat(details.getValue().getName()).isEqualTo("Reporting service");
         assertThat(details.getValue().getServiceName()).isEqualTo("Google Cloud");
+        assertThat(origin.getValue()).isEqualTo(KeyOrigin.provisionedBy("Google Cloud"));
         assertThat(details.getValue().getKeyValue()).isEqualTo("{\"type\":\"service_account\"}");
         assertThat(details.getValue().getExpiresOn()).isNull();
         assertThat(details.getValue().getNotes())
@@ -220,7 +231,7 @@ class KeyProvisioningServiceTest {
 
     @Test
     void cleansUpGoogleServiceAccountWhenKeyCreationFails() {
-        when(integrations.getById(9L)).thenReturn(googleIntegration);
+        when(integrations.getById(9L, owner)).thenReturn(googleIntegration);
         when(googleIamClient.acquireToken(anyString(), anyString())).thenReturn("gtok");
         when(googleIamClient.createServiceAccount(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(new CreatedServiceAccount("reporting@my-project.iam.gserviceaccount.com", "123"));
@@ -229,13 +240,13 @@ class KeyProvisioningServiceTest {
                         new RestClientResponseException("400", HttpStatusCode.valueOf(400), "Bad Request",
                                 null, null, null)));
 
-        assertThatThrownBy(() -> service.provision(9L, "Reporting service", SecretValidity.DAYS_90, null))
+        assertThatThrownBy(() -> service.provision(9L, "Reporting service", SecretValidity.DAYS_90, null, owner))
                 .isInstanceOf(ProvisioningException.class)
                 .hasMessageContaining("removed from Google Cloud");
 
         verify(googleIamClient).deleteServiceAccount("gtok", "my-project",
                 "reporting@my-project.iam.gserviceaccount.com");
-        verify(apiKeyService, never()).create(any());
+        verify(apiKeyService, never()).create(any(), any(), any());
     }
 
     @Test
@@ -254,14 +265,14 @@ class KeyProvisioningServiceTest {
 
     @Test
     void doesNotStoreAnythingWhenProviderCallFails() {
-        when(integrations.getById(7L)).thenReturn(integration);
+        when(integrations.getById(7L, owner)).thenReturn(integration);
         when(graphClient.acquireToken(anyString(), anyString(), anyString())).thenReturn("tok");
         when(graphClient.createApplication(anyString(), anyString()))
                 .thenThrow(new ProvisioningException("Could not create the app registration (HTTP 403)"));
 
-        assertThatThrownBy(() -> service.provision(7L, "Reporting service", SecretValidity.DAYS_90, null))
+        assertThatThrownBy(() -> service.provision(7L, "Reporting service", SecretValidity.DAYS_90, null, owner))
                 .isInstanceOf(ProvisioningException.class);
 
-        verify(apiKeyService, never()).create(any());
+        verify(apiKeyService, never()).create(any(), any(), any());
     }
 }

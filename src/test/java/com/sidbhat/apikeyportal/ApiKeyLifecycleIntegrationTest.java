@@ -19,7 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.test.context.support.WithUserDetails;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.sidbhat.apikeyportal.key.ApiKeyRepository;
@@ -48,12 +48,12 @@ class ApiKeyLifecycleIntegrationTest {
 
     @Test
     void logsInWithConfiguredCredentials() throws Exception {
-        mvc.perform(formLogin().user("admin").password("test-password")).andExpect(authenticated());
-        mvc.perform(formLogin().user("admin").password("wrong")).andExpect(unauthenticated());
+        mvc.perform(formLogin().user("admin@example.com").password("test-password")).andExpect(authenticated());
+        mvc.perform(formLogin().user("admin@example.com").password("wrong")).andExpect(unauthenticated());
     }
 
     @Test
-    @WithMockUser
+    @WithUserDetails("admin@example.com")
     void createRevealEditAndDeleteKey() throws Exception {
         mvc.perform(post("/keys").with(csrf())
                         .param("serviceName", "Stripe")

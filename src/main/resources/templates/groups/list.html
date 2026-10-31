@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Groups</title>
+</head>
+<body>
+<main layout:fragment="content">
+    <div class="page-header">
+        <h1 class="page-title">Groups</h1>
+        <p class="page-subtitle">
+            A group is whoever shares a view of each other's keys: a team, a company, or a family.
+            People join one by invitation.
+        </p>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="table-surface" th:unless="${#lists.isEmpty(groups)}">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col" class="text-end">Members</th>
+                            <th scope="col" class="text-end">Keys</th>
+                            <th scope="col" class="text-end">Integrations</th>
+                            <th scope="col" class="text-end">Invited</th>
+                            <th scope="col">Created</th>
+                            <th scope="col" class="text-end"><span class="visually-hidden">Actions</span></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="usage : ${groups}">
+                            <td class="cell-primary" th:text="${usage.group.name}">Platform team</td>
+                            <td class="text-end" th:text="${usage.members}">0</td>
+                            <td class="text-end" th:text="${usage.keys}">0</td>
+                            <td class="text-end" th:text="${usage.integrations}">0</td>
+                            <td class="text-end" th:text="${usage.invitations}">0</td>
+                            <td class="cell-sub"
+                                th:text="${#temporals.format(usage.group.createdAt, 'MMM d, yyyy')}">-</td>
+                            <td class="text-end">
+                                <form th:if="${usage.empty}" class="row-actions"
+                                      th:action="@{/groups/{id}/delete(id=${usage.group.id})}" method="post">
+                                    <button type="submit" class="btn btn-icon btn-icon-danger" title="Delete group">
+                                        <i class="bi bi-trash" aria-hidden="true"></i><span class="visually-hidden">Delete</span>
+                                    </button>
+                                </form>
+                                <span th:unless="${usage.empty}" class="cell-sub">In use</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="empty-state" th:if="${#lists.isEmpty(groups)}">
+                <div class="empty-state-icon"><i class="bi bi-diagram-3" aria-hidden="true"></i></div>
+                <h2 class="empty-state-title">No groups yet</h2>
+                <p class="empty-state-text">Add one, then invite people into it.</p>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <form th:action="@{/groups}" th:object="${form}" method="post" novalidate>
+                <div class="card">
+                    <div class="card-header">Add a group</div>
+                    <div class="card-body">
+                        <div class="mb-0">
+                            <label class="form-label" for="name">Name</label>
+                            <input type="text" class="form-control" th:field="*{name}"
+                                   th:errorclass="is-invalid" maxlength="100"
+                                   placeholder="e.g. Platform team" required>
+                            <small class="form-text">
+                                A group can only be deleted once nothing belongs to it &mdash; move its
+                                people and keys elsewhere first, and withdraw any invitations into it.
+                            </small>
+                            <div class="invalid-feedback" th:errors="*{name}"></div>
+                        </div>
+                    </div>
+                    <div class="card-footer text-end">
+                        <button type="submit" class="btn btn-primary">Add group</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+</body>
+</html>

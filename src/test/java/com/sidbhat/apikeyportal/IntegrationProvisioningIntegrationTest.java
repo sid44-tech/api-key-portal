@@ -24,7 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.test.context.support.WithUserDetails;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -68,7 +68,7 @@ class IntegrationProvisioningIntegrationTest {
     }
 
     @Test
-    @WithMockUser
+    @WithUserDetails("admin@example.com")
     void connectsIntegrationVerifyingCredentialsAndStoresSecretEncrypted() throws Exception {
         when(graphClient.acquireToken("tenant-1", "portal-client", "fake-portal-secret")).thenReturn("tok");
 
@@ -90,7 +90,7 @@ class IntegrationProvisioningIntegrationTest {
     }
 
     @Test
-    @WithMockUser
+    @WithUserDetails("admin@example.com")
     void provisionsKeyThroughIntegrationAndCapturesSecret() throws Exception {
         ServiceIntegration integration = integrationRepository.save(new ServiceIntegration(ServiceProvider.AZURE_AD,
                 "Azure AD", "tenant-1", "portal-client", "fake-portal-secret"));

@@ -35,8 +35,32 @@ server:
 # The app refuses to start if they're missing.
 portal:
   security:
-    username: ${PORTAL_USERNAME:admin}
-    password-hash: ${PORTAL_PASSWORD_HASH:}
+    # Seeds the super admin while the portal has no accounts at all. Sign-up is
+    # closed, so a fresh install always gets this one account; everybody else is
+    # invited by somebody already in. The default password has to be replaced at
+    # the first sign-in - until then that account can reach nothing else.
+    # Setting admin-password-hash instead is taken as a deliberate choice and
+    # forces no change. PORTAL_USERNAME / PORTAL_PASSWORD_HASH are the
+    # pre-multi-user names, still honoured so an upgrade in place doesn't
+    # silently lose its login.
+    admin-email: ${PORTAL_ADMIN_EMAIL:${PORTAL_USERNAME:admin@localhost}}
+    admin-password: ${PORTAL_ADMIN_PASSWORD:changeme}
+    admin-password-hash: ${PORTAL_ADMIN_PASSWORD_HASH:${PORTAL_PASSWORD_HASH:}}
+    admin-group-name: ${PORTAL_ADMIN_GROUP:Administrators}
+  invitations:
+    # How long an invitation link works for, and who it comes from.
+    valid-for: ${PORTAL_INVITE_VALID_FOR:24h}
+    from-address: ${PORTAL_MAIL_FROM:no-reply@localhost}
+    # Base URL the links point at, e.g. https://keys.example.com. Blank means
+    # "whatever address the inviting admin reached the portal on".
+    base-url: ${PORTAL_BASE_URL:}
+  notifications:
+    # Emails key owners a month, two weeks, a week and a day before a key expires.
+    # Needs a mail server (SPRING_MAIL_HOST) and a base URL the links can point at.
+    enabled: ${PORTAL_EXPIRY_REMINDERS:true}
+    cron: ${PORTAL_EXPIRY_REMINDER_CRON:0 0 8 * * *}
+    from-address: ${PORTAL_MAIL_FROM:no-reply@localhost}
+    base-url: ${PORTAL_BASE_URL:http://localhost:8080}
   encryption:
     # Base64 encoded 256-bit key. Generate one with: openssl rand -base64 32
     key: ${PORTAL_ENCRYPTION_KEY:}

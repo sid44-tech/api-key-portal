@@ -7,31 +7,54 @@
 </head>
 <body>
 <main layout:fragment="content">
-    <div class="row justify-content-center">
-        <div class="col-md-6 col-lg-4">
-            <div class="card shadow-sm mt-5">
-                <div class="card-body">
-                    <h1 class="h4 mb-4 text-center">Sign in</h1>
-
-                    <div th:if="${param.error}" class="alert alert-danger">Invalid username or password.</div>
-                    <div th:if="${param.logout}" class="alert alert-success">You have been signed out.</div>
-
-                    <form th:action="@{/login}" method="post">
-                        <div class="mb-3">
-                            <label class="form-label" for="username">Username</label>
-                            <input type="text" class="form-control" id="username" name="username"
-                                   autocomplete="username" autofocus required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label" for="password">Password</label>
-                            <input type="password" class="form-control" id="password" name="password"
-                                   autocomplete="current-password" required>
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100">Sign in</button>
-                    </form>
-                </div>
+    <div class="auth-shell">
+        <div class="auth-card">
+            <div class="auth-header">
+                <span class="brand-mark" aria-hidden="true"><i class="bi bi-key-fill"></i></span>
+                <h1 class="auth-title">Sign in</h1>
+                <p class="auth-subtitle">API Key Portal</p>
             </div>
+
+            <div th:if="${param.error}" class="alert alert-danger">Invalid email or password.</div>
+            <div th:if="${param.logout}" class="alert alert-success">You have been signed out.</div>
+            <div th:if="${param.registered}" class="alert alert-success">
+                Your account is ready. Sign in to get started.
+            </div>
+            <div th:if="${param.passwordChanged}" class="alert alert-success">
+                Password changed. Sign in again with the new one.
+            </div>
+            <div th:if="${ssoErrorMessage != null}" class="alert alert-danger"
+                 th:text="${ssoErrorMessage}">Single sign-on did not complete.</div>
+
+            <!-- Offered first: where SSO is on, it is the way in for almost everyone -->
+            <th:block th:if="${ssoLabel != null}">
+                <a th:href="@{${ssoStartUrl}}" class="btn btn-primary btn-lg w-100">
+                    <i class="bi bi-shield-lock me-1" aria-hidden="true"></i>
+                    Sign in with <span th:text="${ssoLabel}">Contoso</span>
+                </a>
+                <div class="auth-divider"><span>or sign in with a password</span></div>
+            </th:block>
+
+            <form th:action="@{/login}" method="post">
+                <div class="mb-3">
+                    <label class="form-label" for="username">Email</label>
+                    <input type="email" class="form-control" id="username" name="username"
+                           autocomplete="username" autofocus required>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label" for="password">Password</label>
+                    <input type="password" class="form-control" id="password" name="password"
+                           autocomplete="current-password" required>
+                </div>
+                <!-- demoted to the quiet button when SSO is the expected route in -->
+                <button type="submit" class="btn btn-lg w-100"
+                        th:classappend="${ssoLabel != null} ? 'btn-outline-secondary' : 'btn-primary'">Sign in</button>
+            </form>
         </div>
+
+        <p class="auth-footnote">
+            Accounts are by invitation only. Ask an administrator of your group to invite you.
+        </p>
     </div>
 </main>
 </body>

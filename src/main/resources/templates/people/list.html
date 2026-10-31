@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>People</title>
+</head>
+<body>
+<main layout:fragment="content">
+    <div class="page-header page-header-row">
+        <div>
+            <h1 class="page-title"
+                th:text="${currentUser.superAdmin} ? 'Everyone' : 'People in ' + ${currentUser.group != null ? currentUser.group.name : 'your group'}">
+                People
+            </h1>
+            <p class="page-subtitle">
+                <th:block th:if="${currentUser.superAdmin}">Every account in the portal.</th:block>
+                <th:block th:unless="${currentUser.superAdmin}">
+                    Everyone here can see what keys the others hold, but never the key values themselves.
+                </th:block>
+            </p>
+        </div>
+        <div class="page-header-actions" th:if="${canInvite}">
+            <a th:href="@{/invitations/new}" class="btn btn-primary">
+                <i class="bi bi-person-plus me-1" aria-hidden="true"></i> Invite user
+            </a>
+        </div>
+    </div>
+
+    <div class="empty-state" th:if="${#lists.size(people) == 1}">
+        <div class="empty-state-icon"><i class="bi bi-people" aria-hidden="true"></i></div>
+        <h2 class="empty-state-title">It's just you so far</h2>
+        <p class="empty-state-text" th:if="${canInvite}">
+            Invite the rest of your team. Everyone you add can see which keys the group holds and
+            when they expire, without ever seeing each other's values.
+        </p>
+        <p class="empty-state-text" th:unless="${canInvite}">
+            An administrator of your group can invite other people in.
+        </p>
+        <a th:if="${canInvite}" th:href="@{/invitations/new}" class="btn btn-primary">
+            <i class="bi bi-person-plus me-1" aria-hidden="true"></i> Invite someone
+        </a>
+    </div>
+
+    <div class="table-surface" th:unless="${#lists.size(people) == 1}">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Email</th>
+                    <th scope="col" th:if="${currentUser.superAdmin}">Group</th>
+                    <th scope="col">Role</th>
+                    <th scope="col" class="text-end">Keys</th>
+                    <th scope="col">Last signed in</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="person : ${people}">
+                    <td>
+                        <div class="service-chip">
+                            <span class="avatar" aria-hidden="true"
+                                  th:text="${#strings.substring(person.displayName, 0, 1)}">A</span>
+                            <span>
+                                <a class="cell-primary" th:href="@{/people/{id}(id=${person.id})}"
+                                   th:text="${person.displayName}">Alex Carter</a>
+                                <span class="badge bg-light" th:if="${person.id == currentUser.id}">You</span>
+                                <span class="badge bg-secondary" th:unless="${person.enabled}">Disabled</span>
+                                <span class="d-block cell-sub" th:if="${person.jobTitle != null}"
+                                      th:text="${person.jobTitle}">Backend engineer</span>
+                            </span>
+                        </div>
+                    </td>
+                    <td class="cell-sub" th:text="${person.email}">alex@example.com</td>
+                    <td th:if="${currentUser.superAdmin}"
+                        th:text="${person.group != null ? person.group.name : '—'}">Platform team</td>
+                    <td><span th:replace="fragments/badges :: role(${person.role})"></span></td>
+                    <td class="text-end">
+                        <a th:href="@{/keys(owner=${person.id})}"
+                           th:text="${keyCounts.getOrDefault(person.id, 0)}">0</a>
+                    </td>
+                    <td th:text="${person.lastLoginAt != null ? #temporals.format(person.lastLoginAt, 'MMM d, yyyy') : 'Never'}">
+                        Never
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+</body>
+</html>

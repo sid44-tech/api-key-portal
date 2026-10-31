@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClientResponseException;
 
+import com.sidbhat.apikeyportal.activity.KeyOrigin;
 import com.sidbhat.apikeyportal.integration.azure.AzureGraphClient;
 import com.sidbhat.apikeyportal.integration.azure.AzureGraphClient.CreatedApplication;
 import com.sidbhat.apikeyportal.integration.azure.AzureGraphClient.CreatedSecret;
@@ -24,6 +25,7 @@ import com.sidbhat.apikeyportal.integration.google.GoogleIamClient.CreatedServic
 import com.sidbhat.apikeyportal.key.ApiKey;
 import com.sidbhat.apikeyportal.key.ApiKeyDetails;
 import com.sidbhat.apikeyportal.key.ApiKeyService;
+import com.sidbhat.apikeyportal.user.UserAccount;
 
 /**
  * Creates a credential in an external provider and stores the result as a local key.
@@ -74,19 +76,21 @@ public class KeyProvisioningService {
      * the partially created client is deleted again so nothing half-configured is
      * left behind in the provider.
      *
+     * @param owner the person asking for the key; the stored key becomes theirs
      * @throws ProvisioningException if any provider call fails
      */
-    public ApiKey provision(Long integrationId, String name, SecretValidity validity, String notes) {
-        ServiceIntegration integration = integrations.getById(integrationId);
+    public ApiKey provision(Long integrationId, String name, SecretValidity validity, String notes,
+            UserAccount owner) {
+        ServiceIntegration integration = integrations.getById(integrationId, owner);
         return switch (integration.getProvider()) {
-            case AZURE_AD -> provisionAzure(integration, name.trim(), validity, notes);
-            case GOOGLE_CLOUD -> provisionGoogle(integration, name.trim(), notes);
+            case AZURE_AD -> provisionAzure(integration, name.trim(), validity, notes, owner);
+            case GOOGLE_CLOUD -> provisionGoogle(integration, name.trim(), notes, owner);
         };
     }
 
     /** Azure: app registration + service principal + client secret. */
     private ApiKey provisionAzure(ServiceIntegration integration, String displayName, SecretValidity validity,
-            String notes) {
+            String notes, UserAccount owner) {
         String token = graphClient.acquireToken(integration.getTenantId(), integration.getClientId(),
                 integration.getClientSecret());
         CreatedApplication application = graphClient.createApplication(token, displayName);
@@ -106,7 +110,8 @@ public class KeyProvisioningService {
         }
 
         ApiKey key = apiKeyService.create(new ApiKeyDetails(displayName, integration.getName(), secret.secret(),
-                LocalDate.now(), expiryDate(secret, requestedEnd), buildNotes(notes, integration, application)));
+                LocalDate.now(), expiryDate(secret, requestedEnd), buildNotes(notes, integration, application)),
+                owner, KeyOrigin.provisionedBy(integration.getName()));
         integrations.markVerified(integration);
         log.info("Provisioned {} in {} (client id {})", key, integration, application.clientId());
         return key;
@@ -118,7 +123,8 @@ public class KeyProvisioningService {
      * account keys don't expire, so the local key has no expiry. The secret-validity
      * choice doesn't apply here; expiry can't be set through the keys API.
      */
-    private ApiKey provisionGoogle(ServiceIntegration integration, String displayName, String notes) {
+    private ApiKey provisionGoogle(ServiceIntegration integration, String displayName, String notes,
+            UserAccount owner) {
         String projectId = integration.getTenantId();
         String token = googleIamClient.acquireToken(integration.getClientId(), integration.getClientSecret());
         CreatedServiceAccount account = googleIamClient.createServiceAccount(token, projectId,
@@ -134,7 +140,8 @@ public class KeyProvisioningService {
         }
 
         ApiKey key = apiKeyService.create(new ApiKeyDetails(displayName, integration.getName(), keyJson,
-                LocalDate.now(), null, buildGoogleNotes(notes, integration, account)));
+                LocalDate.now(), null, buildGoogleNotes(notes, integration, account)),
+                owner, KeyOrigin.provisionedBy(integration.getName()));
         integrations.markVerified(integration);
         log.info("Provisioned {} in {} (service account {})", key, integration, account.email());
         return key;

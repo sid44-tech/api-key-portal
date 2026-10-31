@@ -9,9 +9,12 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 import org.springframework.data.annotation.CreatedDate;
@@ -19,9 +22,14 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import com.sidbhat.apikeyportal.crypto.EncryptedStringConverter;
+import com.sidbhat.apikeyportal.user.UserAccount;
+import com.sidbhat.apikeyportal.user.UserGroup;
 
 /**
  * A single API / access key for a third-party service.
+ * <p>
+ * Everyone in the owner's group can see a key and its metadata, but
+ * {@link #getKeyValue()} is only ever handed back to the owner.
  */
 @Entity
 @Table(name = "api_key")
@@ -55,6 +63,29 @@ public class ApiKey {
     /** Free-form notes, e.g. scopes or where the key is used. Not encrypted. */
     @Column(length = 1000)
     private String notes;
+
+    /**
+     * Whether the owner has asked not to be emailed as this key approaches its
+     * expiry. Off by default: reminders are the point, silence is opt-in per key.
+     */
+    @Column(name = "expiry_notifications_muted", nullable = false)
+    private boolean expiryNotificationsMuted;
+
+    /**
+     * Who added the key. Only they can reveal, edit or delete it.
+     * Null only for keys that predate accounts; the bootstrap admin claims those.
+     */
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "owner_id")
+    private UserAccount owner;
+
+    /**
+     * Who can see the key listed. Held alongside the owner rather than read through
+     * them, so moving someone to another group doesn't silently move their keys too.
+     */
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "group_id")
+    private UserGroup group;
 
     @CreatedDate
     @Column(name = "added_at", nullable = false, updatable = false)
@@ -155,6 +186,14 @@ public class ApiKey {
         this.notes = notes;
     }
 
+    public boolean isExpiryNotificationsMuted() {
+        return expiryNotificationsMuted;
+    }
+
+    public void setExpiryNotificationsMuted(boolean expiryNotificationsMuted) {
+        this.expiryNotificationsMuted = expiryNotificationsMuted;
+    }
+
     public Instant getAddedAt() {
         return addedAt;
     }
@@ -165,6 +204,33 @@ public class ApiKey {
 
     public Instant getLastRevealedAt() {
         return lastRevealedAt;
+    }
+
+    public UserAccount getOwner() {
+        return owner;
+    }
+
+    public UserGroup getGroup() {
+        return group;
+    }
+
+    /** Puts the key in a group by way of its owner. */
+    public void assignTo(UserAccount owner, UserGroup group) {
+        this.owner = owner;
+        this.group = group;
+    }
+
+    /** Name of the person who added the key, for the group's key list. */
+    public String getOwnerName() {
+        return owner == null ? "Unassigned" : owner.getDisplayName();
+    }
+
+    public Long getOwnerId() {
+        return owner == null ? null : owner.getId();
+    }
+
+    public boolean isOwnedBy(UserAccount user) {
+        return owner != null && user != null && Objects.equals(owner.getId(), user.getId());
     }
 
     @Override

@@ -20,8 +20,9 @@ COPY --from=build /workspace/target/api-key-portal-*.jar app.jar
 RUN mkdir /app/data && chown portal:portal /app/data
 USER portal
 
-# PORTAL_ENCRYPTION_KEY and PORTAL_PASSWORD_HASH must be provided at runtime,
-# e.g. docker run --env-file .env. .env is never copied into the image.
+# PORTAL_ENCRYPTION_KEY must be provided at runtime, e.g. docker run --env-file .env
+# (optionally with PORTAL_ADMIN_EMAIL / PORTAL_ADMIN_PASSWORD_HASH to seed the first
+# account). .env is never copied into the image.
 
 # Keep the SQLite database on the /app/data volume rather than the container layer
 ENV PORTAL_DB_PATH=/app/data/keyportal.db

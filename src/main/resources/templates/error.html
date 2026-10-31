@@ -7,10 +7,16 @@
 </head>
 <body>
 <main layout:fragment="content">
-    <div class="text-center py-5">
-        <h1 class="display-4" th:text="${status}">500</h1>
-        <p class="lead">Something went wrong. Please try again.</p>
-        <a th:href="@{/keys}" class="btn btn-primary">Back to keys</a>
+    <div class="auth-shell">
+        <div class="empty-state">
+            <div class="empty-state-icon"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i></div>
+            <h1 class="empty-state-title">Something went wrong</h1>
+            <p class="empty-state-text">
+                The portal hit an unexpected error<span th:if="${status}"> (<span th:text="${status}">500</span>)</span>.
+                Nothing was changed. Try again, and if it keeps happening let an administrator know.
+            </p>
+            <a th:href="@{/keys}" class="btn btn-primary">Back to keys</a>
+        </div>
     </div>
 </main>
 </body>

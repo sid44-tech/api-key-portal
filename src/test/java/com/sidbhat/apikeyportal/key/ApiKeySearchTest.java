@@ -12,12 +12,15 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 
+import com.sidbhat.apikeyportal.activity.ActivityService;
 import com.sidbhat.apikeyportal.config.JpaAuditingConfig;
 import com.sidbhat.apikeyportal.crypto.EncryptionProperties;
 import com.sidbhat.apikeyportal.crypto.EncryptionService;
+import com.sidbhat.apikeyportal.user.TestUsers;
+import com.sidbhat.apikeyportal.user.UserAccount;
 
 @DataJpaTest
-@Import({EncryptionService.class, JpaAuditingConfig.class, ApiKeyService.class})
+@Import({EncryptionService.class, JpaAuditingConfig.class, ApiKeyService.class, ActivityService.class})
 @EnableConfigurationProperties(EncryptionProperties.class)
 class ApiKeySearchTest {
 
@@ -26,6 +29,9 @@ class ApiKeySearchTest {
 
     @Autowired
     private ApiKeyService service;
+
+    /** A super admin sees every key, so these cases are about filtering, not visibility. */
+    private final UserAccount viewer = TestUsers.superAdmin();
 
     @BeforeEach
     void setUp() {
@@ -38,38 +44,38 @@ class ApiKeySearchTest {
 
     @Test
     void returnsEverythingWithoutFilters() {
-        assertThat(service.search(null, "", null, 0).getContent()).hasSize(4);
+        assertThat(service.search(viewer, null, "", null, null, 0).getContent()).hasSize(4);
     }
 
     @Test
     void matchesNameOrServiceCaseInsensitively() {
-        assertThat(service.search("DEPLOY", null, null, 0).getContent()).extracting(ApiKey::getName)
+        assertThat(service.search(viewer, "DEPLOY", null, null, null, 0).getContent()).extracting(ApiKey::getName)
                 .containsExactly("CI deploy", "Deploy");
-        assertThat(service.search("git", null, null, 0).getContent()).extracting(ApiKey::getName)
+        assertThat(service.search(viewer, "git", null, null, null, 0).getContent()).extracting(ApiKey::getName)
                 .containsExactly("CI deploy", "Personal");
     }
 
     @Test
     void filtersByService() {
-        assertThat(service.search(null, "GitHub", null, 0).getContent())
+        assertThat(service.search(viewer, null, "GitHub", null, null, 0).getContent())
                 .extracting(ApiKey::getServiceName).containsOnly("GitHub");
     }
 
     @Test
     void combinesTextAndServiceFilters() {
-        assertThat(service.search("deploy", "Heroku", null, 0).getContent())
+        assertThat(service.search(viewer, "deploy", "Heroku", null, null, 0).getContent())
                 .extracting(ApiKey::getName).containsExactly("Deploy");
     }
 
     @Test
     void sortsByExpiryWithNonExpiringKeysLast() {
-        assertThat(service.search(null, null, ApiKeySort.EXPIRES, 0).getContent()).extracting(ApiKey::getName)
+        assertThat(service.search(viewer, null, null, null, ApiKeySort.EXPIRES, 0).getContent()).extracting(ApiKey::getName)
                 .containsExactly("Deploy", "Prod secret key", "CI deploy", "Personal");
     }
 
     @Test
     void sortsByNewestFirst() {
-        assertThat(service.search(null, null, ApiKeySort.CREATED, 0).getContent()).extracting(ApiKey::getName)
+        assertThat(service.search(viewer, null, null, null, ApiKeySort.CREATED, 0).getContent()).extracting(ApiKey::getName)
                 .containsExactly("Personal", "Deploy", "Prod secret key", "CI deploy");
     }
 
@@ -79,8 +85,8 @@ class ApiKeySearchTest {
             repository.save(new ApiKey("Key " + i, "Zapier", "zp_" + i, LocalDate.now(), null));
         }
 
-        Page<ApiKey> first = service.search(null, null, ApiKeySort.SERVICE, 0);
-        Page<ApiKey> second = service.search(null, null, ApiKeySort.SERVICE, 1);
+        Page<ApiKey> first = service.search(viewer, null, null, null, ApiKeySort.SERVICE, 0);
+        Page<ApiKey> second = service.search(viewer, null, null, null, ApiKeySort.SERVICE, 1);
 
         assertThat(first.getTotalElements()).isEqualTo(ApiKeyService.PAGE_SIZE + 4);
         assertThat(first.getContent()).hasSize(ApiKeyService.PAGE_SIZE);

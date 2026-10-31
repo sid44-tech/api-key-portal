@@ -1,50 +1,131 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org"
+<html lang="en" data-bs-theme="light" xmlns:th="http://www.thymeleaf.org"
       xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title layout:title-pattern="$CONTENT_TITLE · API Key Portal">API Key Portal</title>
+    <meta name="color-scheme" content="light dark">
+    <!-- Before the stylesheet, so the theme is settled before the first paint -->
+    <script th:src="@{/js/theme.js}"></script>
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}">
     <link rel="stylesheet" th:href="@{/webjars/bootstrap-icons/font/bootstrap-icons.css}">
     <link rel="stylesheet" th:href="@{/css/app.css}">
 </head>
 <body>
-<nav class="navbar navbar-expand-md navbar-dark bg-dark mb-4">
+<nav class="navbar navbar-expand-md app-nav">
     <div class="container">
-        <a class="navbar-brand" th:href="@{/}"><i class="bi bi-key-fill me-1"></i> API Key Portal</a>
-        <ul class="navbar-nav me-auto" sec:authorize="isAuthenticated()">
-            <li class="nav-item">
-                <a class="nav-link" th:href="@{/keys}">Keys</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" th:href="@{/integrations}">Integrations</a>
-            </li>
-        </ul>
-        <div class="ms-auto d-flex align-items-center" sec:authorize="isAuthenticated()">
-            <span class="navbar-text me-3" sec:authentication="name">admin</span>
-            <form th:action="@{/logout}" method="post">
-                <button type="submit" class="btn btn-sm btn-outline-light">Sign out</button>
-            </form>
+        <a class="navbar-brand" th:href="@{/}">
+            <span class="brand-mark" aria-hidden="true"><i class="bi bi-key-fill"></i></span>
+            API Key Portal
+        </a>
+
+        <button class="navbar-toggler" type="button" sec:authorize="isAuthenticated()"
+                data-bs-toggle="collapse" data-bs-target="#appNav"
+                aria-controls="appNav" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-list" aria-hidden="true"></i>
+        </button>
+
+        <div class="collapse navbar-collapse" id="appNav" sec:authorize="isAuthenticated()">
+            <ul class="navbar-nav me-auto mt-2 mt-md-0">
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/keys}" th:classappend="${activeNav == 'keys'} ? 'active'"
+                       th:attrappend="aria-current=${activeNav == 'keys'} ? 'page'">Keys</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/people}" th:classappend="${activeNav == 'people'} ? 'active'"
+                       th:attrappend="aria-current=${activeNav == 'people'} ? 'page'">People</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/integrations}"
+                       th:classappend="${activeNav == 'integrations'} ? 'active'"
+                       th:attrappend="aria-current=${activeNav == 'integrations'} ? 'page'">Integrations</a>
+                </li>
+                <li class="nav-item" sec:authorize="hasAnyRole('SUPER_ADMIN', 'GROUP_ADMIN')">
+                    <a class="nav-link" th:href="@{/invitations}"
+                       th:classappend="${activeNav == 'invitations'} ? 'active'"
+                       th:attrappend="aria-current=${activeNav == 'invitations'} ? 'page'">Invitations</a>
+                </li>
+                <li class="nav-item" sec:authorize="hasRole('SUPER_ADMIN')">
+                    <a class="nav-link" th:href="@{/groups}" th:classappend="${activeNav == 'groups'} ? 'active'"
+                       th:attrappend="aria-current=${activeNav == 'groups'} ? 'page'">Groups</a>
+                </li>
+                <li class="nav-item" sec:authorize="hasAnyRole('SUPER_ADMIN', 'GROUP_ADMIN')">
+                    <a class="nav-link" th:href="@{/activity}"
+                       th:classappend="${activeNav == 'activity'} ? 'active'"
+                       th:attrappend="aria-current=${activeNav == 'activity'} ? 'page'">History</a>
+                </li>
+                <li class="nav-item" sec:authorize="hasRole('SUPER_ADMIN')">
+                    <a class="nav-link" th:href="@{/sso}" th:classappend="${activeNav == 'sso'} ? 'active'"
+                       th:attrappend="aria-current=${activeNav == 'sso'} ? 'page'">Single sign-on</a>
+                </li>
+            </ul>
+
+            <div class="dropdown mt-2 mt-md-0">
+                <button class="account-button dropdown-toggle" type="button"
+                        data-bs-toggle="dropdown" aria-expanded="false">
+                    <span class="avatar" aria-hidden="true" sec:authentication="principal.initials">AC</span>
+                    <span sec:authentication="principal.displayName">Administrator</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                        <h6 class="dropdown-header mb-0" sec:authentication="principal.email">you@example.com</h6>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" th:href="@{/profile}">
+                        <i class="bi bi-person me-2" aria-hidden="true"></i>My profile</a></li>
+                    <!-- the principal, not a model attribute: most pages don't publish currentUser -->
+                    <li th:unless="${#authentication.principal.ssoLinked}">
+                        <a class="dropdown-item" th:href="@{/profile/password}">
+                            <i class="bi bi-shield-lock me-2" aria-hidden="true"></i>Change password</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <form th:action="@{/logout}" method="post">
+                            <button type="submit" class="dropdown-item">
+                                <i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Sign out
+                            </button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
         </div>
     </div>
 </nav>
 
-<div class="container" th:if="${success != null or error != null}">
-    <div class="alert alert-success alert-dismissible fade show" role="alert" th:if="${success != null}">
+<div class="container flash-stack" th:if="${success != null or warning != null or error != null}">
+    <div class="alert alert-success alert-dismissible fade show d-flex align-items-start" role="alert"
+         th:if="${success != null}">
+        <i class="bi bi-check-circle-fill me-2 mt-1" aria-hidden="true"></i>
         <span th:text="${success}">Saved.</span>
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
-    <div class="alert alert-danger alert-dismissible fade show" role="alert" th:if="${error != null}">
+    <div class="alert alert-warning alert-dismissible fade show d-flex align-items-start" role="alert"
+         th:if="${warning != null}">
+        <i class="bi bi-exclamation-triangle-fill me-2 mt-1" aria-hidden="true"></i>
+        <span th:text="${warning}">Partly done.</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <div class="alert alert-danger alert-dismissible fade show d-flex align-items-start" role="alert"
+         th:if="${error != null}">
+        <i class="bi bi-exclamation-circle-fill me-2 mt-1" aria-hidden="true"></i>
         <span th:text="${error}">Something went wrong.</span>
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 </div>
 
-<main class="container" layout:fragment="content">
+<main class="container app-main" layout:fragment="content">
     <p>Page content goes here.</p>
 </main>
+
+<footer class="app-footer">
+    <div class="container d-flex flex-wrap justify-content-between gap-2">
+        <span>API Key Portal</span>
+        <span sec:authorize="isAuthenticated()">
+            Key values are encrypted at rest and only ever shown to the person who added them.
+        </span>
+    </div>
+</footer>
 
 <script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
 <th:block layout:fragment="scripts"></th:block>

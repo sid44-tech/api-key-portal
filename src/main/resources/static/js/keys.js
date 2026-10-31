@@ -37,6 +37,7 @@
 
         if (button.dataset.revealed === 'true') {
             text.textContent = button.dataset.masked;
+            text.classList.remove('is-revealed');
             button.dataset.revealed = 'false';
             setIcon(button, 'bi-eye', 'Show value');
             return;
@@ -46,6 +47,8 @@
             .then(function (value) {
                 button.dataset.masked = text.textContent;
                 text.textContent = value;
+                // the styling shift is the cue that what's on screen is now the real secret
+                text.classList.add('is-revealed');
                 button.dataset.revealed = 'true';
                 setIcon(button, 'bi-eye-slash', 'Hide value');
             })
@@ -81,6 +84,13 @@
             document.getElementById('deleteForm').action = button.dataset.deleteUrl;
         });
     }
+
+    // a switch that is really a form: flipping it saves straight away
+    document.querySelectorAll('.js-submit-on-change').forEach(function (toggle) {
+        toggle.addEventListener('change', function () {
+            toggle.form.submit();
+        });
+    });
 
     document.querySelectorAll('.js-autosubmit').forEach(function (select) {
         select.addEventListener('change', function () {

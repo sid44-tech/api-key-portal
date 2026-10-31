@@ -6,29 +6,59 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * The portal is single-user, so the credentials live in configuration rather than the database.
+ * Seed credentials for the super admin. Accounts live in the database, so these
+ * are only read while the portal is empty - see {@link BootstrapAdminInitializer}.
+ * <p>
+ * A fresh install always gets this one account, because sign-up is closed and
+ * every other account arrives by invitation from someone who is already in.
  */
 @ConfigurationProperties(prefix = "portal.security")
 @Validated
 public class SecurityProperties {
 
+    /** Login identifier of the seeded super admin. An email address, since that is what sign-in uses. */
     @NotBlank
-    private final String username;
+    private final String adminEmail;
 
-    /** BCrypt hash of the password. */
-    @NotBlank(message = "must be set, e.g. with the PORTAL_PASSWORD_HASH environment variable")
-    private final String passwordHash;
+    /**
+     * Password the seeded super admin starts with. Has to be replaced at their
+     * first sign-in, so the shipped default is a placeholder, not a secret.
+     */
+    @NotBlank
+    private final String adminPassword;
 
-    public SecurityProperties(String username, String passwordHash) {
-        this.username = username;
-        this.passwordHash = passwordHash;
+    /**
+     * BCrypt hash of the seeded super admin's password, for deployments that would
+     * rather not put a plaintext password in configuration at all. Set, it wins over
+     * {@link #getAdminPassword()} and is taken as deliberate, so no change is forced.
+     */
+    private final String adminPasswordHash;
+
+    /** Name of the group the seeded super admin administers. */
+    @NotBlank
+    private final String adminGroupName;
+
+    public SecurityProperties(String adminEmail, String adminPassword, String adminPasswordHash,
+            String adminGroupName) {
+        this.adminEmail = adminEmail;
+        this.adminPassword = adminPassword;
+        this.adminPasswordHash = adminPasswordHash;
+        this.adminGroupName = adminGroupName;
     }
 
-    public String getUsername() {
-        return username;
+    public String getAdminEmail() {
+        return adminEmail;
     }
 
-    public String getPasswordHash() {
-        return passwordHash;
+    public String getAdminPassword() {
+        return adminPassword;
+    }
+
+    public String getAdminPasswordHash() {
+        return adminPasswordHash;
+    }
+
+    public String getAdminGroupName() {
+        return adminGroupName;
     }
 }

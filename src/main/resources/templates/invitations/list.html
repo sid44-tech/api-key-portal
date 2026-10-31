@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Invitations</title>
+</head>
+<body>
+<main layout:fragment="content">
+    <div class="page-header page-header-row">
+        <div>
+            <h1 class="page-title">Invitations</h1>
+            <p class="page-subtitle">
+                Nobody can sign themselves up. An invitation link is good for 24 hours and can be
+                used once; after that, send another.
+            </p>
+        </div>
+        <div class="page-header-actions">
+            <a th:href="@{/invitations/new}" class="btn btn-primary">
+                <i class="bi bi-person-plus me-1" aria-hidden="true"></i> Invite user
+            </a>
+        </div>
+    </div>
+
+    <!-- Shown once, only when the email couldn't be sent: the token is nowhere else. -->
+    <div class="card mb-4" th:if="${invitationLink != null}">
+        <div class="card-body">
+            <h2 class="section-title">
+                <i class="bi bi-link-45deg me-1 text-primary" aria-hidden="true"></i>
+                The link, since the email didn't go out
+            </h2>
+            <p class="text-muted small">Pass this on yourself &mdash; it won't be shown again.</p>
+            <code class="user-select-all text-break d-block p-3 rounded-3 border"
+                  th:text="${invitationLink}">https://example.com/invite/token</code>
+        </div>
+    </div>
+
+    <div class="empty-state" th:if="${#lists.isEmpty(invitations)}">
+        <div class="empty-state-icon"><i class="bi bi-envelope-paper" aria-hidden="true"></i></div>
+        <h2 class="empty-state-title">No invitations yet</h2>
+        <p class="empty-state-text">
+            Invite someone by email and they'll get a link to set up their own account, with the
+            role and group you choose.
+        </p>
+        <a th:href="@{/invitations/new}" class="btn btn-primary">
+            <i class="bi bi-person-plus me-1" aria-hidden="true"></i> Invite someone
+        </a>
+    </div>
+
+    <div class="table-surface" th:unless="${#lists.isEmpty(invitations)}">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                <tr>
+                    <th scope="col">Email</th>
+                    <th scope="col" th:if="${currentUser.superAdmin}">Group</th>
+                    <th scope="col">Role</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Invited by</th>
+                    <th scope="col">Expires</th>
+                    <th scope="col" class="text-end">Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="invite : ${invitations}" th:with="status=${invite.statusAt(now)}">
+                    <td class="cell-primary" th:text="${invite.email}">sam@example.com</td>
+                    <td th:if="${currentUser.superAdmin}"
+                        th:text="${invite.group != null ? invite.group.name : '—'}">Platform team</td>
+                    <td><span th:replace="fragments/badges :: role(${invite.role})"></span></td>
+                    <td><span th:replace="fragments/badges :: invitation(${status})"></span></td>
+                    <td class="cell-sub"
+                        th:text="${invite.invitedBy != null ? invite.invitedBy.displayName : '—'}">Alex Carter</td>
+                    <td class="cell-sub"
+                        th:text="${#temporals.format(invite.expiresAt, 'MMM d, yyyy h:mm a')}">-</td>
+                    <!-- always visible: acting on an invitation is the point of this page -->
+                    <td class="text-end">
+                        <form th:if="${status.name() == 'PENDING'}" class="d-inline-block"
+                              th:action="@{/invitations/{id}/revoke(id=${invite.id})}" method="post">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">Withdraw</button>
+                        </form>
+                        <form th:if="${status.name() == 'EXPIRED' or status.name() == 'REVOKED'}" class="d-inline-block"
+                              th:action="@{/invitations/{id}/resend(id=${invite.id})}" method="post">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i> Send again
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</main>
+</body>
+</html>

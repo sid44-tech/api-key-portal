@@ -1,0 +1,36 @@
+-- Single sign-on against the organisation's identity provider (OpenID Connect).
+--
+-- One row, holding the one connection this portal trusts. A portal is deployed
+-- per organisation, so there is one identity provider; the table has a primary
+-- key rather than being a key/value blob so a second connection could be added
+-- later without a migration.
+
+CREATE TABLE sso_configuration (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    enabled          BOOLEAN      NOT NULL DEFAULT 0,
+    -- Shown on the sign-in button, e.g. "Contoso" in "Sign in with Contoso"
+    display_name     VARCHAR(60)  NOT NULL,
+    -- OIDC issuer; everything else is read from its discovery document
+    issuer_uri       VARCHAR(500) NOT NULL,
+    client_id        VARCHAR(255) NOT NULL,
+    -- Encrypted at rest with the portal's own key, like integration credentials
+    client_secret    VARCHAR(8192) NOT NULL,
+    scopes           VARCHAR(300) NOT NULL,
+    -- Which token claim carries group membership, and the value that grants access
+    groups_claim     VARCHAR(100) NOT NULL,
+    required_group   VARCHAR(255) NOT NULL,
+    -- Optional: membership of this one additionally makes somebody a group admin.
+    -- Super admin is deliberately never grantable from a claim.
+    admin_group      VARCHAR(255),
+    -- The portal group accounts created through SSO are placed in
+    default_group_id INTEGER      REFERENCES user_group (id),
+    created_at       TIMESTAMP    NOT NULL,
+    updated_at       TIMESTAMP    NOT NULL
+);
+
+-- How a local account is tied to a person at the identity provider. The OIDC
+-- subject is stable across email and name changes, which the email is not.
+ALTER TABLE user_account ADD COLUMN sso_subject VARCHAR(255);
+
+CREATE UNIQUE INDEX idx_user_account_sso_subject ON user_account (sso_subject)
+    WHERE sso_subject IS NOT NULL;

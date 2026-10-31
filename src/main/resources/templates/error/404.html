@@ -7,10 +7,15 @@
 </head>
 <body>
 <main layout:fragment="content">
-    <div class="text-center py-5">
-        <h1 class="display-4">404</h1>
-        <p class="lead">That page or key doesn't exist. It may have been deleted.</p>
-        <a th:href="@{/keys}" class="btn btn-primary">Back to keys</a>
+    <div class="auth-shell">
+        <div class="empty-state">
+            <div class="empty-state-icon"><i class="bi bi-compass" aria-hidden="true"></i></div>
+            <h1 class="empty-state-title">Not found</h1>
+            <p class="empty-state-text">
+                That page or key doesn't exist. It may have been deleted, or the link may be out of date.
+            </p>
+            <a th:href="@{/keys}" class="btn btn-primary">Back to keys</a>
+        </div>
     </div>
 </main>
 </body>

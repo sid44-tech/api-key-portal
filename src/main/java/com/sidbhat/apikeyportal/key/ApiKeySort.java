@@ -7,7 +7,8 @@ public enum ApiKeySort {
 
     SERVICE("Service"),
     EXPIRES("Expires soonest"),
-    CREATED("Newest first");
+    CREATED("Newest first"),
+    OWNER("Owner");
 
     private final String label;
 

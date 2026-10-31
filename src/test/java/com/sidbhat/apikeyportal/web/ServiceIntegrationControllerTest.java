@@ -18,11 +18,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.List;
 
 import org.hamcrest.Matchers;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -31,6 +31,11 @@ import com.sidbhat.apikeyportal.integration.ServiceIntegration;
 import com.sidbhat.apikeyportal.integration.ServiceIntegrationService;
 import com.sidbhat.apikeyportal.integration.ServiceProvider;
 import com.sidbhat.apikeyportal.security.SecurityConfig;
+import com.sidbhat.apikeyportal.user.PortalUser;
+import com.sidbhat.apikeyportal.user.TestUsers;
+import com.sidbhat.apikeyportal.user.UserAccount;
+import com.sidbhat.apikeyportal.user.UserAccountService;
+import com.sidbhat.apikeyportal.user.WithPortalUser;
 
 @WebMvcTest(controllers = ServiceIntegrationController.class)
 @Import(SecurityConfig.class)
@@ -42,6 +47,17 @@ class ServiceIntegrationControllerTest {
     @MockitoBean
     private ServiceIntegrationService integrationService;
 
+    @MockitoBean
+    private UserAccountService userService;
+
+    private final UserAccount alex = TestUsers.alex();
+
+    @BeforeEach
+    void stubCurrentUser() {
+        when(userService.getCurrent(any()))
+                .thenAnswer(invocation -> TestUsers.accountFor((PortalUser) invocation.getArgument(0)));
+    }
+
     @Test
     void redirectsAnonymousUsersToLogin() throws Exception {
         mvc.perform(get("/integrations"))
@@ -50,9 +66,9 @@ class ServiceIntegrationControllerTest {
     }
 
     @Test
-    @WithMockUser
+    @WithPortalUser
     void listsIntegrationsWithoutRenderingSecrets() throws Exception {
-        when(integrationService.findAll()).thenReturn(List.of(new ServiceIntegration(ServiceProvider.AZURE_AD,
+        when(integrationService.findAll(alex)).thenReturn(List.of(new ServiceIntegration(ServiceProvider.AZURE_AD,
                 "Azure AD", "tenant-1", "client-1", "fake-portal-secret")));
 
         mvc.perform(get("/integrations"))
@@ -64,13 +80,13 @@ class ServiceIntegrationControllerTest {
     }
 
     @Test
-    @WithMockUser
+    @WithPortalUser
     void showsEmptyStateWithSetupLink() throws Exception {
-        when(integrationService.findAll()).thenReturn(List.of());
+        when(integrationService.findAll(alex)).thenReturn(List.of());
 
         mvc.perform(get("/integrations"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(Matchers.containsString("Create a new integration")))
+                .andExpect(content().string(Matchers.containsString("Connect a provider")))
                 .andExpect(content().string(Matchers.containsString("/integrations/new?provider=AZURE_AD")))
                 .andExpect(content().string(Matchers.containsString("/integrations/new?provider=GOOGLE_CLOUD")))
                 .andExpect(content().string(Matchers.containsString("/keys/guided/github")))
@@ -78,7 +94,7 @@ class ServiceIntegrationControllerTest {
     }
 
     @Test
-    @WithMockUser
+    @WithPortalUser
     void setupPageShowsWalkthroughWithAzureLinks() throws Exception {
         mvc.perform(get("/integrations/new").param("provider", "AZURE_AD"))
                 .andExpect(status().isOk())
@@ -89,10 +105,10 @@ class ServiceIntegrationControllerTest {
     }
 
     @Test
-    @WithMockUser
+    @WithPortalUser
     void connectVerifiesAndSaves() throws Exception {
         when(integrationService.connect(eq(ServiceProvider.AZURE_AD), eq("Azure AD"), eq("tenant-1"),
-                eq("client-1"), eq("portal-secret")))
+                eq("client-1"), eq("portal-secret"), eq(alex)))
                 .thenReturn(new ServiceIntegration(ServiceProvider.AZURE_AD, "Azure AD", "tenant-1", "client-1",
                         "portal-secret"));
 
@@ -107,7 +123,7 @@ class ServiceIntegrationControllerTest {
     }
 
     @Test
-    @WithMockUser
+    @WithPortalUser
     void connectRedisplaysFormWhenInvalid() throws Exception {
         mvc.perform(post("/integrations/azure-ad").with(csrf())
                         .param("name", "Azure AD")
@@ -118,13 +134,13 @@ class ServiceIntegrationControllerTest {
                 .andExpect(view().name("integrations/azure-setup"))
                 .andExpect(model().attributeHasFieldErrors("form", "tenantId", "clientSecret"));
 
-        verify(integrationService, never()).connect(any(), any(), any(), any(), any());
+        verify(integrationService, never()).connect(any(), any(), any(), any(), any(), any());
     }
 
     @Test
-    @WithMockUser
+    @WithPortalUser
     void connectShowsProviderErrorWhenVerificationFails() throws Exception {
-        when(integrationService.connect(any(), any(), any(), any(), any()))
+        when(integrationService.connect(any(), any(), any(), any(), any(), any()))
                 .thenThrow(new ProvisioningException("Azure AD rejected the credentials (HTTP 401): bad secret"));
 
         mvc.perform(post("/integrations/azure-ad").with(csrf())
@@ -139,9 +155,9 @@ class ServiceIntegrationControllerTest {
     }
 
     @Test
-    @WithMockUser
+    @WithPortalUser
     void testEndpointReportsResult() throws Exception {
-        when(integrationService.test(1L)).thenReturn(new ServiceIntegration(ServiceProvider.AZURE_AD, "Azure AD",
+        when(integrationService.test(1L, alex)).thenReturn(new ServiceIntegration(ServiceProvider.AZURE_AD, "Azure AD",
                 "tenant-1", "client-1", "portal-secret"));
 
         mvc.perform(post("/integrations/1/test").with(csrf()))
@@ -150,9 +166,9 @@ class ServiceIntegrationControllerTest {
     }
 
     @Test
-    @WithMockUser
+    @WithPortalUser
     void testEndpointReportsFailure() throws Exception {
-        when(integrationService.test(1L)).thenThrow(new ProvisioningException("Azure AD rejected the credentials"));
+        when(integrationService.test(1L, alex)).thenThrow(new ProvisioningException("Azure AD rejected the credentials"));
 
         mvc.perform(post("/integrations/1/test").with(csrf()))
                 .andExpect(redirectedUrl("/integrations"))
@@ -160,18 +176,18 @@ class ServiceIntegrationControllerTest {
     }
 
     @Test
-    @WithMockUser
+    @WithPortalUser
     void deleteRequiresCsrfToken() throws Exception {
         mvc.perform(post("/integrations/1/delete"))
                 .andExpect(status().isForbidden());
 
-        verify(integrationService, never()).delete(any());
+        verify(integrationService, never()).delete(any(), any());
     }
 
     @Test
-    @WithMockUser
+    @WithPortalUser
     void deleteRedirectsToList() throws Exception {
-        when(integrationService.delete(1L)).thenReturn(new ServiceIntegration(ServiceProvider.AZURE_AD, "Azure AD",
+        when(integrationService.delete(1L, alex)).thenReturn(new ServiceIntegration(ServiceProvider.AZURE_AD, "Azure AD",
                 "tenant-1", "client-1", "portal-secret"));
 
         mvc.perform(post("/integrations/1/delete").with(csrf()))

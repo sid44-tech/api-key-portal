@@ -1,0 +1,20 @@
+-- Email reminders before a key expires, and the per-key switch that silences them.
+
+-- Off by default: everyone gets reminders until they ask not to, per key.
+ALTER TABLE api_key ADD COLUMN expiry_notifications_muted BOOLEAN NOT NULL DEFAULT 0;
+
+-- One row per reminder actually sent. The expiry date is part of the key so
+-- that editing a key's expiry starts its reminders afresh - a key rotated for
+-- another year should be warned about again a year on, and a key whose expiry
+-- was pushed out a week shouldn't be re-warned at thresholds it already passed.
+CREATE TABLE expiry_reminder (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    api_key_id      INTEGER      NOT NULL REFERENCES api_key (id) ON DELETE CASCADE,
+    expires_on      DATE         NOT NULL,
+    threshold_days  INTEGER      NOT NULL,
+    recipient_email VARCHAR(255) NOT NULL,
+    sent_at         TIMESTAMP    NOT NULL
+);
+
+CREATE UNIQUE INDEX idx_expiry_reminder_once
+    ON expiry_reminder (api_key_id, expires_on, threshold_days);

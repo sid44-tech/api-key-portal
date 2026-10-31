@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>History</title>
+</head>
+<body>
+<main layout:fragment="content">
+    <div class="page-header">
+        <h1 class="page-title">History</h1>
+        <p class="page-subtitle">
+            <th:block th:if="${currentUser.superAdmin}">
+                Everything created across every group, newest first.
+            </th:block>
+            <th:block th:unless="${currentUser.superAdmin}">
+                Everything created in
+                <span th:text="${currentUser.group != null ? currentUser.group.name : 'your group'}">your group</span>,
+                newest first.
+            </th:block>
+        </p>
+    </div>
+
+    <div class="empty-state" th:if="${page.totalElements == 0}">
+        <div class="empty-state-icon"><i class="bi bi-clock-history" aria-hidden="true"></i></div>
+        <h2 class="empty-state-title">Nothing yet</h2>
+        <p class="empty-state-text">
+            Keys, integrations and invitations will show up here as people create them.
+        </p>
+    </div>
+
+    <div class="table-surface" th:if="${page.totalElements > 0}">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                <tr>
+                    <th scope="col">When</th>
+                    <th scope="col">Who</th>
+                    <th scope="col">Did what</th>
+                    <th scope="col">To what</th>
+                    <th scope="col" th:if="${currentUser.superAdmin}">Group</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="event : ${page.content}">
+                    <td class="cell-sub text-nowrap"
+                        th:text="${#temporals.format(event.occurredAt, 'MMM d, yyyy h:mm a')}">-</td>
+                    <td>
+                        <div class="service-chip">
+                            <span class="avatar" aria-hidden="true"
+                                  th:text="${#strings.substring(event.actorName, 0, 1)}">A</span>
+                            <span>
+                                <span class="d-block cell-primary" th:text="${event.actorName}">Alex Carter</span>
+                                <span class="d-block cell-sub" th:text="${event.actorEmail}">alex@example.com</span>
+                            </span>
+                        </div>
+                    </td>
+                    <td>
+                        <span th:replace="fragments/badges :: activity(${event.action})"></span>
+                        <div class="cell-sub mt-1" th:if="${event.keySource != null}"
+                             th:text="${event.keySource.label}">Created via integration</div>
+                    </td>
+                    <td>
+                        <a th:if="${event.keyEvent and event.targetId != null}"
+                           th:href="@{/keys/{id}(id=${event.targetId})}"
+                           th:text="${event.targetName}">GitHub / CI deploy token</a>
+                        <span th:unless="${event.keyEvent and event.targetId != null}"
+                              th:text="${event.targetName}">GitHub / CI deploy token</span>
+                        <div class="cell-sub" th:if="${event.detail != null}" th:text="${event.detail}">
+                            Azure AD production
+                        </div>
+                    </td>
+                    <td th:if="${currentUser.superAdmin}" class="cell-sub"
+                        th:text="${event.groupName != null ? event.groupName : '—'}">Platform team</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <nav aria-label="History pages" class="mt-4" th:if="${page.totalPages > 1}">
+        <ul class="pagination justify-content-center">
+            <li class="page-item" th:classappend="${page.first} ? 'disabled'">
+                <a class="page-link" th:href="@{/activity(page=${page.number - 1})}">Previous</a>
+            </li>
+            <li class="page-item" th:each="i : ${#numbers.sequence(0, page.totalPages - 1)}"
+                th:classappend="${i == page.number} ? 'active'">
+                <a class="page-link" th:href="@{/activity(page=${i})}" th:text="${i + 1}">1</a>
+            </li>
+            <li class="page-item" th:classappend="${page.last} ? 'disabled'">
+                <a class="page-link" th:href="@{/activity(page=${page.number + 1})}">Next</a>
+            </li>
+        </ul>
+    </nav>
+</main>
+</body>
+</html>

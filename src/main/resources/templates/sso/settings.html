@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Single sign-on</title>
+</head>
+<body>
+<main layout:fragment="content">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <div class="page-header">
+                <h1 class="page-title">Single sign-on</h1>
+                <p class="page-subtitle">
+                    Let people sign in with your organisation's identity provider. Access is granted by
+                    putting someone in a directory group &mdash; nobody gets in without it.
+                </p>
+            </div>
+
+            <th:block th:object="${form}">
+                <div class="alert alert-danger" th:if="${#fields.hasGlobalErrors()}">
+                    <p class="mb-0" th:each="err : ${#fields.globalErrors()}" th:text="${err}">Error</p>
+                </div>
+            </th:block>
+
+            <div class="card mb-4">
+                <div class="card-header">Before you start</div>
+                <div class="card-body">
+                    <p class="text-muted small">
+                        Register this portal as an application in your identity provider (an
+                        <strong>app registration</strong> in Microsoft Entra ID, an
+                        <strong>OIDC web app</strong> in Okta or Google Workspace), then paste its details
+                        below. The portal reads everything else from the provider's OpenID configuration.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label" for="redirectUri">Redirect URI to register</label>
+                        <input type="text" class="form-control font-monospace" id="redirectUri"
+                               th:value="${redirectUri}" readonly>
+                        <small class="form-text">
+                            Give the provider exactly this. It must be reachable by the person signing in,
+                            so set <code>PORTAL_BASE_URL</code> if the portal sits behind a proxy.
+                        </small>
+                    </div>
+                    <p class="text-muted small mb-0">
+                        Then make the provider send group membership: in Entra ID that is
+                        <em>Token configuration &rarr; Add groups claim</em>, choosing
+                        <em>Groups assigned to the application</em> so the claim stays small.
+                    </p>
+                </div>
+            </div>
+
+            <form th:action="@{/sso}" th:object="${form}" method="post" novalidate>
+                <input type="hidden" th:field="*{secretStored}">
+
+                <div class="card mb-4">
+                    <div class="card-header">Provider</div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label" for="displayName">Name on the sign-in button</label>
+                            <input type="text" class="form-control" th:field="*{displayName}"
+                                   th:errorclass="is-invalid" maxlength="60" placeholder="e.g. Contoso" required>
+                            <small class="form-text">People will see "Sign in with this".</small>
+                            <div class="invalid-feedback" th:errors="*{displayName}"></div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="issuerUri">Issuer URL</label>
+                            <input type="url" class="form-control font-monospace" th:field="*{issuerUri}"
+                                   th:errorclass="is-invalid" maxlength="500"
+                                   placeholder="https://login.microsoftonline.com/&lt;tenant-id&gt;/v2.0" required>
+                            <small class="form-text">
+                                The portal appends <code>/.well-known/openid-configuration</code> and checks it
+                                when you save.
+                            </small>
+                            <div class="invalid-feedback" th:errors="*{issuerUri}"></div>
+                        </div>
+
+                        <div class="row">
+                            <div class="mb-3 col-md-6">
+                                <label class="form-label" for="clientId">Client ID</label>
+                                <input type="text" class="form-control font-monospace" th:field="*{clientId}"
+                                       th:errorclass="is-invalid" maxlength="255" required>
+                                <div class="invalid-feedback" th:errors="*{clientId}"></div>
+                            </div>
+                            <div class="mb-3 col-md-6">
+                                <label class="form-label" for="clientSecret">Client secret</label>
+                                <input type="password" class="form-control" th:field="*{clientSecret}"
+                                       th:classappend="${#fields.hasErrors('clientSecret') or #fields.hasErrors('clientSecretPresentWhenNew')} ? 'is-invalid'"
+                                       autocomplete="new-password" maxlength="2000">
+                                <small class="form-text" th:if="*{secretStored}">
+                                    <i class="bi bi-shield-lock me-1" aria-hidden="true"></i>
+                                    A secret is stored and encrypted. Leave blank to keep it.
+                                </small>
+                                <small class="form-text" th:unless="*{secretStored}">
+                                    Stored encrypted and never shown again.
+                                </small>
+                                <div class="invalid-feedback" th:errors="*{clientSecret}"></div>
+                                <div class="invalid-feedback" th:errors="*{clientSecretPresentWhenNew}"></div>
+                            </div>
+                        </div>
+
+                        <div class="mb-0">
+                            <label class="form-label" for="scopes">Scopes</label>
+                            <input type="text" class="form-control font-monospace" th:field="*{scopes}"
+                                   th:errorclass="is-invalid" maxlength="300">
+                            <small class="form-text">
+                                Comma separated. <code>openid</code> is always requested.
+                            </small>
+                            <div class="invalid-feedback" th:errors="*{scopes}"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">Who gets in</div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="mb-3 col-md-6">
+                                <label class="form-label" for="groupsClaim">Group claim</label>
+                                <input type="text" class="form-control font-monospace" th:field="*{groupsClaim}"
+                                       th:errorclass="is-invalid" maxlength="100">
+                                <small class="form-text">Entra ID, Okta and Google all use <code>groups</code>.</small>
+                                <div class="invalid-feedback" th:errors="*{groupsClaim}"></div>
+                            </div>
+                            <div class="mb-3 col-md-6">
+                                <label class="form-label" for="requiredGroup">Group that grants access</label>
+                                <input type="text" class="form-control font-monospace" th:field="*{requiredGroup}"
+                                       th:errorclass="is-invalid" maxlength="255" required>
+                                <small class="form-text">
+                                    Checked on every sign-in. Entra sends group object IDs; others send names.
+                                </small>
+                                <div class="invalid-feedback" th:errors="*{requiredGroup}"></div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="mb-3 col-md-6">
+                                <label class="form-label" for="adminGroup">Group that grants group admin</label>
+                                <input type="text" class="form-control font-monospace" th:field="*{adminGroup}"
+                                       th:errorclass="is-invalid" maxlength="255">
+                                <small class="form-text">
+                                    Optional. Set it and the provider owns this flag on every sign-in; leave it
+                                    blank and roles stay whatever the portal says.
+                                </small>
+                                <div class="invalid-feedback" th:errors="*{adminGroup}"></div>
+                            </div>
+                            <div class="mb-3 col-md-6">
+                                <label class="form-label" for="defaultGroupId">Portal group for new accounts</label>
+                                <select class="form-select" th:field="*{defaultGroupId}"
+                                        th:classappend="${#fields.hasErrors('defaultGroupId') or #fields.hasErrors('defaultGroupChosenWhenEnabled')} ? 'is-invalid'">
+                                    <option value="">Choose a group</option>
+                                    <option th:each="g : ${groups}" th:value="${g.id}" th:text="${g.name}">Platform team</option>
+                                </select>
+                                <small class="form-text">
+                                    People already in the portal keep the group they have.
+                                </small>
+                                <div class="invalid-feedback" th:errors="*{defaultGroupId}"></div>
+                                <div class="invalid-feedback" th:errors="*{defaultGroupChosenWhenEnabled}"></div>
+                            </div>
+                        </div>
+
+                        <p class="text-muted small mb-0">
+                            <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+                            Super admin is never granted from a directory group &mdash; it stays something you
+                            hand out inside the portal.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <div class="form-check mb-0">
+                            <input type="checkbox" class="form-check-input" th:field="*{enabled}">
+                            <label class="form-check-label" for="enabled">
+                                <strong>Offer single sign-on on the sign-in page</strong>
+                                <span class="d-block form-text">
+                                    The provider is contacted when you save, so a wrong issuer or secret is
+                                    caught here rather than by the first person who tries to sign in.
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="card-footer d-flex justify-content-between align-items-center">
+                        <span class="cell-sub" th:if="${configured}">
+                            Turning it off leaves accounts and settings intact.
+                        </span>
+                        <span th:unless="${configured}"></span>
+                        <span class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Save</button>
+                        </span>
+                    </div>
+                </div>
+            </form>
+
+            <form th:action="@{/sso/disable}" method="post" class="mt-3 text-end" th:if="${configured}">
+                <button type="submit" class="btn btn-outline-danger btn-sm">Switch single sign-on off</button>
+            </form>
+        </div>
+    </div>
+</main>
+</body>
+</html>

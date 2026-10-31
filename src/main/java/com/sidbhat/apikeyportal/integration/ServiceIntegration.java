@@ -9,9 +9,12 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 import org.springframework.data.annotation.CreatedDate;
@@ -19,6 +22,7 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import com.sidbhat.apikeyportal.crypto.EncryptedStringConverter;
+import com.sidbhat.apikeyportal.user.UserGroup;
 
 /**
  * A connection to an external service provider that the portal can create
@@ -57,6 +61,14 @@ public class ServiceIntegration {
     @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "client_secret", nullable = false, length = 8192)
     private String clientSecret;
+
+    /**
+     * The group that set the integration up. Stored credentials can mint new
+     * credentials in the provider, so only that group may use or see it.
+     */
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "group_id")
+    private UserGroup group;
 
     @CreatedDate
     @Column(name = "added_at", nullable = false, updatable = false)
@@ -117,6 +129,18 @@ public class ServiceIntegration {
 
     public Instant getLastVerifiedAt() {
         return lastVerifiedAt;
+    }
+
+    public UserGroup getGroup() {
+        return group;
+    }
+
+    public void assignTo(UserGroup group) {
+        this.group = group;
+    }
+
+    public Long getGroupId() {
+        return group == null ? null : group.getId();
     }
 
     public void markVerified(Instant verifiedAt) {

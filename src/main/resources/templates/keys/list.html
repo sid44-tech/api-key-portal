@@ -7,47 +7,64 @@
 </head>
 <body>
 <main layout:fragment="content">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 mb-0">My keys</h1>
-        <a th:href="@{/keys/new}" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Add key</a>
+    <div class="page-header page-header-row">
+        <div>
+            <h1 class="page-title"
+                th:text="${currentUser.group != null ? currentUser.group.name + ' keys' : 'Keys'}">Keys</h1>
+            <p class="page-subtitle">
+                Everyone in the group sees these. Only the person who added a key can reveal, copy or change it.
+            </p>
+        </div>
+        <div class="page-header-actions">
+            <a th:href="@{/keys/new}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1" aria-hidden="true"></i> Add key
+            </a>
+        </div>
     </div>
 
-    <div class="row mb-4" th:if="${summary.total > 0}">
-        <div class="col-sm-4 mb-3 mb-sm-0">
-            <div class="card text-center h-100">
-                <div class="card-body">
-                    <div class="display-4" th:text="${summary.total}">0</div>
-                    <div class="text-muted">Keys</div>
-                </div>
+    <div class="stat-grid" th:if="${summary.total > 0}">
+        <div class="stat">
+            <div class="stat-value" th:text="${summary.total}">0</div>
+            <div class="stat-label">
+                <i class="bi bi-key" aria-hidden="true"></i>
+                <span th:text="${summary.total == 1 ? 'Key tracked' : 'Keys tracked'}">Keys tracked</span>
             </div>
         </div>
-        <div class="col-sm-4 mb-3 mb-sm-0">
-            <a th:href="@{/keys(sort=EXPIRES)}" class="card text-center h-100 text-decoration-none"
-               th:classappend="${summary.expiringSoon > 0} ? 'border-warning'">
-                <div class="card-body">
-                    <div class="display-4 text-warning" th:text="${summary.expiringSoon}">0</div>
-                    <div class="text-muted">Expiring in the next 30 days</div>
-                </div>
-            </a>
-        </div>
-        <div class="col-sm-4">
-            <a th:href="@{/keys(sort=EXPIRES)}" class="card text-center h-100 text-decoration-none"
-               th:classappend="${summary.expired > 0} ? 'border-danger'">
-                <div class="card-body">
-                    <div class="display-4 text-danger" th:text="${summary.expired}">0</div>
-                    <div class="text-muted">Expired</div>
-                </div>
-            </a>
-        </div>
+        <a th:href="@{/keys(sort=EXPIRES)}" class="stat"
+           th:classappend="${summary.expiringSoon > 0} ? 'stat-attention' : 'stat-quiet'">
+            <div class="stat-value" th:text="${summary.expiringSoon}">0</div>
+            <div class="stat-label">
+                <i class="bi bi-clock-history" aria-hidden="true"></i> Expiring within 30 days
+            </div>
+        </a>
+        <a th:href="@{/keys(sort=EXPIRES)}" class="stat"
+           th:classappend="${summary.expired > 0} ? 'stat-critical' : 'stat-quiet'">
+            <div class="stat-value" th:text="${summary.expired}">0</div>
+            <div class="stat-label">
+                <i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Already expired
+            </div>
+        </a>
     </div>
 
-    <form th:action="@{/keys}" method="get" class="row g-2 mb-3">
-        <div class="col-md-4">
+    <form th:action="@{/keys}" method="get" class="filter-bar">
+        <div class="filter-search">
             <label class="visually-hidden" for="q">Search</label>
-            <input type="search" class="form-control" id="q" name="q" th:value="${q}"
-                   placeholder="Search by name or service">
+            <div class="search-input-group">
+                <i class="bi bi-search" aria-hidden="true"></i>
+                <input type="search" class="form-control" id="q" name="q" th:value="${q}"
+                       placeholder="Search by name, service or owner">
+            </div>
         </div>
-        <div class="col-md-3">
+        <div class="filter-select">
+            <label class="visually-hidden" for="owner">Owner</label>
+            <select class="form-select js-autosubmit" id="owner" name="owner">
+                <option value="">Everyone in the group</option>
+                <option th:each="p : ${people}" th:value="${p.id}"
+                        th:text="${p.id == currentUser.id ? 'Only mine' : p.displayName}"
+                        th:selected="${p.id == owner}">Only mine</option>
+            </select>
+        </div>
+        <div class="filter-select">
             <label class="visually-hidden" for="service">Service</label>
             <select class="form-select js-autosubmit" id="service" name="service">
                 <option value="">All services</option>
@@ -55,89 +72,131 @@
                         th:selected="${s == service}">GitHub</option>
             </select>
         </div>
-        <div class="col-md-3">
+        <div class="filter-select">
             <label class="visually-hidden" for="sort">Sort by</label>
             <select class="form-select js-autosubmit" id="sort" name="sort">
                 <option th:each="s : ${sorts}" th:value="${s}" th:text="${'Sort: ' + s.label}"
                         th:selected="${s == sort}">Sort: Service</option>
             </select>
         </div>
-        <div class="col-md-2">
-            <button type="submit" class="btn btn-outline-secondary w-100">Search</button>
-        </div>
+        <button type="submit" class="btn btn-outline-secondary">Search</button>
     </form>
 
-    <div th:if="${#lists.isEmpty(keys)}" class="alert alert-info">
-        <th:block th:if="${#strings.isEmpty(q) and #strings.isEmpty(service)}">
-            No keys yet. <a th:href="@{/keys/new}" class="alert-link">Add your first one.</a>
-        </th:block>
-        <th:block th:unless="${#strings.isEmpty(q) and #strings.isEmpty(service)}">
-            No keys match your search. <a th:href="@{/keys}" class="alert-link">Clear filters</a>
-        </th:block>
+    <th:block th:if="${#lists.isEmpty(keys)}">
+        <div class="empty-state"
+             th:if="${#strings.isEmpty(q) and #strings.isEmpty(service) and owner == null}">
+            <div class="empty-state-icon"><i class="bi bi-key" aria-hidden="true"></i></div>
+            <h2 class="empty-state-title">No keys yet</h2>
+            <p class="empty-state-text">
+                Add the API keys and tokens your group relies on, and the portal will keep track of
+                who holds what and when each one expires.
+            </p>
+            <a th:href="@{/keys/new}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1" aria-hidden="true"></i> Add your first key
+            </a>
+        </div>
+        <div class="empty-state"
+             th:unless="${#strings.isEmpty(q) and #strings.isEmpty(service) and owner == null}">
+            <div class="empty-state-icon"><i class="bi bi-search" aria-hidden="true"></i></div>
+            <h2 class="empty-state-title">No matches</h2>
+            <p class="empty-state-text">Nothing here matches those filters.</p>
+            <a th:href="@{/keys}" class="btn btn-outline-secondary">Clear filters</a>
+        </div>
+    </th:block>
+
+    <div class="table-surface" th:unless="${#lists.isEmpty(keys)}">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                <tr>
+                    <th scope="col">Service</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Owner</th>
+                    <th scope="col">Value</th>
+                    <th scope="col">Created</th>
+                    <th scope="col">Expires</th>
+                    <!-- the row actions appear on hover, so a standing label would sit over an empty column -->
+                    <th scope="col" class="text-end"><span class="visually-hidden">Actions</span></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="key : ${keys}"
+                    th:with="mine=${key.ownerId != null and key.ownerId == currentUser.id}">
+                    <td>
+                        <span class="service-chip">
+                            <span class="service-glyph" aria-hidden="true"
+                                  th:text="${#strings.substring(key.serviceName, 0, 1)}">G</span>
+                            <span th:text="${key.serviceName}">GitHub</span>
+                        </span>
+                    </td>
+                    <td>
+                        <a class="cell-primary" th:href="@{/keys/{id}(id=${key.id})}"
+                           th:text="${key.name}">Deploy token</a>
+                    </td>
+                    <td>
+                        <span th:if="${mine}">You</span>
+                        <a th:unless="${mine}" th:href="@{/keys(owner=${key.ownerId})}"
+                           th:text="${key.ownerName}">Alex Carter</a>
+                    </td>
+                    <td>
+                        <span class="key-value">
+                            <code class="key-value-text" th:text="${key.maskedValue}">••••••••</code>
+                            <th:block th:if="${mine}">
+                                <button type="button" class="btn btn-icon js-reveal" title="Show value"
+                                        th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">
+                                    <i class="bi bi-eye" aria-hidden="true"></i><span class="visually-hidden">Show value</span>
+                                </button>
+                                <button type="button" class="btn btn-icon js-copy" title="Copy to clipboard"
+                                        th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">
+                                    <i class="bi bi-clipboard" aria-hidden="true"></i><span class="visually-hidden">Copy to clipboard</span>
+                                </button>
+                            </th:block>
+                            <i class="bi bi-lock text-muted" th:unless="${mine}"
+                               th:title="|Only ${key.ownerName} can see this value|" aria-hidden="true"></i>
+                            <span class="visually-hidden" th:unless="${mine}">Value hidden; owned by another member</span>
+                        </span>
+                    </td>
+                    <td th:text="${#temporals.format(key.createdOn, 'MMM d, yyyy')}">Jan 1, 2021</td>
+                    <td>
+                        <div th:text="${key.expiresOn != null ? #temporals.format(key.expiresOn, 'MMM d, yyyy') : 'Never'}">Never</div>
+                        <span th:replace="fragments/badges :: expiration(${key})"></span>
+                    </td>
+                    <td class="text-end">
+                        <span class="row-actions" th:if="${mine}">
+                            <a th:href="@{/keys/{id}/edit(id=${key.id})}" class="btn btn-icon" title="Edit">
+                                <i class="bi bi-pencil" aria-hidden="true"></i><span class="visually-hidden">Edit</span>
+                            </a>
+                            <button type="button" class="btn btn-icon btn-icon-danger" title="Delete"
+                                    data-bs-toggle="modal" data-bs-target="#deleteModal"
+                                    th:attr="data-key-name=${key.serviceName + ' / ' + key.name},data-delete-url=@{/keys/{id}/delete(id=${key.id})}">
+                                <i class="bi bi-trash" aria-hidden="true"></i><span class="visually-hidden">Delete</span>
+                            </button>
+                        </span>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
-    <div class="table-responsive" th:unless="${#lists.isEmpty(keys)}">
-        <table class="table table-hover">
-            <thead class="table-light">
-            <tr>
-                <th scope="col">Service</th>
-                <th scope="col">Name</th>
-                <th scope="col">Value</th>
-                <th scope="col">Created</th>
-                <th scope="col">Expires</th>
-                <th scope="col" class="text-end">Actions</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr th:each="key : ${keys}" th:classappend="${key.expirationStatus.name() == 'EXPIRED'} ? 'text-muted'">
-                <td th:text="${key.serviceName}">GitHub</td>
-                <td><a th:href="@{/keys/{id}(id=${key.id})}" th:text="${key.name}">Deploy token</a></td>
-                <td class="key-value">
-                    <code class="key-value-text" th:text="${key.maskedValue}">••••••••</code>
-                    <button type="button" class="btn btn-sm btn-link js-reveal" title="Show value"
-                            th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">
-                        <i class="bi bi-eye" aria-hidden="true"></i><span class="visually-hidden">Show value</span>
-                    </button>
-                    <button type="button" class="btn btn-sm btn-link js-copy" title="Copy to clipboard"
-                            th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">
-                        <i class="bi bi-clipboard" aria-hidden="true"></i><span class="visually-hidden">Copy to clipboard</span>
-                    </button>
-                </td>
-                <td th:text="${#temporals.format(key.createdOn, 'MMM d, yyyy')}">Jan 1, 2021</td>
-                <td>
-                    <span th:text="${key.expiresOn != null ? #temporals.format(key.expiresOn, 'MMM d, yyyy') : 'Never'}">Never</span>
-                    <span th:replace="fragments/badges :: expiration(${key})"></span>
-                </td>
-                <td class="text-end">
-                    <button type="button" class="btn btn-sm btn-outline-danger" title="Delete"
-                            data-bs-toggle="modal" data-bs-target="#deleteModal"
-                            th:attr="data-key-name=${key.serviceName + ' / ' + key.name},data-delete-url=@{/keys/{id}/delete(id=${key.id})}">
-                        <i class="bi bi-trash" aria-hidden="true"></i><span class="visually-hidden">Delete</span>
-                    </button>
-                </td>
-            </tr>
-            </tbody>
-        </table>
-    </div>
-
-    <nav aria-label="Key list pages" th:if="${page.totalPages > 1}">
+    <nav aria-label="Key list pages" class="mt-4" th:if="${page.totalPages > 1}">
         <ul class="pagination justify-content-center">
             <li class="page-item" th:classappend="${page.first} ? 'disabled'">
-                <a class="page-link" th:href="@{/keys(q=${q},service=${service},sort=${sort},page=${page.number - 1})}">Previous</a>
+                <a class="page-link" th:href="@{/keys(q=${q},service=${service},owner=${owner},sort=${sort},page=${page.number - 1})}">Previous</a>
             </li>
             <li class="page-item" th:each="i : ${#numbers.sequence(0, page.totalPages - 1)}"
                 th:classappend="${i == page.number} ? 'active'">
-                <a class="page-link" th:href="@{/keys(q=${q},service=${service},sort=${sort},page=${i})}"
+                <a class="page-link" th:href="@{/keys(q=${q},service=${service},owner=${owner},sort=${sort},page=${i})}"
                    th:text="${i + 1}">1</a>
             </li>
             <li class="page-item" th:classappend="${page.last} ? 'disabled'">
-                <a class="page-link" th:href="@{/keys(q=${q},service=${service},sort=${sort},page=${page.number + 1})}">Next</a>
+                <a class="page-link" th:href="@{/keys(q=${q},service=${service},owner=${owner},sort=${sort},page=${page.number + 1})}">Next</a>
             </li>
         </ul>
     </nav>
 
     <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <form method="post" id="deleteForm">
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
