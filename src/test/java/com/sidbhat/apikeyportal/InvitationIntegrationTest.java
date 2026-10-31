@@ -336,7 +336,7 @@ class InvitationIntegrationTest {
 
         mvc.perform(get("/profile/password").with(as(fresh)))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("before you go on")));
+                .andExpect(content().string(containsString("Nothing else is reachable until you have")));
     }
 
     @Test

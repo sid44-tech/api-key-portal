@@ -11,17 +11,17 @@ package com.sidbhat.apikeyportal.user;
 public enum UserRole {
 
     /** Runs the portal. Sees every group and every account. */
-    SUPER_ADMIN("Super admin", "bg-danger"),
+    SUPER_ADMIN("Super admin", "pill-dark"),
 
     /** Created a group. Sees and administers the accounts in it. */
-    GROUP_ADMIN("Group admin", "bg-primary"),
+    GROUP_ADMIN("Group admin", "pill-accent"),
 
     /** Belongs to a group. Sees the other people in it and the keys they hold. */
-    MEMBER("Member", "bg-secondary");
+    MEMBER("Member", "pill-neutral");
 
     private final String label;
 
-    /** Bootstrap background class for the role badge. */
+    /** Pill class for the role badge. */
     private final String badgeClass;
 
     UserRole(String label, String badgeClass) {

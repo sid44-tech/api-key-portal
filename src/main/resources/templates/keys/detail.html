@@ -6,7 +6,7 @@
     <title th:text="${key.name}">Key</title>
 </head>
 <body>
-<main layout:fragment="content" th:with="mine=${key.ownerId != null and key.ownerId == currentUser.id}">
+<div layout:fragment="content" th:with="mine=${key.ownerId != null and key.ownerId == currentUser.id}">
     <div class="row justify-content-center">
         <div class="col-lg-9">
             <nav aria-label="breadcrumb">
@@ -16,20 +16,54 @@
                 </ol>
             </nav>
 
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center gap-3">
-                    <span class="service-chip">
-                        <span class="service-glyph" aria-hidden="true"
-                              th:text="${#strings.substring(key.serviceName, 0, 1)}">G</span>
-                        <span>
-                            <span class="d-block cell-sub" th:text="${key.serviceName}">GitHub</span>
-                            <span class="d-block" th:text="${key.name}">Deploy token</span>
-                        </span>
-                    </span>
-                    <span th:replace="fragments/badges :: expiration(${key})"></span>
+            <div class="kp-page-header">
+                <div>
+                    <div class="kp-eyebrow" th:text="${key.serviceName}">GitHub</div>
+                    <h1 th:text="${key.name}">Deploy token</h1>
+                    <p class="kp-subtitle d-flex align-items-center gap-2">
+                        <span th:replace="fragments/badges :: expiration(${key})"></span>
+                        <span th:if="${key.daysUntilExpiry != null and key.daysUntilExpiry >= 0}"
+                              th:text="${key.daysUntilExpiry == 0 ? 'Expires today' : key.daysUntilExpiry + ' days remaining'}">30 days remaining</span>
+                        <span th:if="${key.expiresOn == null}">Doesn't expire</span>
+                    </p>
                 </div>
+                <div class="kp-actions" th:if="${mine}">
+                    <a th:href="@{/keys/{id}/edit(id=${key.id})}" class="btn btn-secondary">
+                        <i class="bi bi-pencil me-1" aria-hidden="true"></i> Edit
+                    </a>
+                    <form th:action="@{/keys/{id}/delete(id=${key.id})}" method="post" class="d-inline js-confirm"
+                          data-confirm="Delete this key? This can't be undone.">
+                        <button type="submit" class="btn btn-outline-danger">
+                            <i class="bi bi-trash me-1" aria-hidden="true"></i> Delete
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">Credential</div>
                 <div class="card-body">
-                    <dl class="detail-list">
+                    <dl class="kp-details">
+                        <div>
+                            <dt>Value</dt>
+                            <dd class="key-value">
+                                <code class="key-value-text" th:text="${key.maskedValue}">••••••••</code>
+                                <th:block th:if="${mine}">
+                                    <button type="button" class="btn btn-sm btn-link js-reveal" title="Show value"
+                                            th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">
+                                        <i class="bi bi-eye" aria-hidden="true"></i><span class="visually-hidden">Show value</span>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-link js-copy" title="Copy to clipboard"
+                                            th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">
+                                        <i class="bi bi-clipboard" aria-hidden="true"></i><span class="visually-hidden">Copy to clipboard</span>
+                                    </button>
+                                </th:block>
+                                <div class="form-text" th:unless="${mine}">
+                                    <i class="bi bi-lock me-1" aria-hidden="true"></i>
+                                    Only <span th:text="${key.ownerName}">the owner</span> can see this value.
+                                </div>
+                            </dd>
+                        </div>
                         <div>
                             <dt>Owner</dt>
                             <dd>
@@ -38,83 +72,33 @@
                                    th:text="${key.ownerName}">Alex Carter</a>
                             </dd>
                         </div>
-
-                        <div>
-                            <dt>Value</dt>
-                            <dd>
-                                <span class="key-value">
-                                    <code class="key-value-text" th:text="${key.maskedValue}">••••••••</code>
-                                    <th:block th:if="${mine}">
-                                        <button type="button" class="btn btn-icon js-reveal" title="Show value"
-                                                th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">
-                                            <i class="bi bi-eye" aria-hidden="true"></i><span class="visually-hidden">Show value</span>
-                                        </button>
-                                        <button type="button" class="btn btn-icon js-copy" title="Copy to clipboard"
-                                                th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">
-                                            <i class="bi bi-clipboard" aria-hidden="true"></i><span class="visually-hidden">Copy to clipboard</span>
-                                        </button>
-                                    </th:block>
-                                </span>
-                                <div class="form-text" th:unless="${mine}">
-                                    <i class="bi bi-lock me-1" aria-hidden="true"></i>
-                                    Only <span th:text="${key.ownerName}">the owner</span> can see this value.
-                                </div>
-                            </dd>
-                        </div>
-
                         <div>
                             <dt>Created</dt>
                             <dd th:text="${#temporals.format(key.createdOn, 'MMMM d, yyyy')}">January 1, 2021</dd>
                         </div>
-
                         <div>
                             <dt>Expires</dt>
-                            <dd>
-                                <span th:text="${key.expiresOn != null ? #temporals.format(key.expiresOn, 'MMMM d, yyyy') : 'Never'}">Never</span>
-                                <span class="cell-sub ms-1"
-                                      th:if="${key.daysUntilExpiry != null and key.daysUntilExpiry >= 0}"
-                                      th:text="${'· ' + key.daysUntilExpiry + (key.daysUntilExpiry == 1 ? ' day left' : ' days left')}">· 30 days left</span>
-                            </dd>
+                            <dd th:text="${key.expiresOn != null ? #temporals.format(key.expiresOn, 'MMMM d, yyyy') : 'Never'}">Never</dd>
                         </div>
-
                         <div th:if="${key.notes != null}">
                             <dt>Notes</dt>
                             <dd class="notes" th:text="${key.notes}">Notes</dd>
                         </div>
-
-                        <div>
-                            <dt>Added to portal</dt>
-                            <dd th:text="${#temporals.format(key.addedAt, 'MMMM d, yyyy h:mm a')}">-</dd>
-                        </div>
-
-                        <div>
-                            <dt>Last updated</dt>
-                            <dd th:text="${#temporals.format(key.updatedAt, 'MMMM d, yyyy h:mm a')}">-</dd>
-                        </div>
-
-                        <div>
-                            <dt>Last revealed</dt>
-                            <dd th:text="${key.lastRevealedAt != null ? #temporals.format(key.lastRevealedAt, 'MMMM d, yyyy h:mm a') : 'Never'}">
-                                Never
-                            </dd>
-                        </div>
                     </dl>
                 </div>
-                <div class="card-footer" th:if="${mine and key.expiresOn != null}" id="notifications">
+            </div>
+
+            <div class="card mb-4" th:if="${mine and key.expiresOn != null}" id="notifications">
+                <div class="card-header">Expiration notifications</div>
+                <div class="card-body">
                     <form th:action="@{/keys/{id}/notifications(id=${key.id})}" method="post"
                           class="d-flex flex-wrap justify-content-between align-items-center gap-3">
-                        <div>
-                            <h2 class="section-title">
-                                <i class="bi bi-bell me-1 text-primary" aria-hidden="true"></i>
-                                Expiration notifications
-                            </h2>
-                            <p class="text-muted small mb-0" th:unless="${key.expiryNotificationsMuted}">
-                                You'll be emailed a month, two weeks, a week and a day before this key expires.
-                            </p>
-                            <p class="text-muted small mb-0" th:if="${key.expiryNotificationsMuted}">
-                                Muted. You won't be emailed about this key expiring; other keys are unaffected.
-                            </p>
-                        </div>
+                        <p class="text-muted mb-0" th:unless="${key.expiryNotificationsMuted}">
+                            You'll be emailed a month, two weeks, a week and a day before this key expires.
+                        </p>
+                        <p class="text-muted mb-0" th:if="${key.expiryNotificationsMuted}">
+                            Muted. You won't be emailed about this key expiring; other keys are unaffected.
+                        </p>
                         <!-- the submitted value is the state to move to, so one form serves both ways -->
                         <input type="hidden" name="muted" th:value="${!key.expiryNotificationsMuted}">
                         <div class="form-check form-switch mb-0">
@@ -124,21 +108,30 @@
                         </div>
                     </form>
                 </div>
-                <div class="card-footer d-flex justify-content-end gap-2" th:if="${mine}">
-                    <form th:action="@{/keys/{id}/delete(id=${key.id})}" method="post" class="js-confirm"
-                          data-confirm="Delete this key? This can't be undone.">
-                        <button type="submit" class="btn btn-outline-danger">
-                            <i class="bi bi-trash me-1" aria-hidden="true"></i> Delete
-                        </button>
-                    </form>
-                    <a th:href="@{/keys/{id}/edit(id=${key.id})}" class="btn btn-primary">
-                        <i class="bi bi-pencil me-1" aria-hidden="true"></i> Edit
-                    </a>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Activity</div>
+                <div class="card-body">
+                    <dl class="kp-details">
+                        <div>
+                            <dt>Added to portal</dt>
+                            <dd th:text="${#temporals.format(key.addedAt, 'MMMM d, yyyy h:mm a')}">-</dd>
+                        </div>
+                        <div>
+                            <dt>Last updated</dt>
+                            <dd th:text="${#temporals.format(key.updatedAt, 'MMMM d, yyyy h:mm a')}">-</dd>
+                        </div>
+                        <div>
+                            <dt>Last revealed</dt>
+                            <dd th:text="${key.lastRevealedAt != null ? #temporals.format(key.lastRevealedAt, 'MMMM d, yyyy h:mm a') : 'Never'}">Never</dd>
+                        </div>
+                    </dl>
                 </div>
             </div>
         </div>
     </div>
-</main>
+</div>
 
 <th:block layout:fragment="scripts">
     <script th:src="@{/js/keys.js}"></script>

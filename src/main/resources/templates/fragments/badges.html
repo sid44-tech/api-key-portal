@@ -3,22 +3,23 @@
 <body>
 <th:block th:fragment="expiration(key)" th:with="status=${key.expirationStatus}">
     <span th:if="${status.name() != 'NEVER'}"
-          th:class="${'badge ' + status.badgeClass}"
+          th:class="${'pill ' + status.badgeClass}"
           th:text="${status.label}">Active</span>
 </th:block>
 
 <th:block th:fragment="role(role)">
-    <span th:class="${'badge ' + role.badgeClass}" th:text="${role.label}">Member</span>
+    <span th:class="${'pill ' + role.badgeClass}" th:text="${role.label}">Member</span>
 </th:block>
 
 <th:block th:fragment="activity(action)">
-    <span th:class="${'badge ' + action.badgeClass}">
-        <i th:class="${'bi me-1 ' + action.icon}" aria-hidden="true"></i><span th:text="${action.label}">Key created</span>
+    <!-- the icon stands in for the pill's status dot -->
+    <span th:class="${'pill has-icon ' + action.badgeClass}">
+        <i th:class="${'bi ' + action.icon}" aria-hidden="true"></i><span th:text="${action.label}">Key created</span>
     </span>
 </th:block>
 
 <th:block th:fragment="invitation(status)">
-    <span th:class="${'badge ' + status.badgeClass}" th:text="${status.label}">Pending</span>
+    <span th:class="${'pill ' + status.badgeClass}" th:text="${status.label}">Pending</span>
 </th:block>
 </body>
 </html>

@@ -129,7 +129,7 @@ class SsoSignInIntegrationTest {
         // the SSO principal has to work everywhere the password one does
         mvc.perform(get("/keys").with(user(principalFor(account))))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Staff keys")));
+                .andExpect(content().string(containsString("<h1>Staff</h1>")));
         mvc.perform(get("/people").with(user(principalFor(account)))).andExpect(status().isOk());
     }
 

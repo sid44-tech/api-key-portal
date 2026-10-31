@@ -6,16 +6,16 @@
     <title>Create key in provider</title>
 </head>
 <body>
-<main layout:fragment="content">
+<div layout:fragment="content">
     <div class="row justify-content-center">
         <div class="col-lg-8">
-            <h1 class="page-title">Create a key in <span th:text="${integration.name}">Azure AD</span></h1>
-            <p class="page-subtitle mb-4" th:if="${integration.provider.name() == 'AZURE_AD'}">
+            <h1 class="mb-2">Create a key in <span th:text="${integration.name}">Azure AD</span></h1>
+            <p class="text-muted mb-4" th:if="${integration.provider.name() == 'AZURE_AD'}">
                 The portal will register a new client in tenant
                 <code th:text="${integration.tenantId}">tenant</code>, generate a client secret for it, and store
                 the secret here encrypted. You never have to touch the Azure portal or copy anything.
             </p>
-            <p class="page-subtitle mb-4" th:if="${integration.provider.name() == 'GOOGLE_CLOUD'}">
+            <p class="text-muted mb-4" th:if="${integration.provider.name() == 'GOOGLE_CLOUD'}">
                 The portal will create a new service account in project
                 <code th:text="${integration.tenantId}">project</code>, generate a JSON key for it, and store
                 the key here encrypted. You never have to touch the Google Cloud console or copy anything.
@@ -74,6 +74,6 @@
             </form>
         </div>
     </div>
-</main>
+</div>
 </body>
 </html>

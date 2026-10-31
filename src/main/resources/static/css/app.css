@@ -1,1256 +1,1104 @@
-/*
- * API Key Portal theme.
- *
- * Bootstrap 5.3 is driven by CSS custom properties, so this file re-points those
- * at a small set of design tokens rather than overriding component rules one by
- * one. Everything lives here because the Content-Security-Policy allows no
- * inline styles at all (see SecurityConfig) - there is no second place to put a
- * one-off rule, which is the main reason the system below is worth having.
- *
- * Contents:
- *   1. Tokens
- *   2. Dark mode
- *   3. Base typography
- *   4. Layout: nav, page header, footer
- *   5. Surfaces: cards, stats, empty states
- *   6. Data: tables, key values, badges
- *   7. Controls: buttons, forms
- *   8. Feedback: alerts, modals, breadcrumbs, pagination
- */
-
-/* ------------------------------------------------------------------ *
- * 1. Tokens
- * ------------------------------------------------------------------ */
+/* ==========================================================================
+   API Key Portal — design system
+   A thin layer over Bootstrap 5.3: warm off-white canvas, white surfaces with
+   hairline borders, system typography, one restrained accent, soft status
+   tints. Everything lives here because the CSP forbids inline styles.
+   ========================================================================== */
 
 :root {
-    /* Neutrals, very slightly cool. --ak-canvas is the page, --ak-surface is
-       anything sitting on it. Keeping those two distinct is what stops the UI
-       reading as a flat white document. */
-    --ak-canvas: #f5f5f7;
-    --ak-surface: #ffffff;
-    --ak-surface-sunken: #fafafa;
-    --ak-surface-hover: #f5f5f7;
+    /* palette */
+    --kp-canvas: #f5f5f7;
+    --kp-surface: #ffffff;
+    --kp-surface-muted: #fafafa;
+    --kp-ink: #1d1d1f;
+    --kp-ink-2: #515154;
+    --kp-ink-3: #86868b;
+    --kp-hairline: rgba(0, 0, 0, 0.08);
+    --kp-hairline-strong: rgba(0, 0, 0, 0.14);
+    --kp-accent: #0a5fd6;
+    --kp-accent-hover: #0950b5;
+    --kp-accent-soft: rgba(10, 95, 214, 0.10);
+    --kp-accent-ring: rgba(10, 95, 214, 0.22);
 
-    --ak-text: #1d1d1f;
-    --ak-text-secondary: #6e6e73;
-    --ak-text-tertiary: #8e8e93;
+    --kp-green: #1f8a4c;
+    --kp-green-soft: rgba(31, 138, 76, 0.12);
+    --kp-amber: #a86400;
+    --kp-amber-soft: rgba(230, 150, 0, 0.16);
+    --kp-red: #c62d2d;
+    --kp-red-soft: rgba(198, 45, 45, 0.11);
+    --kp-gray-soft: rgba(0, 0, 0, 0.055);
 
-    --ak-hairline: rgba(0, 0, 0, 0.09);
-    --ak-hairline-strong: rgba(0, 0, 0, 0.16);
+    --kp-radius-sm: 8px;
+    --kp-radius: 12px;
+    --kp-radius-lg: 16px;
+    --kp-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px -12px rgba(0, 0, 0, 0.12);
+    --kp-shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.05), 0 16px 40px -16px rgba(0, 0, 0, 0.18);
 
-    /* One accent. Semantic colours are deliberately desaturated next to it so a
-       table of amber "expiring" badges doesn't shout over the page. */
-    --ak-accent: #0071e3;
-    --ak-accent-hover: #0077ed;
-    --ak-accent-active: #0062c4;
-    --ak-accent-soft: rgba(0, 113, 227, 0.1);
-    --ak-accent-ring: rgba(0, 113, 227, 0.28);
-
-    --ak-success: #1d8a4e;
-    --ak-success-soft: rgba(29, 138, 78, 0.12);
-    --ak-warning: #a45a00;
-    --ak-warning-soft: rgba(205, 127, 0, 0.14);
-    --ak-danger: #d02b32;
-    --ak-danger-soft: rgba(208, 43, 50, 0.1);
-
-    /* Shadows do the work borders would otherwise do. Two layers: a tight one
-       for the edge, a wide soft one for the lift. */
-    --ak-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.05);
-    --ak-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 6px 16px rgba(0, 0, 0, 0.06);
-    --ak-shadow-lg: 0 8px 20px rgba(0, 0, 0, 0.08), 0 24px 48px rgba(0, 0, 0, 0.12);
-
-    --ak-radius-sm: 8px;
-    --ak-radius: 12px;
-    --ak-radius-lg: 16px;
-    --ak-radius-pill: 980px;
-
-    --ak-ease: cubic-bezier(0.4, 0, 0.2, 1);
-    --ak-duration: 180ms;
-
-    --ak-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text",
-        "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    --ak-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-
-    /* Bootstrap mappings */
-    --bs-body-bg: var(--ak-canvas);
-    --bs-body-color: var(--ak-text);
-    --bs-body-font-family: var(--ak-font);
+    /* bootstrap wiring */
+    --bs-body-bg: var(--kp-canvas);
+    --bs-body-color: var(--kp-ink);
+    --bs-body-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
     --bs-body-font-size: 0.9375rem;
     --bs-body-line-height: 1.55;
-    --bs-emphasis-color: var(--ak-text);
-    --bs-secondary-color: var(--ak-text-secondary);
-    --bs-tertiary-color: var(--ak-text-tertiary);
-    --bs-secondary-bg: var(--ak-surface-sunken);
-    --bs-tertiary-bg: var(--ak-surface-sunken);
-    --bs-border-color: var(--ak-hairline);
-    --bs-border-radius: var(--ak-radius-sm);
-    --bs-border-radius-sm: 6px;
-    --bs-border-radius-lg: var(--ak-radius);
-    --bs-link-color: var(--ak-accent);
-    --bs-link-hover-color: var(--ak-accent-hover);
-    --bs-link-color-rgb: 0, 113, 227;
-    --bs-primary: var(--ak-accent);
-    --bs-primary-rgb: 0, 113, 227;
-    --bs-code-color: var(--ak-text);
-    --bs-font-monospace: var(--ak-font-mono);
+    --bs-font-monospace: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    --bs-secondary-color: var(--kp-ink-2);
+    --bs-tertiary-color: var(--kp-ink-3);
+    --bs-border-color: var(--kp-hairline);
+    --bs-border-radius: var(--kp-radius-sm);
+    --bs-border-radius-lg: var(--kp-radius);
+    --bs-link-color: var(--kp-accent);
+    --bs-link-color-rgb: 10, 95, 214;
+    --bs-link-hover-color: var(--kp-accent-hover);
+    --bs-link-hover-color-rgb: 9, 80, 181;
+    --bs-primary: var(--kp-accent);
+    --bs-primary-rgb: 10, 95, 214;
+    --bs-heading-color: var(--kp-ink);
 }
 
-/* ------------------------------------------------------------------ *
- * 2. Dark mode
- *
- * Applied by /js/theme.js setting data-bs-theme, which is also how Bootstrap's
- * own dark component rules switch over. Pure black is avoided: a near-black
- * canvas with lifted surfaces keeps the same figure/ground relationship the
- * light theme has.
- * ------------------------------------------------------------------ */
-
-[data-bs-theme="dark"] {
-    --ak-canvas: #0b0b0d;
-    --ak-surface: #1a1a1d;
-    --ak-surface-sunken: #141417;
-    --ak-surface-hover: #232327;
-
-    --ak-text: #f5f5f7;
-    --ak-text-secondary: #a1a1a6;
-    --ak-text-tertiary: #86868b;
-
-    --ak-hairline: rgba(255, 255, 255, 0.11);
-    --ak-hairline-strong: rgba(255, 255, 255, 0.2);
-
-    --ak-accent: #0a84ff;
-    --ak-accent-hover: #3d9bff;
-    --ak-accent-active: #0a84ff;
-    --ak-accent-soft: rgba(10, 132, 255, 0.18);
-    --ak-accent-ring: rgba(10, 132, 255, 0.4);
-
-    --ak-success: #30d158;
-    --ak-success-soft: rgba(48, 209, 88, 0.16);
-    --ak-warning: #ffb340;
-    --ak-warning-soft: rgba(255, 179, 64, 0.16);
-    --ak-danger: #ff6961;
-    --ak-danger-soft: rgba(255, 105, 97, 0.16);
-
-    --ak-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-    --ak-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 16px rgba(0, 0, 0, 0.45);
-    --ak-shadow-lg: 0 8px 20px rgba(0, 0, 0, 0.5), 0 24px 48px rgba(0, 0, 0, 0.6);
-
-    --bs-link-color-rgb: 10, 132, 255;
-    --bs-primary-rgb: 10, 132, 255;
-}
-
-/* ------------------------------------------------------------------ *
- * 3. Base typography
- * ------------------------------------------------------------------ */
-
-body {
-    background-color: var(--ak-canvas);
-    padding-bottom: 0;
+html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+body {
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
 }
 
-h1, h2, h3, h4, h5, h6 {
-    letter-spacing: -0.021em;
-    font-weight: 600;
-    color: var(--ak-text);
-}
-
-h1, .h1 { font-weight: 650; letter-spacing: -0.028em; }
-
-/* Numbers that sit in columns have to line up; this is a data tool. */
-table, .stat-value, time, .tabular {
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum";
+main.container {
+    flex: 1 0 auto;
+    padding-top: 0.5rem;
+    padding-bottom: 4rem;
 }
 
 a {
     text-decoration: none;
-    transition: color var(--ak-duration) var(--ak-ease);
 }
 
 a:hover {
-    text-decoration: none;
-}
-
-/* Links inside prose keep their underline - that's where it carries meaning. */
-p a:not(.btn), .alert a, dd a, li a:not(.nav-link):not(.page-link):not(.dropdown-item) {
     text-decoration: underline;
     text-underline-offset: 0.15em;
-    text-decoration-thickness: 1px;
-    text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
-}
-
-p a:not(.btn):hover, .alert a:hover, dd a:hover {
-    text-decoration-color: currentColor;
-}
-
-code {
-    font-family: var(--ak-font-mono);
-    font-size: 0.875em;
 }
 
 .text-muted {
-    color: var(--ak-text-secondary) !important;
+    color: var(--kp-ink-2) !important;
 }
 
-.form-text {
-    color: var(--ak-text-secondary);
-    font-size: 0.8125rem;
+code {
+    color: var(--kp-ink);
+    background: var(--kp-gray-soft);
+    padding: 0.1em 0.4em;
+    border-radius: 6px;
+    font-size: 0.85em;
 }
 
-:focus-visible {
-    outline: 2px solid var(--ak-accent);
-    outline-offset: 2px;
+pre code {
+    background: none;
+    padding: 0;
 }
 
-/* ------------------------------------------------------------------ *
- * 4. Layout
- * ------------------------------------------------------------------ */
+/* --------------------------------------------------------------------------
+   Typography
+   -------------------------------------------------------------------------- */
 
-/* Translucent chrome that lets content scroll under it, with a hairline instead
-   of a heavy dark bar. */
-.app-nav {
-    background-color: color-mix(in srgb, var(--ak-surface) 80%, transparent);
-    backdrop-filter: saturate(180%) blur(20px);
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
-    border-bottom: 1px solid var(--ak-hairline);
+h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 {
+    font-weight: 600;
+    letter-spacing: -0.015em;
+}
+
+h1, .h1 {
+    font-size: 1.75rem;
+}
+
+.h3, h3 {
+    font-size: 1.5rem;
+}
+
+.display-4, .display-5, .display-6 {
+    font-weight: 600;
+    letter-spacing: -0.03em;
+}
+
+.lead {
+    color: var(--kp-ink-2);
+    font-weight: 400;
+}
+
+/* --------------------------------------------------------------------------
+   Header
+   -------------------------------------------------------------------------- */
+
+.kp-header {
     position: sticky;
     top: 0;
-    z-index: 1030;
-    padding-top: 0.5rem;
-    padding-bottom: 0.5rem;
+    z-index: 1020;
+    background: rgba(255, 255, 255, 0.82);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid var(--kp-hairline);
+    margin-bottom: 2rem;
 }
 
-@supports not (backdrop-filter: blur(20px)) {
-    .app-nav {
-        background-color: var(--ak-surface);
-    }
+.kp-header .container {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    min-height: 3.5rem;
 }
 
-.app-nav .navbar-brand {
-    font-weight: 600;
-    letter-spacing: -0.022em;
-    color: var(--ak-text);
-    font-size: 1rem;
+.kp-brand {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.6rem;
+    color: var(--kp-ink);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
 }
 
-.app-nav .navbar-brand:hover {
-    color: var(--ak-text);
+.kp-brand:hover {
+    color: var(--kp-ink);
+    text-decoration: none;
 }
 
-/* The brand mark: a rounded-square glyph, the one piece of colour in the chrome. */
-.brand-mark {
+.kp-brand-mark {
     width: 1.75rem;
     height: 1.75rem;
-    border-radius: 7px;
-    background: linear-gradient(145deg, var(--ak-accent-hover), var(--ak-accent-active));
+    border-radius: 8px;
+    background: linear-gradient(145deg, #2d7ff0, var(--kp-accent));
     color: #fff;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.9rem;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
-    flex-shrink: 0;
+    font-size: 0.95rem;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
-.app-nav .nav-link {
-    color: var(--ak-text-secondary);
-    font-size: 0.875rem;
+.kp-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.kp-nav a {
+    display: inline-block;
+    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
+    color: var(--kp-ink-2);
     font-weight: 500;
-    padding: 0.375rem 0.75rem;
-    border-radius: var(--ak-radius-sm);
-    transition: color var(--ak-duration) var(--ak-ease),
-                background-color var(--ak-duration) var(--ak-ease);
+    font-size: 0.9rem;
+    transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.app-nav .nav-link:hover {
-    color: var(--ak-text);
-    background-color: var(--ak-surface-hover);
+.kp-nav a:hover {
+    color: var(--kp-ink);
+    background: var(--kp-gray-soft);
+    text-decoration: none;
 }
 
-.app-nav .nav-link.active {
-    color: var(--ak-text);
-    background-color: var(--ak-surface-hover);
-    font-weight: 600;
+.kp-nav a.active {
+    color: var(--kp-ink);
+    background: var(--kp-gray-soft);
 }
 
-.app-nav .navbar-toggler {
-    border: none;
-    padding: 0.25rem 0.5rem;
-    color: var(--ak-text-secondary);
-    font-size: 1.25rem;
+.kp-user {
+    margin-left: auto;
 }
 
-.app-nav .navbar-toggler:focus {
-    box-shadow: none;
-}
-
-/* The account button is chrome, not an action: quiet until hovered. */
-.account-button {
+.kp-user > .btn {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--ak-text-secondary);
-    background: transparent;
+    padding: 0.25rem 0.6rem 0.25rem 0.25rem;
+    border-radius: 999px;
     border: 1px solid transparent;
-    border-radius: var(--ak-radius-pill);
-    padding: 0.3rem 0.5rem 0.3rem 0.3rem;
-    transition: background-color var(--ak-duration) var(--ak-ease),
-                border-color var(--ak-duration) var(--ak-ease),
-                color var(--ak-duration) var(--ak-ease);
+    background: transparent;
+    color: var(--kp-ink);
+    font-weight: 500;
+    font-size: 0.9rem;
 }
 
-.account-button:hover,
-.account-button[aria-expanded="true"] {
-    color: var(--ak-text);
-    background-color: var(--ak-surface-hover);
-    border-color: var(--ak-hairline);
+.kp-user > .btn:hover,
+.kp-user > .btn:focus-visible,
+.kp-user > .btn[aria-expanded="true"] {
+    background: var(--kp-gray-soft);
+    border-color: transparent;
+    color: var(--kp-ink);
 }
 
-.account-button::after {
+.kp-user > .btn::after {
     display: none;
 }
 
-/* Initials rather than a generic person icon - it reads as "your account". */
-.avatar {
+.kp-avatar {
     width: 1.75rem;
     height: 1.75rem;
     border-radius: 50%;
-    background-color: var(--ak-accent-soft);
-    color: var(--ak-accent);
+    background: var(--kp-accent-soft);
+    color: var(--kp-accent);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.6875rem;
-    font-weight: 650;
-    letter-spacing: 0.01em;
+    font-size: 0.75rem;
+    font-weight: 600;
     text-transform: uppercase;
     flex-shrink: 0;
 }
 
-.app-main {
-    flex: 1 0 auto;
-    padding-top: 2.25rem;
-    padding-bottom: 4rem;
+.kp-user .dropdown-menu {
+    min-width: 14rem;
+    padding: 0.4rem;
 }
 
-.app-footer {
-    flex-shrink: 0;
-    border-top: 1px solid var(--ak-hairline);
-    padding: 1.25rem 0;
-    font-size: 0.8125rem;
-    color: var(--ak-text-tertiary);
+.kp-user .dropdown-header {
+    padding: 0.5rem 0.75rem 0.35rem;
+    color: var(--kp-ink);
+    font-size: 0.85rem;
 }
 
-/* A consistent title block: name, then one line saying what the page is for. */
-.page-header {
-    margin-bottom: 1.75rem;
-}
-
-.page-header .page-title {
-    font-size: 1.75rem;
-    font-weight: 650;
-    letter-spacing: -0.028em;
-    margin-bottom: 0.25rem;
-}
-
-.page-header .page-subtitle {
-    color: var(--ak-text-secondary);
-    margin-bottom: 0;
-    max-width: 62ch;
-}
-
-.page-header-row {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
-
-.page-header-row .page-header-actions {
-    display: flex;
-    gap: 0.5rem;
-    flex-shrink: 0;
-}
-
-.section-title {
-    font-size: 1rem;
-    font-weight: 600;
-    letter-spacing: -0.018em;
-    margin-bottom: 0.25rem;
-}
-
-/* ------------------------------------------------------------------ *
- * 5. Surfaces
- * ------------------------------------------------------------------ */
-
-.card {
-    --bs-card-bg: var(--ak-surface);
-    --bs-card-border-color: transparent;
-    --bs-card-border-radius: var(--ak-radius);
-    --bs-card-inner-border-radius: var(--ak-radius);
-    --bs-card-spacer-x: 1.5rem;
-    --bs-card-spacer-y: 1.35rem;
-    --bs-card-cap-bg: transparent;
-    border: 1px solid var(--ak-hairline);
-    box-shadow: var(--ak-shadow-sm);
-}
-
-.card-header {
-    border-bottom: 1px solid var(--ak-hairline);
-    padding: 1.1rem 1.5rem;
-    font-weight: 600;
-    font-size: 0.9375rem;
-    letter-spacing: -0.012em;
-}
-
-.card-footer {
-    border-top: 1px solid var(--ak-hairline);
-    background-color: transparent;
-    padding: 1rem 1.5rem;
-}
-
-/* Cards that are themselves links get a gentle lift, so it's obvious they do
-   something without adding a button. */
-.card-interactive {
-    transition: transform var(--ak-duration) var(--ak-ease),
-                box-shadow var(--ak-duration) var(--ak-ease),
-                border-color var(--ak-duration) var(--ak-ease);
-}
-
-.card-interactive:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--ak-shadow);
-    border-color: var(--ak-hairline-strong);
-}
-
-/* Stat tiles. The number is the point, so it gets the weight and the label
-   stays quiet underneath. */
-.stat-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-    gap: 1rem;
-    margin-bottom: 2rem;
-}
-
-.stat {
+.kp-user .dropdown-header small {
     display: block;
-    background-color: var(--ak-surface);
-    border: 1px solid var(--ak-hairline);
-    border-radius: var(--ak-radius);
-    box-shadow: var(--ak-shadow-sm);
-    padding: 1.25rem 1.35rem;
-    color: inherit;
+    color: var(--kp-ink-3);
+    font-weight: 400;
+    margin-top: 0.1rem;
 }
 
-a.stat {
-    transition: transform var(--ak-duration) var(--ak-ease),
-                box-shadow var(--ak-duration) var(--ak-ease),
-                border-color var(--ak-duration) var(--ak-ease);
-}
-
-a.stat:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--ak-shadow);
-    border-color: var(--ak-hairline-strong);
-    color: inherit;
-}
-
-.stat-value {
-    font-size: 2.25rem;
-    font-weight: 650;
-    line-height: 1.1;
-    letter-spacing: -0.03em;
-    margin-bottom: 0.2rem;
-}
-
-.stat-label {
-    font-size: 0.8125rem;
-    color: var(--ak-text-secondary);
+.kp-user .dropdown-item {
     display: flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.6rem;
+    border-radius: 6px;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.9rem;
 }
 
-.stat-attention .stat-value { color: var(--ak-warning); }
-.stat-critical .stat-value { color: var(--ak-danger); }
-.stat-quiet .stat-value { color: var(--ak-text-tertiary); }
-
-/* Empty states are the first thing a new group sees, so they get a proper
-   welcome rather than an alert box. */
-.empty-state {
+.kp-user .dropdown-item .bi {
+    color: var(--kp-ink-3);
+    width: 1rem;
     text-align: center;
-    padding: 3.5rem 1.5rem;
-    background-color: var(--ak-surface);
-    border: 1px solid var(--ak-hairline);
-    border-radius: var(--ak-radius);
-    box-shadow: var(--ak-shadow-sm);
 }
 
-.empty-state-icon {
-    width: 3.5rem;
-    height: 3.5rem;
-    border-radius: var(--ak-radius);
-    background-color: var(--ak-accent-soft);
-    color: var(--ak-accent);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
-    margin-bottom: 1rem;
-}
-
-.empty-state-title {
-    font-size: 1.0625rem;
-    font-weight: 600;
-    margin-bottom: 0.35rem;
-}
-
-.empty-state-text {
-    color: var(--ak-text-secondary);
-    max-width: 44ch;
-    margin: 0 auto 1.25rem;
-}
-
-.empty-state-text:last-child {
-    margin-bottom: 0;
-}
-
-/* The signed-out pages (sign in, accept invitation) centre a single card. */
-.auth-shell {
-    max-width: 25rem;
-    margin: 0 auto;
-}
-
-.auth-shell-wide {
-    max-width: 34rem;
-}
-
-.auth-card {
-    background-color: var(--ak-surface);
-    border: 1px solid var(--ak-hairline);
-    border-radius: var(--ak-radius-lg);
-    box-shadow: var(--ak-shadow);
-    padding: 2rem;
-}
-
-.auth-header {
-    text-align: center;
-    margin-bottom: 1.75rem;
-}
-
-.auth-header .brand-mark {
-    width: 2.75rem;
-    height: 2.75rem;
-    border-radius: 11px;
-    font-size: 1.35rem;
-    margin-bottom: 1rem;
-}
-
-.auth-title {
-    font-size: 1.3125rem;
-    font-weight: 600;
-    letter-spacing: -0.022em;
-    margin-bottom: 0.25rem;
-}
-
-.auth-subtitle {
-    color: var(--ak-text-secondary);
-    font-size: 0.875rem;
-    margin-bottom: 0;
-}
-
-/* "or sign in with a password" between the SSO button and the form. */
-.auth-divider {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin: 1.25rem 0;
-    color: var(--ak-text-tertiary);
-    font-size: 0.75rem;
-}
-
-.auth-divider::before,
-.auth-divider::after {
-    content: "";
-    flex: 1;
-    height: 1px;
-    background-color: var(--ak-hairline);
-}
-
-.auth-footnote {
-    text-align: center;
-    font-size: 0.8125rem;
-    color: var(--ak-text-tertiary);
-    margin: 1.25rem 0 0;
-}
-
-/* ------------------------------------------------------------------ *
- * 6. Data
- * ------------------------------------------------------------------ */
-
-/* Tables sit on a card surface with hairline rows - no filled header bar, no
-   vertical rules. Scanning is easier with less drawn on the page. */
-.table-surface {
-    background-color: var(--ak-surface);
-    border: 1px solid var(--ak-hairline);
-    border-radius: var(--ak-radius);
-    box-shadow: var(--ak-shadow-sm);
-    overflow: hidden;
-}
-
-.table-surface .table {
-    margin-bottom: 0;
-}
-
-/* Below the md breakpoint the table keeps its natural column widths and the card
-   scrolls sideways. Squeezing seven columns into a phone gives wrapped, uneven
-   rows that are harder to read than a scroll. */
 @media (max-width: 767.98px) {
-    .table-surface .table {
-        min-width: 44rem;
+    .kp-header .container {
+        flex-wrap: wrap;
+        row-gap: 0.25rem;
+        padding-bottom: 0.5rem;
+    }
+
+    .kp-nav {
+        order: 3;
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .kp-nav a {
+        white-space: nowrap;
     }
 }
 
-.table {
-    --bs-table-bg: transparent;
-    --bs-table-border-color: var(--ak-hairline);
-    --bs-table-hover-bg: var(--ak-surface-hover);
-    --bs-table-color: var(--ak-text);
-    --bs-table-hover-color: var(--ak-text);
+/* --------------------------------------------------------------------------
+   Page header, sections
+   -------------------------------------------------------------------------- */
+
+.kp-page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-bottom: 1.75rem;
 }
 
-.table > thead {
-    --bs-table-bg: transparent;
+.kp-page-header h1 {
+    font-size: 1.75rem;
+    margin-bottom: 0.25rem;
 }
 
-.table > thead th {
-    background-color: transparent;
-    color: var(--ak-text-tertiary);
-    font-size: 0.6875rem;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--ak-hairline);
-    white-space: nowrap;
+.kp-page-header .kp-subtitle {
+    color: var(--kp-ink-2);
+    margin: 0;
+    max-width: 46rem;
 }
 
-.table > tbody td {
-    padding: 0.875rem 1rem;
-    border-bottom-color: var(--ak-hairline);
-    vertical-align: middle;
+.kp-page-header .kp-avatar {
+    width: 2.75rem;
+    height: 2.75rem;
+    font-size: 1.1rem;
+    margin-right: 0.25rem;
 }
 
-.table > tbody tr:last-child td {
-    border-bottom: 0;
-}
-
-.table-hover > tbody > tr {
-    transition: background-color var(--ak-duration) var(--ak-ease);
-}
-
-/* The main cell in a row - the thing you came to find. */
-.cell-primary {
-    font-weight: 550;
-    color: var(--ak-text);
-}
-
-.cell-sub {
-    font-size: 0.8125rem;
-    color: var(--ak-text-secondary);
-}
-
-/* Row actions stay out of the way until the row is touched, which keeps a long
-   table calm. They remain visible on touch devices and for keyboard users. */
-.row-actions {
-    display: inline-flex;
-    gap: 0.25rem;
-    justify-content: flex-end;
-    opacity: 0;
-    transition: opacity var(--ak-duration) var(--ak-ease);
-}
-
-tr:hover .row-actions,
-tr:focus-within .row-actions {
-    opacity: 1;
-}
-
-@media (hover: none) {
-    .row-actions { opacity: 1; }
-}
-
-/* Service name as a small monogram, so providers are recognisable at a glance. */
-.service-chip {
-    display: inline-flex;
-    align-items: center;
+.kp-page-header .kp-actions {
+    display: flex;
     gap: 0.5rem;
-    font-weight: 550;
+    flex-shrink: 0;
+    padding-top: 0.15rem;
 }
 
-.service-glyph {
-    width: 1.625rem;
-    height: 1.625rem;
-    border-radius: 7px;
-    background-color: var(--ak-surface-hover);
-    border: 1px solid var(--ak-hairline);
-    color: var(--ak-text-secondary);
+.kp-eyebrow {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--kp-ink-3);
+}
+
+.kp-section-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 2rem 0 0.75rem;
+}
+
+.breadcrumb {
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+    --bs-breadcrumb-divider-color: var(--kp-ink-3);
+    --bs-breadcrumb-item-active-color: var(--kp-ink-2);
+}
+
+.breadcrumb a {
+    color: var(--kp-ink-2);
+}
+
+/* --------------------------------------------------------------------------
+   Surfaces (cards)
+   -------------------------------------------------------------------------- */
+
+.card {
+    --bs-card-bg: var(--kp-surface);
+    --bs-card-border-color: var(--kp-hairline);
+    --bs-card-border-radius: var(--kp-radius);
+    --bs-card-inner-border-radius: calc(var(--kp-radius) - 1px);
+    --bs-card-cap-bg: transparent;
+    --bs-card-cap-padding-y: 1rem;
+    --bs-card-cap-padding-x: 1.25rem;
+    --bs-card-spacer-y: 1.25rem;
+    --bs-card-spacer-x: 1.25rem;
+    box-shadow: var(--kp-shadow);
+}
+
+.card-header {
+    border-bottom-color: var(--kp-hairline);
+}
+
+.card-header:not(.d-flex) {
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.card-footer {
+    background: var(--kp-surface-muted);
+    border-top-color: var(--kp-hairline);
+}
+
+a.card {
+    color: inherit;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+a.card:hover {
+    text-decoration: none;
+    transform: translateY(-1px);
+    box-shadow: var(--kp-shadow-lift);
+}
+
+.card.border-primary-subtle {
+    --bs-card-border-color: rgba(10, 95, 214, 0.22);
+    background: linear-gradient(180deg, rgba(10, 95, 214, 0.035), rgba(10, 95, 214, 0)) var(--kp-surface);
+}
+
+.card.bg-body-tertiary {
+    --bs-card-bg: var(--kp-surface-muted);
+    box-shadow: none;
+}
+
+/* A card that wraps a table edge to edge */
+.kp-table-card {
+    overflow: hidden;
+}
+
+.kp-table-card .table {
+    margin-bottom: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Metric tiles (key list summary)
+   -------------------------------------------------------------------------- */
+
+.kp-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 575.98px) {
+    .kp-metrics {
+        grid-template-columns: 1fr;
+    }
+}
+
+.kp-metric {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.1rem 1.25rem;
+    background: var(--kp-surface);
+    border: 1px solid var(--kp-hairline);
+    border-radius: var(--kp-radius);
+    box-shadow: var(--kp-shadow);
+    color: inherit;
+}
+
+a.kp-metric {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+a.kp-metric:hover {
+    text-decoration: none;
+    color: inherit;
+    transform: translateY(-1px);
+    box-shadow: var(--kp-shadow-lift);
+}
+
+.kp-metric-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 10px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.6875rem;
-    font-weight: 650;
-    text-transform: uppercase;
+    font-size: 1.1rem;
     flex-shrink: 0;
+    background: var(--kp-gray-soft);
+    color: var(--kp-ink-2);
+}
+
+.kp-metric-icon.is-accent { background: var(--kp-accent-soft); color: var(--kp-accent); }
+.kp-metric-icon.is-amber  { background: var(--kp-amber-soft);  color: var(--kp-amber); }
+.kp-metric-icon.is-red    { background: var(--kp-red-soft);    color: var(--kp-red); }
+.kp-metric-icon.is-green  { background: var(--kp-green-soft);  color: var(--kp-green); }
+
+.kp-metric-value {
+    font-size: 1.6rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+}
+
+.kp-metric-label {
+    color: var(--kp-ink-2);
+    font-size: 0.85rem;
+}
+
+.kp-metric.is-quiet .kp-metric-value {
+    color: var(--kp-ink-3);
+}
+
+/* --------------------------------------------------------------------------
+   Toolbar (filters above a table)
+   -------------------------------------------------------------------------- */
+
+.kp-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.kp-toolbar .form-control,
+.kp-toolbar .form-select {
+    background-color: var(--kp-surface);
+}
+
+.kp-search {
+    position: relative;
+    flex: 1 1 16rem;
+}
+
+.kp-search .bi {
+    position: absolute;
+    left: 0.8rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--kp-ink-3);
+    pointer-events: none;
+}
+
+.kp-search .form-control {
+    padding-left: 2.3rem;
+}
+
+.kp-toolbar .form-select {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 10rem;
+}
+
+/* --------------------------------------------------------------------------
+   Tables
+   -------------------------------------------------------------------------- */
+
+.table {
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--kp-ink);
+    --bs-table-border-color: var(--kp-hairline);
+    --bs-table-hover-bg: rgba(0, 0, 0, 0.025);
+    --bs-table-hover-color: var(--kp-ink);
+    font-size: 0.9rem;
+}
+
+.table > :not(caption) > * > * {
+    padding: 0.8rem 1rem;
+}
+
+.table > thead th,
+.table-light {
+    --bs-table-bg: var(--kp-surface-muted);
+    --bs-table-color: var(--kp-ink-3);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-bottom-width: 1px;
+    white-space: nowrap;
+}
+
+.table > :not(:first-child) {
+    border-top: 0;
+}
+
+.table tbody tr:last-child > * {
+    border-bottom: 0;
+}
+
+.table td > a:not(.btn) {
+    font-weight: 500;
+}
+
+.table .kp-cell-primary {
+    font-weight: 500;
+    color: var(--kp-ink);
+}
+
+.table .kp-cell-secondary {
+    color: var(--kp-ink-3);
+    font-size: 0.8rem;
 }
 
 .key-value {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-/* Masked values are short, so they stay on one line - letting them break turns a
-   squeezed column into a row several times taller than the rest. */
-.key-value code {
     white-space: nowrap;
-    font-size: 0.8125rem;
-    color: var(--ak-text-secondary);
-    background-color: var(--ak-surface-sunken);
-    border: 1px solid var(--ak-hairline);
-    border-radius: 6px;
-    padding: 0.2rem 0.45rem;
+    min-width: 9.5rem;
 }
 
-/* On the detail page the value is shown in full and has room to wrap. */
-.detail-list .key-value code {
-    white-space: normal;
+.key-value code {
     word-break: break-all;
+    white-space: normal;
 }
 
-/* A revealed value is the real secret: give it the foreground colour so it's
-   unmistakably different from the dots. */
-.key-value code.is-revealed {
-    color: var(--ak-text);
-    background-color: var(--ak-accent-soft);
-    border-color: transparent;
+.key-value .btn-link {
+    padding: 0.1rem 0.3rem;
+    color: var(--kp-ink-3);
 }
 
-/* Icon-only affordances next to a value. */
-.btn-icon {
-    --bs-btn-padding-x: 0.4rem;
-    --bs-btn-padding-y: 0.25rem;
-    --bs-btn-color: var(--ak-text-tertiary);
-    --bs-btn-hover-color: var(--ak-accent);
-    --bs-btn-hover-bg: var(--ak-accent-soft);
-    --bs-btn-active-color: var(--ak-accent);
-    --bs-btn-active-bg: var(--ak-accent-soft);
-    --bs-btn-border-color: transparent;
-    --bs-btn-hover-border-color: transparent;
-    --bs-btn-active-border-color: transparent;
-    --bs-btn-disabled-color: var(--ak-text-tertiary);
-    --bs-btn-disabled-border-color: transparent;
-    --bs-btn-disabled-bg: transparent;
-    --bs-btn-border-radius: 6px;
-    line-height: 1;
-}
-
-.btn-icon-danger {
-    --bs-btn-hover-color: var(--ak-danger);
-    --bs-btn-hover-bg: var(--ak-danger-soft);
-    --bs-btn-active-color: var(--ak-danger);
-    --bs-btn-active-bg: var(--ak-danger-soft);
+.key-value .btn-link:hover {
+    color: var(--kp-accent);
 }
 
 .notes {
     white-space: pre-line;
 }
 
-/* Badges: soft tinted pills, not saturated blocks. */
+/* --------------------------------------------------------------------------
+   Pills (status badges)
+   -------------------------------------------------------------------------- */
+
 .badge {
+    --bs-badge-padding-x: 0.6em;
+    --bs-badge-padding-y: 0.35em;
+    --bs-badge-font-size: 0.72rem;
+    --bs-badge-font-weight: 600;
+    --bs-badge-border-radius: 999px;
+    letter-spacing: 0.01em;
+    vertical-align: middle;
+}
+
+.pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0.25em 0.65em 0.25em 0.55em;
+    border-radius: 999px;
+    font-size: 0.74rem;
     font-weight: 600;
-    font-size: 0.6875rem;
-    letter-spacing: 0.005em;
-    padding: 0.3em 0.65em;
-    border-radius: var(--ak-radius-pill);
-    line-height: 1.35;
+    line-height: 1.4;
+    white-space: nowrap;
+    background: var(--kp-gray-soft);
+    color: var(--kp-ink-2);
 }
 
-.badge.bg-secondary,
-.badge.text-bg-secondary {
-    background-color: var(--ak-surface-hover) !important;
-    color: var(--ak-text-secondary) !important;
-    box-shadow: inset 0 0 0 1px var(--ak-hairline);
+.pill::before {
+    content: "";
+    width: 0.45em;
+    height: 0.45em;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.9;
 }
 
-.badge.bg-primary,
+.pill-neutral { background: var(--kp-gray-soft);   color: var(--kp-ink-2); }
+.pill-success { background: var(--kp-green-soft);  color: var(--kp-green); }
+.pill-warning { background: var(--kp-amber-soft);  color: var(--kp-amber); }
+.pill-danger  { background: var(--kp-red-soft);    color: var(--kp-red); }
+.pill-accent  { background: var(--kp-accent-soft); color: var(--kp-accent); }
+.pill-dark    { background: var(--kp-ink);         color: #fff; }
+
+/* soft variants of bootstrap's own text-bg badges, used on provider cards */
 .badge.text-bg-primary {
-    background-color: var(--ak-accent-soft) !important;
-    color: var(--ak-accent) !important;
+    background-color: var(--kp-accent-soft) !important;
+    color: var(--kp-accent) !important;
 }
 
-.badge.bg-success,
-.badge.text-bg-success {
-    background-color: var(--ak-success-soft) !important;
-    color: var(--ak-success) !important;
+.badge.text-bg-secondary {
+    background-color: var(--kp-gray-soft) !important;
+    color: var(--kp-ink-2) !important;
 }
 
-.badge.bg-warning,
-.badge.text-bg-warning {
-    background-color: var(--ak-warning-soft) !important;
-    color: var(--ak-warning) !important;
+.badge.bg-light {
+    background-color: var(--kp-gray-soft) !important;
+    color: var(--kp-ink-2) !important;
 }
 
-.badge.bg-danger,
-.badge.text-bg-danger {
-    background-color: var(--ak-danger-soft) !important;
-    color: var(--ak-danger) !important;
+.badge.bg-secondary {
+    background-color: var(--kp-gray-soft) !important;
+    color: var(--kp-ink-2) !important;
 }
 
-.badge.bg-dark,
-.badge.text-bg-dark {
-    background-color: var(--ak-text-secondary) !important;
-    color: var(--ak-surface) !important;
-}
-
-.badge.bg-light,
-.badge.text-bg-light {
-    background-color: var(--ak-surface-hover) !important;
-    color: var(--ak-text-secondary) !important;
-}
-
-/* Definition lists on the detail pages, as label/value rows. */
-.detail-list {
-    margin-bottom: 0;
-}
-
-.detail-list > div {
-    display: grid;
-    grid-template-columns: minmax(8rem, 12rem) 1fr;
-    gap: 1rem;
-    padding: 0.7rem 0;
-    border-bottom: 1px solid var(--ak-hairline);
-}
-
-.detail-list > div:last-child {
-    border-bottom: 0;
-    padding-bottom: 0;
-}
-
-.detail-list > div:first-child {
-    padding-top: 0;
-}
-
-.detail-list dt {
-    color: var(--ak-text-secondary);
-    font-weight: 450;
-}
-
-.detail-list dd {
-    margin-bottom: 0;
-    min-width: 0;
-}
-
-@media (max-width: 575.98px) {
-    .detail-list > div {
-        grid-template-columns: 1fr;
-        gap: 0.15rem;
-    }
-}
-
-/* ------------------------------------------------------------------ *
- * 7. Controls
- * ------------------------------------------------------------------ */
+/* --------------------------------------------------------------------------
+   Buttons
+   -------------------------------------------------------------------------- */
 
 .btn {
-    --bs-btn-font-size: 0.875rem;
-    --bs-btn-font-weight: 550;
-    --bs-btn-padding-x: 1rem;
     --bs-btn-padding-y: 0.45rem;
-    --bs-btn-border-radius: var(--ak-radius-sm);
-    letter-spacing: -0.008em;
-    transition: background-color var(--ak-duration) var(--ak-ease),
-                border-color var(--ak-duration) var(--ak-ease),
-                color var(--ak-duration) var(--ak-ease),
-                transform var(--ak-duration) var(--ak-ease),
-                box-shadow var(--ak-duration) var(--ak-ease);
-}
-
-.btn:active {
-    transform: scale(0.98);
+    --bs-btn-padding-x: 0.95rem;
+    --bs-btn-font-size: 0.9rem;
+    --bs-btn-font-weight: 500;
+    --bs-btn-border-radius: var(--kp-radius-sm);
+    --bs-btn-focus-box-shadow: 0 0 0 0.2rem var(--kp-accent-ring);
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .btn-sm {
-    --bs-btn-font-size: 0.8125rem;
-    --bs-btn-padding-x: 0.7rem;
     --bs-btn-padding-y: 0.3rem;
+    --bs-btn-padding-x: 0.7rem;
+    --bs-btn-font-size: 0.82rem;
+    --bs-btn-border-radius: 7px;
 }
 
-.btn-lg {
-    --bs-btn-font-size: 0.9375rem;
-    --bs-btn-padding-x: 1.35rem;
-    --bs-btn-padding-y: 0.65rem;
+.btn .bi {
+    vertical-align: -0.1em;
 }
 
 .btn-primary {
-    --bs-btn-bg: var(--ak-accent);
-    --bs-btn-border-color: var(--ak-accent);
-    --bs-btn-hover-bg: var(--ak-accent-hover);
-    --bs-btn-hover-border-color: var(--ak-accent-hover);
-    --bs-btn-active-bg: var(--ak-accent-active);
-    --bs-btn-active-border-color: var(--ak-accent-active);
-    --bs-btn-disabled-bg: var(--ak-accent);
-    --bs-btn-disabled-border-color: var(--ak-accent);
-    --bs-btn-color: #fff;
-    --bs-btn-hover-color: #fff;
-    --bs-btn-active-color: #fff;
-    --bs-btn-disabled-color: #fff;
+    --bs-btn-bg: var(--kp-accent);
+    --bs-btn-border-color: var(--kp-accent);
+    --bs-btn-hover-bg: var(--kp-accent-hover);
+    --bs-btn-hover-border-color: var(--kp-accent-hover);
+    --bs-btn-active-bg: var(--kp-accent-hover);
+    --bs-btn-active-border-color: var(--kp-accent-hover);
+    --bs-btn-disabled-bg: var(--kp-accent);
+    --bs-btn-disabled-border-color: var(--kp-accent);
+    box-shadow: 0 1px 2px rgba(10, 95, 214, 0.25);
 }
 
-.btn-danger {
-    --bs-btn-bg: var(--ak-danger);
-    --bs-btn-border-color: var(--ak-danger);
-    --bs-btn-hover-bg: color-mix(in srgb, var(--ak-danger) 88%, black);
-    --bs-btn-hover-border-color: color-mix(in srgb, var(--ak-danger) 88%, black);
-    --bs-btn-active-bg: color-mix(in srgb, var(--ak-danger) 80%, black);
-    --bs-btn-active-border-color: color-mix(in srgb, var(--ak-danger) 80%, black);
-    --bs-btn-color: #fff;
-    --bs-btn-hover-color: #fff;
-}
-
-/* The default quiet button: a surface chip, not a grey outline. */
-.btn-outline-secondary {
-    --bs-btn-color: var(--ak-text);
-    --bs-btn-bg: var(--ak-surface);
-    --bs-btn-border-color: var(--ak-hairline-strong);
-    --bs-btn-hover-color: var(--ak-text);
-    --bs-btn-hover-bg: var(--ak-surface-hover);
-    --bs-btn-hover-border-color: var(--ak-hairline-strong);
-    --bs-btn-active-color: var(--ak-text);
-    --bs-btn-active-bg: var(--ak-surface-hover);
-    --bs-btn-active-border-color: var(--ak-hairline-strong);
-    --bs-btn-disabled-color: var(--ak-text-tertiary);
-    --bs-btn-disabled-border-color: var(--ak-hairline);
+/* Secondary actions are soft tinted buttons rather than outlines */
+.btn-secondary,
+.btn-outline-secondary,
+.btn-light {
+    --bs-btn-color: var(--kp-ink);
+    --bs-btn-bg: var(--kp-gray-soft);
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-color: var(--kp-ink);
+    --bs-btn-hover-bg: rgba(0, 0, 0, 0.09);
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-color: var(--kp-ink);
+    --bs-btn-active-bg: rgba(0, 0, 0, 0.12);
+    --bs-btn-active-border-color: transparent;
+    --bs-btn-disabled-color: var(--kp-ink-3);
+    --bs-btn-disabled-bg: var(--kp-gray-soft);
+    --bs-btn-disabled-border-color: transparent;
 }
 
 .btn-outline-primary {
-    --bs-btn-color: var(--ak-accent);
-    --bs-btn-bg: transparent;
-    --bs-btn-border-color: color-mix(in srgb, var(--ak-accent) 45%, transparent);
-    --bs-btn-hover-color: var(--ak-accent);
-    --bs-btn-hover-bg: var(--ak-accent-soft);
-    --bs-btn-hover-border-color: var(--ak-accent);
-    --bs-btn-active-color: var(--ak-accent);
-    --bs-btn-active-bg: var(--ak-accent-soft);
-    --bs-btn-active-border-color: var(--ak-accent);
+    --bs-btn-color: var(--kp-accent);
+    --bs-btn-bg: var(--kp-accent-soft);
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-color: var(--kp-accent-hover);
+    --bs-btn-hover-bg: rgba(10, 95, 214, 0.16);
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-color: var(--kp-accent-hover);
+    --bs-btn-active-bg: rgba(10, 95, 214, 0.2);
+    --bs-btn-active-border-color: transparent;
 }
 
 .btn-outline-danger {
-    --bs-btn-color: var(--ak-danger);
-    --bs-btn-border-color: color-mix(in srgb, var(--ak-danger) 40%, transparent);
-    --bs-btn-hover-color: #fff;
-    --bs-btn-hover-bg: var(--ak-danger);
-    --bs-btn-hover-border-color: var(--ak-danger);
-    --bs-btn-active-color: #fff;
-    --bs-btn-active-bg: var(--ak-danger);
-    --bs-btn-active-border-color: var(--ak-danger);
+    --bs-btn-color: var(--kp-red);
+    --bs-btn-bg: transparent;
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-color: var(--kp-red);
+    --bs-btn-hover-bg: var(--kp-red-soft);
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-color: var(--kp-red);
+    --bs-btn-active-bg: var(--kp-red-soft);
+    --bs-btn-active-border-color: transparent;
 }
 
-.btn-secondary {
-    --bs-btn-color: var(--ak-text);
-    --bs-btn-bg: var(--ak-surface-hover);
-    --bs-btn-border-color: var(--ak-hairline);
-    --bs-btn-hover-color: var(--ak-text);
-    --bs-btn-hover-bg: var(--ak-hairline);
-    --bs-btn-hover-border-color: var(--ak-hairline-strong);
-    --bs-btn-active-color: var(--ak-text);
-    --bs-btn-active-bg: var(--ak-hairline);
-    --bs-btn-active-border-color: var(--ak-hairline-strong);
+.btn-danger {
+    --bs-btn-bg: var(--kp-red);
+    --bs-btn-border-color: var(--kp-red);
+    --bs-btn-hover-bg: #ad2626;
+    --bs-btn-hover-border-color: #ad2626;
+    --bs-btn-active-bg: #ad2626;
+    --bs-btn-active-border-color: #ad2626;
+}
+
+.btn-outline-light {
+    --bs-btn-color: var(--kp-ink);
+    --bs-btn-border-color: var(--kp-hairline-strong);
+    --bs-btn-hover-color: var(--kp-ink);
+    --bs-btn-hover-bg: var(--kp-gray-soft);
+    --bs-btn-hover-border-color: var(--kp-hairline-strong);
 }
 
 .btn-link {
-    --bs-btn-color: var(--ak-accent);
-    --bs-btn-hover-color: var(--ak-accent-hover);
-    --bs-btn-font-weight: 550;
+    --bs-btn-color: var(--kp-ink-2);
+    --bs-btn-hover-color: var(--kp-ink);
+    --bs-btn-font-weight: 500;
     text-decoration: none;
+}
+
+.btn-link:hover {
+    text-decoration: underline;
+}
+
+/* --------------------------------------------------------------------------
+   Forms
+   -------------------------------------------------------------------------- */
+
+.form-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--kp-ink);
+    margin-bottom: 0.35rem;
 }
 
 .form-control,
 .form-select {
-    background-color: var(--ak-surface);
-    border: 1px solid var(--ak-hairline-strong);
-    border-radius: var(--ak-radius-sm);
-    color: var(--ak-text);
-    font-size: 0.875rem;
+    border-color: var(--kp-hairline-strong);
+    border-radius: var(--kp-radius-sm);
     padding: 0.5rem 0.75rem;
-    transition: border-color var(--ak-duration) var(--ak-ease),
-                box-shadow var(--ak-duration) var(--ak-ease);
+    font-size: 0.9rem;
+    color: var(--kp-ink);
+    background-color: var(--kp-surface);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form-select {
+    padding-right: 2.25rem;
 }
 
 .form-control::placeholder {
-    color: var(--ak-text-tertiary);
+    color: var(--kp-ink-3);
 }
 
 .form-control:focus,
 .form-select:focus {
-    background-color: var(--ak-surface);
-    border-color: var(--ak-accent);
-    box-shadow: 0 0 0 3.5px var(--ak-accent-ring);
-    color: var(--ak-text);
+    border-color: var(--kp-accent);
+    box-shadow: 0 0 0 0.2rem var(--kp-accent-ring);
 }
 
 .form-control:disabled,
+.form-control[readonly],
 .form-select:disabled {
-    background-color: var(--ak-surface-sunken);
-    color: var(--ak-text-secondary);
+    background-color: var(--kp-surface-muted);
+    color: var(--kp-ink-2);
 }
 
-.form-label {
-    font-size: 0.8125rem;
-    font-weight: 550;
-    color: var(--ak-text);
-    margin-bottom: 0.35rem;
+.form-text,
+small.form-text {
+    display: block;
+    margin-top: 0.35rem;
+    font-size: 0.8rem;
+    color: var(--kp-ink-3);
+}
+
+.form-check-input {
+    border-color: var(--kp-hairline-strong);
+}
+
+.form-check-input:checked {
+    background-color: var(--kp-accent);
+    border-color: var(--kp-accent);
+}
+
+.form-check-input:focus {
+    border-color: var(--kp-accent);
+    box-shadow: 0 0 0 0.2rem var(--kp-accent-ring);
+}
+
+.invalid-feedback {
+    font-size: 0.8rem;
 }
 
 .form-control.is-invalid,
-.form-select.is-invalid,
-.was-validated .form-control:invalid {
-    border-color: var(--ak-danger);
+.form-select.is-invalid {
+    border-color: var(--kp-red);
+    background-image: none;
 }
 
 .form-control.is-invalid:focus,
 .form-select.is-invalid:focus {
-    box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--ak-danger) 25%, transparent);
+    box-shadow: 0 0 0 0.2rem var(--kp-red-soft);
 }
 
-.invalid-feedback {
-    font-size: 0.8125rem;
-    color: var(--ak-danger);
-}
-
-.form-check-input {
-    border-color: var(--ak-hairline-strong);
-    width: 1.05em;
-    height: 1.05em;
-    margin-top: 0.22em;
-}
-
-.form-check-input:checked {
-    background-color: var(--ak-accent);
-    border-color: var(--ak-accent);
-}
-
-.form-check-input:focus {
-    border-color: var(--ak-accent);
-    box-shadow: 0 0 0 3.5px var(--ak-accent-ring);
-}
-
-.input-group-text {
-    background-color: var(--ak-surface-sunken);
-    border-color: var(--ak-hairline-strong);
-    color: var(--ak-text-secondary);
-    font-size: 0.875rem;
-}
-
-/* The filter bar above a table reads as one control, not five loose ones. */
-.filter-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-bottom: 1.25rem;
-}
-
-.filter-bar .filter-search {
-    flex: 2 1 16rem;
-    min-width: 0;
-}
-
-.filter-bar .filter-select {
-    flex: 1 1 9.5rem;
-    min-width: 0;
-}
-
-.search-input-group {
-    position: relative;
-}
-
-.search-input-group .bi {
-    position: absolute;
-    left: 0.75rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--ak-text-tertiary);
-    pointer-events: none;
-    font-size: 0.875rem;
-}
-
-.search-input-group .form-control {
-    padding-left: 2.1rem;
-}
-
-/* ------------------------------------------------------------------ *
- * 8. Feedback
- * ------------------------------------------------------------------ */
+/* --------------------------------------------------------------------------
+   Alerts, flash messages
+   -------------------------------------------------------------------------- */
 
 .alert {
-    border-radius: var(--ak-radius);
-    border: 1px solid transparent;
-    font-size: 0.875rem;
-    padding: 0.85rem 1.1rem;
-    box-shadow: var(--ak-shadow-sm);
+    --bs-alert-border-radius: var(--kp-radius);
+    --bs-alert-padding-y: 0.85rem;
+    --bs-alert-padding-x: 1.1rem;
+    border-width: 1px;
+    font-size: 0.9rem;
 }
 
 .alert-success {
-    background-color: var(--ak-success-soft);
-    border-color: color-mix(in srgb, var(--ak-success) 25%, transparent);
-    color: var(--ak-success);
+    --bs-alert-bg: #eef8f1;
+    --bs-alert-border-color: rgba(31, 138, 76, 0.25);
+    --bs-alert-color: #155f36;
 }
 
 .alert-danger {
-    background-color: var(--ak-danger-soft);
-    border-color: color-mix(in srgb, var(--ak-danger) 25%, transparent);
-    color: var(--ak-danger);
+    --bs-alert-bg: #fdf0f0;
+    --bs-alert-border-color: rgba(198, 45, 45, 0.25);
+    --bs-alert-color: #8f1f1f;
 }
 
 .alert-warning {
-    background-color: var(--ak-warning-soft);
-    border-color: color-mix(in srgb, var(--ak-warning) 25%, transparent);
-    color: var(--ak-warning);
+    --bs-alert-bg: #fff7e8;
+    --bs-alert-border-color: rgba(230, 150, 0, 0.3);
+    --bs-alert-color: #7a4a00;
 }
 
 .alert-info {
-    background-color: var(--ak-accent-soft);
-    border-color: color-mix(in srgb, var(--ak-accent) 22%, transparent);
-    color: var(--ak-accent);
+    --bs-alert-bg: #eef4fd;
+    --bs-alert-border-color: rgba(10, 95, 214, 0.22);
+    --bs-alert-color: #0b3f86;
 }
 
 .alert .alert-link {
-    color: inherit;
     font-weight: 600;
 }
 
-/* Flash messages float over the page rather than pushing it down. */
-.flash-stack {
-    position: sticky;
-    top: 4.5rem;
-    z-index: 1020;
-    margin-bottom: 1.25rem;
+.kp-flash {
+    margin-bottom: 1.5rem;
 }
 
-.modal-content {
-    border: 1px solid var(--ak-hairline);
-    border-radius: var(--ak-radius-lg);
-    box-shadow: var(--ak-shadow-lg);
-    background-color: var(--ak-surface);
+.kp-flash .alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    box-shadow: var(--kp-shadow);
 }
 
-.modal-header {
-    border-bottom: 1px solid var(--ak-hairline);
-    padding: 1.1rem 1.5rem;
+.kp-flash .alert .bi {
+    margin-top: 0.1rem;
 }
 
-.modal-title {
-    font-size: 1rem;
-    font-weight: 600;
+.kp-flash .alert .btn-close {
+    margin-left: auto;
+    font-size: 0.7rem;
+    padding: 0.6rem;
 }
 
-.modal-body {
-    padding: 1.35rem 1.5rem;
-    color: var(--ak-text-secondary);
+.kp-flash .alert-dismissible {
+    padding-right: 1.1rem;
 }
 
-.modal-footer {
-    border-top: 1px solid var(--ak-hairline);
-    padding: 1rem 1.5rem;
+.kp-flash .alert-dismissible .btn-close {
+    position: static;
 }
 
-.modal-backdrop.show {
-    opacity: 0.35;
+/* --------------------------------------------------------------------------
+   Empty states
+   -------------------------------------------------------------------------- */
+
+.kp-empty {
+    text-align: center;
+    padding: 3.5rem 1.5rem;
+    background: var(--kp-surface);
+    border: 1px dashed var(--kp-hairline-strong);
+    border-radius: var(--kp-radius);
 }
 
-.dropdown-menu {
-    --bs-dropdown-bg: var(--ak-surface);
-    --bs-dropdown-border-color: var(--ak-hairline);
-    --bs-dropdown-border-radius: var(--ak-radius);
-    --bs-dropdown-link-color: var(--ak-text);
-    --bs-dropdown-link-hover-bg: var(--ak-surface-hover);
-    --bs-dropdown-link-hover-color: var(--ak-text);
-    --bs-dropdown-link-active-bg: var(--ak-accent-soft);
-    --bs-dropdown-link-active-color: var(--ak-accent);
-    --bs-dropdown-font-size: 0.875rem;
-    --bs-dropdown-padding-y: 0.35rem;
-    --bs-dropdown-item-padding-x: 0.85rem;
-    --bs-dropdown-item-padding-y: 0.4rem;
-    box-shadow: var(--ak-shadow-lg);
+.kp-empty-icon {
+    width: 3.25rem;
+    height: 3.25rem;
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--kp-accent-soft);
+    color: var(--kp-accent);
+    font-size: 1.4rem;
+    margin-bottom: 1rem;
 }
 
-.dropdown-item {
-    border-radius: 6px;
-    width: auto;
-    margin: 0 0.35rem;
+.kp-empty h2 {
+    font-size: 1.1rem;
+    margin-bottom: 0.35rem;
 }
 
-.dropdown-header {
-    font-size: 0.75rem;
-    color: var(--ak-text-tertiary);
-    padding: 0.4rem 0.85rem 0.25rem;
+.kp-empty p {
+    color: var(--kp-ink-2);
+    max-width: 28rem;
+    margin: 0 auto 1.25rem;
 }
 
-.breadcrumb {
-    --bs-breadcrumb-font-size: 0.8125rem;
-    --bs-breadcrumb-divider-color: var(--ak-text-tertiary);
-    --bs-breadcrumb-item-active-color: var(--ak-text-secondary);
-    --bs-breadcrumb-margin-bottom: 1rem;
+/* --------------------------------------------------------------------------
+   Definition lists (detail pages)
+   -------------------------------------------------------------------------- */
+
+.kp-details {
+    margin: 0;
 }
 
-.breadcrumb a {
-    color: var(--ak-text-secondary);
+.kp-details > div {
+    display: grid;
+    grid-template-columns: 11rem minmax(0, 1fr);
+    gap: 1rem;
+    padding: 0.8rem 0;
+    border-bottom: 1px solid var(--kp-hairline);
 }
 
-.breadcrumb a:hover {
-    color: var(--ak-accent);
+.kp-details > div:last-child {
+    border-bottom: 0;
 }
 
-.pagination {
-    --bs-pagination-color: var(--ak-text-secondary);
-    --bs-pagination-bg: var(--ak-surface);
-    --bs-pagination-border-color: var(--ak-hairline);
-    --bs-pagination-hover-color: var(--ak-text);
-    --bs-pagination-hover-bg: var(--ak-surface-hover);
-    --bs-pagination-hover-border-color: var(--ak-hairline);
-    --bs-pagination-active-bg: var(--ak-accent);
-    --bs-pagination-active-border-color: var(--ak-accent);
-    --bs-pagination-focus-bg: var(--ak-surface-hover);
-    --bs-pagination-focus-box-shadow: 0 0 0 3.5px var(--ak-accent-ring);
-    --bs-pagination-disabled-color: var(--ak-text-tertiary);
-    --bs-pagination-disabled-bg: var(--ak-surface);
-    --bs-pagination-disabled-border-color: var(--ak-hairline);
-    --bs-pagination-font-size: 0.8125rem;
-    --bs-pagination-border-radius: var(--ak-radius-sm);
+.kp-details dt {
+    color: var(--kp-ink-3);
+    font-weight: 500;
+    font-size: 0.85rem;
 }
 
-.page-link {
-    transition: background-color var(--ak-duration) var(--ak-ease);
+.kp-details dd {
+    margin: 0;
 }
 
-/* Numbered steps on the integration walk-throughs. */
+@media (max-width: 575.98px) {
+    .kp-details > div {
+        grid-template-columns: 1fr;
+        gap: 0.2rem;
+    }
+}
+
+/* legacy dl.row details keep sensible spacing */
+dl.row dt {
+    color: var(--kp-ink-3);
+    font-weight: 500;
+    font-size: 0.85rem;
+}
+
+/* --------------------------------------------------------------------------
+   Auth pages (login, invitation)
+   -------------------------------------------------------------------------- */
+
+.kp-auth {
+    max-width: 26rem;
+    margin: 3rem auto 0;
+}
+
+.kp-auth.is-wide {
+    max-width: 32rem;
+}
+
+.kp-auth-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    color: var(--kp-ink);
+}
+
+.kp-auth-brand .kp-brand-mark {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 14px;
+    font-size: 1.5rem;
+    box-shadow: var(--kp-shadow);
+}
+
+.kp-auth-brand h1 {
+    font-size: 1.35rem;
+    margin: 0;
+}
+
+.kp-auth .card {
+    border-radius: var(--kp-radius-lg);
+    box-shadow: var(--kp-shadow-lift);
+}
+
+.kp-auth .card-body {
+    padding: 1.75rem;
+}
+
+.kp-auth-foot {
+    text-align: center;
+    color: var(--kp-ink-3);
+    font-size: 0.85rem;
+    margin-top: 1.25rem;
+}
+
+/* --------------------------------------------------------------------------
+   Setup walk-throughs
+   -------------------------------------------------------------------------- */
+
+.setup-step {
+    position: relative;
+}
+
+.setup-step .card-body {
+    padding: 1.5rem;
+}
+
+.setup-step h2 {
+    font-size: 1.05rem;
+    margin-bottom: 0.5rem;
+}
+
+.setup-step p,
+.setup-step li {
+    color: var(--kp-ink-2);
+}
+
+.setup-step ol li {
+    margin-bottom: 0.2rem;
+}
+
 .step-number {
-    width: 1.75rem;
-    height: 1.75rem;
+    width: 2rem;
+    height: 2rem;
     border-radius: 50%;
-    background-color: var(--ak-accent-soft);
-    color: var(--ak-accent);
-    font-weight: 650;
-    font-size: 0.8125rem;
+    background: var(--kp-ink);
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.85rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1261,44 +1109,241 @@ tr:focus-within .row-actions {
     max-width: 36rem;
 }
 
-/* Provider tiles on the integrations page. */
-.provider-glyph {
-    width: 2.75rem;
-    height: 2.75rem;
-    border-radius: 11px;
-    background-color: var(--ak-surface-hover);
-    border: 1px solid var(--ak-hairline);
-    color: var(--ak-text);
+/* Provider cards on the integrations page */
+.kp-provider .kp-provider-icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 12px;
+    background: var(--kp-gray-soft);
+    color: var(--kp-ink);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     font-size: 1.35rem;
-    margin-bottom: 0.85rem;
+    margin-bottom: 0.9rem;
 }
 
-.provider-card .card-body {
-    padding: 1.35rem;
+.kp-provider.is-connected .kp-provider-icon {
+    background: var(--kp-accent-soft);
+    color: var(--kp-accent);
 }
 
-hr {
-    border-color: var(--ak-hairline);
-    opacity: 1;
+/* --------------------------------------------------------------------------
+   Pagination, modals, dropdowns, misc
+   -------------------------------------------------------------------------- */
+
+.pagination {
+    --bs-pagination-border-color: var(--kp-hairline);
+    --bs-pagination-color: var(--kp-ink-2);
+    --bs-pagination-hover-bg: var(--kp-gray-soft);
+    --bs-pagination-hover-color: var(--kp-ink);
+    --bs-pagination-active-bg: var(--kp-ink);
+    --bs-pagination-active-border-color: var(--kp-ink);
+    --bs-pagination-focus-box-shadow: 0 0 0 0.2rem var(--kp-accent-ring);
+    --bs-pagination-font-size: 0.85rem;
+    margin-top: 1.25rem;
 }
 
-/* Someone who asked for less movement gets less movement. */
+.modal-content {
+    border: 0;
+    border-radius: var(--kp-radius-lg);
+    box-shadow: var(--kp-shadow-lift);
+}
+
+.modal-header {
+    border-bottom: 0;
+    padding: 1.5rem 1.5rem 0.5rem;
+}
+
+.modal-body {
+    padding: 0.5rem 1.5rem 1rem;
+    color: var(--kp-ink-2);
+}
+
+.modal-footer {
+    border-top: 0;
+    padding: 0.5rem 1.5rem 1.5rem;
+}
+
+.dropdown-menu {
+    --bs-dropdown-border-color: var(--kp-hairline);
+    --bs-dropdown-border-radius: var(--kp-radius);
+    --bs-dropdown-link-hover-bg: var(--kp-gray-soft);
+    --bs-dropdown-link-active-bg: var(--kp-accent-soft);
+    --bs-dropdown-link-active-color: var(--kp-accent);
+    box-shadow: var(--kp-shadow-lift);
+}
+
+.kp-footer {
+    border-top: 1px solid var(--kp-hairline);
+    padding: 1.25rem 0;
+    color: var(--kp-ink-3);
+    font-size: 0.8rem;
+}
+
+.kp-footer a {
+    color: var(--kp-ink-3);
+}
+
+.kp-error {
+    text-align: center;
+    padding: 5rem 1rem;
+}
+
+.kp-error .kp-error-code {
+    font-size: 4rem;
+    font-weight: 600;
+    letter-spacing: -0.04em;
+    color: var(--kp-ink-3);
+    line-height: 1;
+    margin-bottom: 1rem;
+}
+
+.user-select-all {
+    -webkit-user-select: all;
+    user-select: all;
+}
+
 @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-        animation-duration: 0.001ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.001ms !important;
-        scroll-behavior: auto !important;
+    * {
+        transition: none !important;
     }
+}
 
-    .card-interactive:hover,
-    a.stat:hover,
-    .btn:active {
-        transform: none;
-    }
+/* --------------------------------------------------------------------------
+   Additions for pages the design system predates
+   -------------------------------------------------------------------------- */
+
+/* History badges carry an icon, which stands in for the status dot */
+.pill.has-icon::before {
+    display: none;
+}
+
+/* "or sign in with a password" under the single sign-on button */
+.kp-auth-divider {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 1.25rem 0;
+    color: var(--kp-ink-3);
+    font-size: 0.8rem;
+}
+
+.kp-auth-divider::before,
+.kp-auth-divider::after {
+    content: "";
+    flex: 1;
+    border-top: 1px solid var(--kp-hairline);
+}
+
+/* A revealed key value: the shift in styling is the cue that it is the real secret */
+.key-value-text.is-revealed {
+    color: var(--kp-ink);
+    background: var(--kp-amber-soft);
+}
+
+/* --------------------------------------------------------------------------
+   Dark theme
+   theme.js sets data-bs-theme from the operating system's setting. The same
+   palette, re-tuned: near-black canvas, raised grey surfaces, light ink, and
+   brighter accents so status colours keep their contrast.
+   -------------------------------------------------------------------------- */
+
+:root[data-bs-theme="dark"] {
+    color-scheme: dark;
+
+    --kp-canvas: #000000;
+    --kp-surface: #1c1c1e;
+    --kp-surface-muted: #232326;
+    --kp-ink: #f5f5f7;
+    --kp-ink-2: #c7c7cc;
+    --kp-ink-3: #98989d;
+    --kp-hairline: rgba(255, 255, 255, 0.10);
+    --kp-hairline-strong: rgba(255, 255, 255, 0.18);
+    --kp-accent: #3b8cf6;
+    --kp-accent-hover: #5a9ff8;
+    --kp-accent-soft: rgba(59, 140, 246, 0.18);
+    --kp-accent-ring: rgba(59, 140, 246, 0.35);
+
+    --kp-green: #4cc27a;
+    --kp-green-soft: rgba(76, 194, 122, 0.16);
+    --kp-amber: #f0a830;
+    --kp-amber-soft: rgba(240, 168, 48, 0.18);
+    --kp-red: #f06a6a;
+    --kp-red-soft: rgba(240, 106, 106, 0.16);
+    --kp-gray-soft: rgba(255, 255, 255, 0.08);
+
+    --kp-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --kp-shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.4), 0 16px 40px -16px rgba(0, 0, 0, 0.7);
+
+    --bs-link-color-rgb: 59, 140, 246;
+    --bs-link-hover-color-rgb: 90, 159, 248;
+    --bs-primary-rgb: 59, 140, 246;
+}
+
+[data-bs-theme="dark"] .kp-header {
+    background: rgba(28, 28, 30, 0.82);
+}
+
+[data-bs-theme="dark"] .table {
+    --bs-table-hover-bg: rgba(255, 255, 255, 0.035);
+}
+
+[data-bs-theme="dark"] .btn-secondary,
+[data-bs-theme="dark"] .btn-outline-secondary,
+[data-bs-theme="dark"] .btn-light {
+    --bs-btn-hover-bg: rgba(255, 255, 255, 0.14);
+    --bs-btn-active-bg: rgba(255, 255, 255, 0.18);
+}
+
+[data-bs-theme="dark"] .btn-outline-primary {
+    --bs-btn-hover-bg: rgba(59, 140, 246, 0.26);
+    --bs-btn-active-bg: rgba(59, 140, 246, 0.32);
+}
+
+[data-bs-theme="dark"] .btn-primary {
+    --bs-btn-color: #fff;
+    box-shadow: none;
+}
+
+[data-bs-theme="dark"] .btn-danger {
+    --bs-btn-hover-bg: #e05555;
+    --bs-btn-hover-border-color: #e05555;
+    --bs-btn-active-bg: #e05555;
+    --bs-btn-active-border-color: #e05555;
+}
+
+/* dark ink on light ink, the inverse of the light theme */
+[data-bs-theme="dark"] .pill-dark,
+[data-bs-theme="dark"] .step-number {
+    color: var(--kp-canvas);
+}
+
+[data-bs-theme="dark"] .alert-success {
+    --bs-alert-bg: rgba(76, 194, 122, 0.12);
+    --bs-alert-border-color: rgba(76, 194, 122, 0.3);
+    --bs-alert-color: #8fe0ae;
+}
+
+[data-bs-theme="dark"] .alert-danger {
+    --bs-alert-bg: rgba(240, 106, 106, 0.12);
+    --bs-alert-border-color: rgba(240, 106, 106, 0.3);
+    --bs-alert-color: #f7a5a5;
+}
+
+[data-bs-theme="dark"] .alert-warning {
+    --bs-alert-bg: rgba(240, 168, 48, 0.12);
+    --bs-alert-border-color: rgba(240, 168, 48, 0.3);
+    --bs-alert-color: #f5c977;
+}
+
+[data-bs-theme="dark"] .alert-info {
+    --bs-alert-bg: rgba(59, 140, 246, 0.12);
+    --bs-alert-border-color: rgba(59, 140, 246, 0.3);
+    --bs-alert-color: #9cc4fb;
+}
+
+[data-bs-theme="dark"] .card.border-primary-subtle {
+    --bs-card-border-color: rgba(59, 140, 246, 0.35);
+    background: linear-gradient(180deg, rgba(59, 140, 246, 0.08), rgba(59, 140, 246, 0)) var(--kp-surface);
 }

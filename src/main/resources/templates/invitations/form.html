@@ -6,7 +6,7 @@
     <title>Invite a user</title>
 </head>
 <body>
-<main layout:fragment="content">
+<div layout:fragment="content">
     <div class="row justify-content-center">
         <div class="col-md-8 col-lg-6">
             <nav aria-label="breadcrumb">
@@ -16,68 +16,74 @@
                 </ol>
             </nav>
 
-            <div class="page-header">
-                <h1 class="page-title">Invite a user</h1>
-                <p class="page-subtitle">
-                    They'll get an email with a link to set up their account. It's good for 24 hours.
-                </p>
+            <div class="kp-page-header">
+                <div>
+                    <h1>Invite a user</h1>
+                    <p class="kp-subtitle">
+                        They'll get an email with a link to set up their account. It's good for 24 hours.
+                    </p>
+                </div>
             </div>
 
-            <th:block th:object="${form}">
-                <div class="alert alert-danger" th:if="${#fields.hasGlobalErrors()}">
-                    <p class="mb-0" th:each="err : ${#fields.globalErrors()}" th:text="${err}">Error</p>
-                </div>
-            </th:block>
+            <div class="card">
+                <div class="card-body">
+                    <th:block th:object="${form}">
+                        <div class="alert alert-danger" th:if="${#fields.hasGlobalErrors()}">
+                            <p class="mb-0" th:each="err : ${#fields.globalErrors()}" th:text="${err}">Error</p>
+                        </div>
+                    </th:block>
 
-            <form th:action="@{/invitations}" th:object="${form}" method="post" novalidate>
-                <div class="card">
-                    <div class="card-body">
+                    <form th:action="@{/invitations}" th:object="${form}" method="post" novalidate>
                         <div class="mb-3">
                             <label class="form-label" for="email">Email</label>
                             <input type="email" class="form-control" th:field="*{email}"
-                                   th:errorclass="is-invalid" maxlength="255" autofocus required>
+                                   th:errorclass="is-invalid" maxlength="255" autofocus required
+                                   placeholder="name@example.com">
                             <small class="form-text">This becomes the address they sign in with.</small>
                             <div class="invalid-feedback" th:errors="*{email}"></div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label" for="role">Role</label>
-                            <select class="form-select" th:field="*{role}" th:errorclass="is-invalid">
-                                <option th:each="r : ${roles}" th:value="${r}" th:text="${r.label}">Member</option>
-                            </select>
-                            <div class="invalid-feedback" th:errors="*{role}"></div>
-                        </div>
+                        <div class="row">
+                            <div class="mb-3 col-md-6">
+                                <label class="form-label" for="role">Role</label>
+                                <select class="form-select" th:field="*{role}" th:errorclass="is-invalid">
+                                    <option th:each="r : ${roles}" th:value="${r}" th:text="${r.label}">Member</option>
+                                </select>
+                                <div class="invalid-feedback" th:errors="*{role}"></div>
+                            </div>
 
-                        <div class="mb-0">
-                            <label class="form-label" for="groupId">Group</label>
-                            <select class="form-select" th:field="*{groupId}" th:errorclass="is-invalid"
-                                    th:disabled="${!currentUser.superAdmin}">
-                                <option value="" th:if="${currentUser.superAdmin}">Choose a group</option>
-                                <option th:each="g : ${groups}" th:value="${g.id}" th:text="${g.name}">Platform team</option>
-                            </select>
-                            <small class="form-text" th:if="${currentUser.superAdmin}">
-                                Any group in the portal. Add one under <a th:href="@{/groups}">Groups</a>.
-                            </small>
-                            <small class="form-text" th:unless="${currentUser.superAdmin}">
-                                You can only invite people into your own group.
-                            </small>
-                            <div class="invalid-feedback" th:errors="*{groupId}"></div>
+                            <div class="mb-3 col-md-6">
+                                <label class="form-label" for="groupId">Group</label>
+                                <select class="form-select" th:field="*{groupId}" th:errorclass="is-invalid"
+                                        th:disabled="${!currentUser.superAdmin}">
+                                    <option value="" th:if="${currentUser.superAdmin}">Choose a group</option>
+                                    <option th:each="g : ${groups}" th:value="${g.id}" th:text="${g.name}">Platform team</option>
+                                </select>
+                                <small class="form-text" th:if="${currentUser.superAdmin}">
+                                    Any group in the portal. Add one under <a th:href="@{/groups}">Groups</a>.
+                                </small>
+                                <small class="form-text" th:unless="${currentUser.superAdmin}">
+                                    You can only invite people into your own group.
+                                </small>
+                                <div class="invalid-feedback" th:errors="*{groupId}"></div>
+                            </div>
                         </div>
 
                         <!-- a disabled select submits nothing, so a group admin's single group is carried here -->
                         <input type="hidden" th:unless="${currentUser.superAdmin}" name="groupId"
                                th:value="${currentUser.groupId}">
-                    </div>
-                    <div class="card-footer d-flex justify-content-end gap-2">
-                        <a th:href="@{/invitations}" class="btn btn-outline-secondary">Cancel</a>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-send me-1" aria-hidden="true"></i> Send invitation
-                        </button>
-                    </div>
+
+                        <div class="d-flex gap-2 mt-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-send me-1" aria-hidden="true"></i> Send invitation
+                            </button>
+                            <a th:href="@{/invitations}" class="btn btn-link">Cancel</a>
+                        </div>
+                    </form>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
-</main>
+</div>
 </body>
 </html>

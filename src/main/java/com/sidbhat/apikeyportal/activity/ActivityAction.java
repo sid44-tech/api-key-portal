@@ -8,22 +8,22 @@ package com.sidbhat.apikeyportal.activity;
  */
 public enum ActivityAction {
 
-    KEY_CREATED("Key created", "bi-key", "bg-success"),
-    KEY_DELETED("Key deleted", "bi-trash", "bg-danger"),
-    INTEGRATION_CONNECTED("Integration connected", "bi-plug", "bg-primary"),
-    INTEGRATION_REMOVED("Integration removed", "bi-plug", "bg-danger"),
-    INVITATION_SENT("Invitation sent", "bi-envelope", "bg-secondary"),
-    ACCOUNT_CREATED("Account created", "bi-person-plus", "bg-success"),
-    ACCOUNT_LINKED_TO_SSO("Account linked to SSO", "bi-shield-check", "bg-secondary"),
-    SSO_CONFIGURED("Single sign-on changed", "bi-shield-lock", "bg-primary"),
-    GROUP_CREATED("Group created", "bi-diagram-3", "bg-secondary");
+    KEY_CREATED("Key created", "bi-key", "pill-success"),
+    KEY_DELETED("Key deleted", "bi-trash", "pill-danger"),
+    INTEGRATION_CONNECTED("Integration connected", "bi-plug", "pill-accent"),
+    INTEGRATION_REMOVED("Integration removed", "bi-plug", "pill-danger"),
+    INVITATION_SENT("Invitation sent", "bi-envelope", "pill-neutral"),
+    ACCOUNT_CREATED("Account created", "bi-person-plus", "pill-success"),
+    ACCOUNT_LINKED_TO_SSO("Account linked to SSO", "bi-shield-check", "pill-neutral"),
+    SSO_CONFIGURED("Single sign-on changed", "bi-shield-lock", "pill-accent"),
+    GROUP_CREATED("Group created", "bi-diagram-3", "pill-neutral");
 
     private final String label;
 
     /** Bootstrap icon class shown against the event. */
     private final String icon;
 
-    /** Bootstrap background class for the action badge. */
+    /** Pill class for the action badge. */
     private final String badgeClass;
 
     ActivityAction(String label, String icon, String badgeClass) {

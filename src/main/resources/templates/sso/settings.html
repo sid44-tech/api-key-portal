@@ -6,15 +6,17 @@
     <title>Single sign-on</title>
 </head>
 <body>
-<main layout:fragment="content">
+<div layout:fragment="content">
     <div class="row justify-content-center">
         <div class="col-lg-9">
-            <div class="page-header">
-                <h1 class="page-title">Single sign-on</h1>
-                <p class="page-subtitle">
-                    Let people sign in with your organisation's identity provider. Access is granted by
-                    putting someone in a directory group &mdash; nobody gets in without it.
-                </p>
+            <div class="kp-page-header">
+                <div>
+                    <h1>Single sign-on</h1>
+                    <p class="kp-subtitle">
+                        Let people sign in with your organisation's identity provider. Access is granted by
+                        putting someone in a directory group &mdash; nobody gets in without it.
+                    </p>
+                </div>
             </div>
 
             <th:block th:object="${form}">
@@ -181,7 +183,7 @@
                         </div>
                     </div>
                     <div class="card-footer d-flex justify-content-between align-items-center">
-                        <span class="cell-sub" th:if="${configured}">
+                        <span class="text-muted small" th:if="${configured}">
                             Turning it off leaves accounts and settings intact.
                         </span>
                         <span th:unless="${configured}"></span>
@@ -197,6 +199,6 @@
             </form>
         </div>
     </div>
-</main>
+</div>
 </body>
 </html>

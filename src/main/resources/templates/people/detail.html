@@ -6,7 +6,7 @@
     <title th:text="${person.displayName}">Person</title>
 </head>
 <body>
-<main layout:fragment="content">
+<div layout:fragment="content">
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <nav aria-label="breadcrumb">
@@ -22,28 +22,34 @@
                 </div>
             </th:block>
 
-            <div class="card mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center gap-3">
-                    <span class="service-chip">
-                        <span class="avatar" aria-hidden="true"
-                              th:text="${#strings.substring(person.displayName, 0, 1)}">A</span>
-                        <span>
-                            <span class="d-block" th:text="${person.displayName}">Alex Carter</span>
-                            <span class="d-block cell-sub" th:if="${person.jobTitle != null}"
-                                  th:text="${person.jobTitle}">Backend engineer</span>
-                        </span>
-                    </span>
-                    <span th:replace="fragments/badges :: role(${person.role})"></span>
+            <div class="kp-page-header">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="kp-avatar" aria-hidden="true" th:text="${#strings.substring(person.displayName, 0, 1)}">A</span>
+                    <div>
+                        <h1 th:text="${person.displayName}">Alex Carter</h1>
+                        <p class="kp-subtitle d-flex align-items-center gap-2 flex-wrap">
+                            <span th:replace="fragments/badges :: role(${person.role})"></span>
+                            <span th:if="${person.jobTitle != null}" th:text="${person.jobTitle}">Backend engineer</span>
+                            <span class="pill pill-neutral" th:unless="${person.enabled}">Disabled</span>
+                        </p>
+                    </div>
                 </div>
+                <div class="kp-actions" th:if="${person.id == currentUser.id}">
+                    <a th:href="@{/profile}" class="btn btn-secondary">Edit my profile</a>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">Account</div>
                 <div class="card-body">
-                    <dl class="detail-list">
+                    <dl class="kp-details">
                         <div>
                             <dt>Email</dt>
                             <dd th:text="${person.email}">alex@example.com</dd>
                         </div>
                         <div>
                             <dt>Group</dt>
-                            <dd th:text="${person.group != null ? person.group.name : '—'}">Platform team</dd>
+                            <dd th:text="${person.group != null ? person.group.name : '-'}">Platform team</dd>
                         </div>
                         <div>
                             <dt>Keys</dt>
@@ -55,63 +61,51 @@
                             </dd>
                         </div>
                         <div>
-                            <dt>Account</dt>
-                            <dd>
-                                <span class="badge bg-success" th:if="${person.enabled}">Active</span>
-                                <span class="badge bg-secondary" th:unless="${person.enabled}">Disabled</span>
-                            </dd>
-                        </div>
-                        <div>
                             <dt>Member since</dt>
                             <dd th:text="${#temporals.format(person.createdAt, 'MMMM d, yyyy')}">-</dd>
                         </div>
                         <div>
                             <dt>Last signed in</dt>
-                            <dd th:text="${person.lastLoginAt != null ? #temporals.format(person.lastLoginAt, 'MMMM d, yyyy h:mm a') : 'Never'}">
-                                Never
-                            </dd>
+                            <dd th:text="${person.lastLoginAt != null ? #temporals.format(person.lastLoginAt, 'MMMM d, yyyy h:mm a') : 'Never'}">Never</dd>
                         </div>
                     </dl>
-                </div>
-                <div class="card-footer text-end" th:if="${person.id == currentUser.id}">
-                    <a th:href="@{/profile}" class="btn btn-outline-secondary">Edit my profile</a>
                 </div>
             </div>
 
             <div class="card" th:if="${canAdminister}">
                 <div class="card-header">Administration</div>
                 <div class="card-body">
-                    <form th:action="@{/people/{id}(id=${person.id})}" th:object="${form}" method="post"
-                          novalidate id="administerForm">
-                        <div class="mb-3">
-                            <label class="form-label" for="role">Role</label>
-                            <select class="form-select" th:field="*{role}" th:errorclass="is-invalid">
-                                <option th:each="r : ${roles}" th:value="${r}" th:text="${r.label}">Member</option>
-                            </select>
-                            <div class="invalid-feedback" th:errors="*{role}"></div>
+                    <form th:action="@{/people/{id}(id=${person.id})}" th:object="${form}" method="post" novalidate>
+                        <div class="row">
+                            <div class="mb-3 col-md-6">
+                                <label class="form-label" for="role">Role</label>
+                                <select class="form-select" th:field="*{role}" th:errorclass="is-invalid">
+                                    <option th:each="r : ${roles}" th:value="${r}" th:text="${r.label}">Member</option>
+                                </select>
+                                <div class="invalid-feedback" th:errors="*{role}"></div>
+                            </div>
+
+                            <div class="mb-3 col-md-6" th:if="${currentUser.superAdmin}">
+                                <label class="form-label" for="groupId">Group</label>
+                                <select class="form-select" th:field="*{groupId}">
+                                    <option value="">No group</option>
+                                    <option th:each="g : ${groups}" th:value="${g.id}" th:text="${g.name}">Platform team</option>
+                                </select>
+                                <small class="form-text">Moving someone does not move the keys they already own.</small>
+                            </div>
                         </div>
 
-                        <div class="mb-3" th:if="${currentUser.superAdmin}">
-                            <label class="form-label" for="groupId">Group</label>
-                            <select class="form-select" th:field="*{groupId}">
-                                <option value="">No group</option>
-                                <option th:each="g : ${groups}" th:value="${g.id}" th:text="${g.name}">Platform team</option>
-                            </select>
-                            <small class="form-text">Moving someone does not move the keys they already own.</small>
-                        </div>
-
-                        <div class="form-check mb-0">
-                            <input type="checkbox" class="form-check-input" th:field="*{enabled}">
+                        <div class="form-check form-switch mb-4">
+                            <input type="checkbox" class="form-check-input" role="switch" th:field="*{enabled}">
                             <label class="form-check-label" for="enabled">Can sign in</label>
                         </div>
+
+                        <button type="submit" class="btn btn-primary">Save changes</button>
                     </form>
-                </div>
-                <div class="card-footer text-end">
-                    <button type="submit" form="administerForm" class="btn btn-primary">Save changes</button>
                 </div>
             </div>
         </div>
     </div>
-</main>
+</div>
 </body>
 </html>

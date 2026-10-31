@@ -6,172 +6,154 @@
     <title>Keys</title>
 </head>
 <body>
-<main layout:fragment="content">
-    <div class="page-header page-header-row">
+<div layout:fragment="content"
+     th:with="filtered=${!#strings.isEmpty(q) or !#strings.isEmpty(service) or owner != null}">
+    <div class="kp-page-header">
         <div>
-            <h1 class="page-title"
-                th:text="${currentUser.group != null ? currentUser.group.name + ' keys' : 'Keys'}">Keys</h1>
-            <p class="page-subtitle">
-                Everyone in the group sees these. Only the person who added a key can reveal, copy or change it.
+            <h1 th:text="${currentUser.group != null ? currentUser.group.name : 'Keys'}">Keys</h1>
+            <p class="kp-subtitle">
+                Every key your group holds, in one place. Only the person who added a key can reveal,
+                copy or change it.
             </p>
         </div>
-        <div class="page-header-actions">
+        <div class="kp-actions">
             <a th:href="@{/keys/new}" class="btn btn-primary">
                 <i class="bi bi-plus-lg me-1" aria-hidden="true"></i> Add key
             </a>
         </div>
     </div>
 
-    <div class="stat-grid" th:if="${summary.total > 0}">
-        <div class="stat">
-            <div class="stat-value" th:text="${summary.total}">0</div>
-            <div class="stat-label">
-                <i class="bi bi-key" aria-hidden="true"></i>
-                <span th:text="${summary.total == 1 ? 'Key tracked' : 'Keys tracked'}">Keys tracked</span>
+    <div class="kp-metrics" th:if="${summary.total > 0}">
+        <div class="kp-metric">
+            <span class="kp-metric-icon is-accent" aria-hidden="true"><i class="bi bi-key"></i></span>
+            <div>
+                <div class="kp-metric-value" th:text="${summary.total}">0</div>
+                <div class="kp-metric-label">Keys in the portal</div>
             </div>
         </div>
-        <a th:href="@{/keys(sort=EXPIRES)}" class="stat"
-           th:classappend="${summary.expiringSoon > 0} ? 'stat-attention' : 'stat-quiet'">
-            <div class="stat-value" th:text="${summary.expiringSoon}">0</div>
-            <div class="stat-label">
-                <i class="bi bi-clock-history" aria-hidden="true"></i> Expiring within 30 days
+        <a th:href="@{/keys(sort=EXPIRES)}" class="kp-metric" th:classappend="${summary.expiringSoon == 0} ? 'is-quiet'">
+            <span class="kp-metric-icon" th:classappend="${summary.expiringSoon > 0} ? 'is-amber'" aria-hidden="true">
+                <i class="bi bi-hourglass-split"></i>
+            </span>
+            <div>
+                <div class="kp-metric-value" th:text="${summary.expiringSoon}">0</div>
+                <div class="kp-metric-label">Expiring in the next 30 days</div>
             </div>
         </a>
-        <a th:href="@{/keys(sort=EXPIRES)}" class="stat"
-           th:classappend="${summary.expired > 0} ? 'stat-critical' : 'stat-quiet'">
-            <div class="stat-value" th:text="${summary.expired}">0</div>
-            <div class="stat-label">
-                <i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Already expired
+        <a th:href="@{/keys(sort=EXPIRES)}" class="kp-metric" th:classappend="${summary.expired == 0} ? 'is-quiet'">
+            <span class="kp-metric-icon" th:classappend="${summary.expired > 0} ? 'is-red'" aria-hidden="true">
+                <i class="bi bi-exclamation-octagon"></i>
+            </span>
+            <div>
+                <div class="kp-metric-value" th:text="${summary.expired}">0</div>
+                <div class="kp-metric-label">Expired</div>
             </div>
         </a>
     </div>
 
-    <form th:action="@{/keys}" method="get" class="filter-bar">
-        <div class="filter-search">
+    <form th:action="@{/keys}" method="get" class="kp-toolbar" th:if="${summary.total > 0 or filtered}">
+        <div class="kp-search">
+            <i class="bi bi-search" aria-hidden="true"></i>
             <label class="visually-hidden" for="q">Search</label>
-            <div class="search-input-group">
-                <i class="bi bi-search" aria-hidden="true"></i>
-                <input type="search" class="form-control" id="q" name="q" th:value="${q}"
-                       placeholder="Search by name, service or owner">
-            </div>
+            <input type="search" class="form-control" id="q" name="q" th:value="${q}"
+                   placeholder="Search by name, service or owner">
         </div>
-        <div class="filter-select">
-            <label class="visually-hidden" for="owner">Owner</label>
-            <select class="form-select js-autosubmit" id="owner" name="owner">
-                <option value="">Everyone in the group</option>
-                <option th:each="p : ${people}" th:value="${p.id}"
-                        th:text="${p.id == currentUser.id ? 'Only mine' : p.displayName}"
-                        th:selected="${p.id == owner}">Only mine</option>
-            </select>
-        </div>
-        <div class="filter-select">
-            <label class="visually-hidden" for="service">Service</label>
-            <select class="form-select js-autosubmit" id="service" name="service">
-                <option value="">All services</option>
-                <option th:each="s : ${services}" th:value="${s}" th:text="${s}"
-                        th:selected="${s == service}">GitHub</option>
-            </select>
-        </div>
-        <div class="filter-select">
-            <label class="visually-hidden" for="sort">Sort by</label>
-            <select class="form-select js-autosubmit" id="sort" name="sort">
-                <option th:each="s : ${sorts}" th:value="${s}" th:text="${'Sort: ' + s.label}"
-                        th:selected="${s == sort}">Sort: Service</option>
-            </select>
-        </div>
-        <button type="submit" class="btn btn-outline-secondary">Search</button>
+        <label class="visually-hidden" for="owner">Owner</label>
+        <select class="form-select js-autosubmit" id="owner" name="owner">
+            <option value="">Everyone in the group</option>
+            <option th:each="p : ${people}" th:value="${p.id}"
+                    th:text="${p.id == currentUser.id ? 'Only mine' : p.displayName}"
+                    th:selected="${p.id == owner}">Only mine</option>
+        </select>
+        <label class="visually-hidden" for="service">Service</label>
+        <select class="form-select js-autosubmit" id="service" name="service">
+            <option value="">All services</option>
+            <option th:each="s : ${services}" th:value="${s}" th:text="${s}"
+                    th:selected="${s == service}">GitHub</option>
+        </select>
+        <label class="visually-hidden" for="sort">Sort by</label>
+        <select class="form-select js-autosubmit" id="sort" name="sort">
+            <option th:each="s : ${sorts}" th:value="${s}" th:text="${'Sort: ' + s.label}"
+                    th:selected="${s == sort}">Sort: Service</option>
+        </select>
+        <button type="submit" class="btn btn-secondary">Search</button>
+        <a th:if="${filtered}" th:href="@{/keys}" class="btn btn-link">Clear</a>
     </form>
 
-    <th:block th:if="${#lists.isEmpty(keys)}">
-        <div class="empty-state"
-             th:if="${#strings.isEmpty(q) and #strings.isEmpty(service) and owner == null}">
-            <div class="empty-state-icon"><i class="bi bi-key" aria-hidden="true"></i></div>
-            <h2 class="empty-state-title">No keys yet</h2>
-            <p class="empty-state-text">
-                Add the API keys and tokens your group relies on, and the portal will keep track of
-                who holds what and when each one expires.
-            </p>
+    <div th:if="${#lists.isEmpty(keys)}" class="kp-empty">
+        <th:block th:unless="${filtered}">
+            <span class="kp-empty-icon" aria-hidden="true"><i class="bi bi-key"></i></span>
+            <h2>No keys yet</h2>
+            <p>Add the first key your group needs to keep track of, or create one directly in a
+                connected provider.</p>
             <a th:href="@{/keys/new}" class="btn btn-primary">
-                <i class="bi bi-plus-lg me-1" aria-hidden="true"></i> Add your first key
+                <i class="bi bi-plus-lg me-1" aria-hidden="true"></i> Add key
             </a>
-        </div>
-        <div class="empty-state"
-             th:unless="${#strings.isEmpty(q) and #strings.isEmpty(service) and owner == null}">
-            <div class="empty-state-icon"><i class="bi bi-search" aria-hidden="true"></i></div>
-            <h2 class="empty-state-title">No matches</h2>
-            <p class="empty-state-text">Nothing here matches those filters.</p>
-            <a th:href="@{/keys}" class="btn btn-outline-secondary">Clear filters</a>
-        </div>
-    </th:block>
+        </th:block>
+        <th:block th:if="${filtered}">
+            <span class="kp-empty-icon" aria-hidden="true"><i class="bi bi-search"></i></span>
+            <h2>No keys match</h2>
+            <p>Try a different search, or clear the filters to see everything.</p>
+            <a th:href="@{/keys}" class="btn btn-secondary">Clear filters</a>
+        </th:block>
+    </div>
 
-    <div class="table-surface" th:unless="${#lists.isEmpty(keys)}">
+    <div class="card kp-table-card" th:unless="${#lists.isEmpty(keys)}">
         <div class="table-responsive">
-            <table class="table table-hover">
+            <table class="table table-hover align-middle">
                 <thead>
                 <tr>
-                    <th scope="col">Service</th>
-                    <th scope="col">Name</th>
+                    <th scope="col">Key</th>
                     <th scope="col">Owner</th>
                     <th scope="col">Value</th>
                     <th scope="col">Created</th>
                     <th scope="col">Expires</th>
-                    <!-- the row actions appear on hover, so a standing label would sit over an empty column -->
                     <th scope="col" class="text-end"><span class="visually-hidden">Actions</span></th>
                 </tr>
                 </thead>
                 <tbody>
-                <tr th:each="key : ${keys}"
+                <tr th:each="key : ${keys}" th:classappend="${key.expirationStatus.name() == 'EXPIRED'} ? 'text-muted'"
                     th:with="mine=${key.ownerId != null and key.ownerId == currentUser.id}">
                     <td>
-                        <span class="service-chip">
-                            <span class="service-glyph" aria-hidden="true"
-                                  th:text="${#strings.substring(key.serviceName, 0, 1)}">G</span>
-                            <span th:text="${key.serviceName}">GitHub</span>
-                        </span>
-                    </td>
-                    <td>
-                        <a class="cell-primary" th:href="@{/keys/{id}(id=${key.id})}"
-                           th:text="${key.name}">Deploy token</a>
+                        <a th:href="@{/keys/{id}(id=${key.id})}" th:text="${key.name}">Deploy token</a>
+                        <div class="kp-cell-secondary" th:text="${key.serviceName}">GitHub</div>
                     </td>
                     <td>
                         <span th:if="${mine}">You</span>
                         <a th:unless="${mine}" th:href="@{/keys(owner=${key.ownerId})}"
-                           th:text="${key.ownerName}">Alex Carter</a>
+                           th:text="${key.ownerName}" class="fw-normal">Alex Carter</a>
                     </td>
-                    <td>
-                        <span class="key-value">
-                            <code class="key-value-text" th:text="${key.maskedValue}">••••••••</code>
-                            <th:block th:if="${mine}">
-                                <button type="button" class="btn btn-icon js-reveal" title="Show value"
-                                        th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">
-                                    <i class="bi bi-eye" aria-hidden="true"></i><span class="visually-hidden">Show value</span>
-                                </button>
-                                <button type="button" class="btn btn-icon js-copy" title="Copy to clipboard"
-                                        th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">
-                                    <i class="bi bi-clipboard" aria-hidden="true"></i><span class="visually-hidden">Copy to clipboard</span>
-                                </button>
-                            </th:block>
-                            <i class="bi bi-lock text-muted" th:unless="${mine}"
-                               th:title="|Only ${key.ownerName} can see this value|" aria-hidden="true"></i>
-                            <span class="visually-hidden" th:unless="${mine}">Value hidden; owned by another member</span>
-                        </span>
+                    <td class="key-value">
+                        <code class="key-value-text" th:text="${key.maskedValue}">••••••••</code>
+                        <th:block th:if="${mine}">
+                            <button type="button" class="btn btn-sm btn-link js-reveal" title="Show value"
+                                    th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">
+                                <i class="bi bi-eye" aria-hidden="true"></i><span class="visually-hidden">Show value</span>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-link js-copy" title="Copy to clipboard"
+                                    th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">
+                                <i class="bi bi-clipboard" aria-hidden="true"></i><span class="visually-hidden">Copy to clipboard</span>
+                            </button>
+                        </th:block>
+                        <i class="bi bi-lock text-muted ms-1" th:unless="${mine}"
+                           th:title="|Only ${key.ownerName} can see this value|" aria-hidden="true"></i>
+                        <span class="visually-hidden" th:unless="${mine}">Value hidden; owned by another member</span>
                     </td>
                     <td th:text="${#temporals.format(key.createdOn, 'MMM d, yyyy')}">Jan 1, 2021</td>
                     <td>
                         <div th:text="${key.expiresOn != null ? #temporals.format(key.expiresOn, 'MMM d, yyyy') : 'Never'}">Never</div>
                         <span th:replace="fragments/badges :: expiration(${key})"></span>
                     </td>
-                    <td class="text-end">
-                        <span class="row-actions" th:if="${mine}">
-                            <a th:href="@{/keys/{id}/edit(id=${key.id})}" class="btn btn-icon" title="Edit">
-                                <i class="bi bi-pencil" aria-hidden="true"></i><span class="visually-hidden">Edit</span>
-                            </a>
-                            <button type="button" class="btn btn-icon btn-icon-danger" title="Delete"
-                                    data-bs-toggle="modal" data-bs-target="#deleteModal"
-                                    th:attr="data-key-name=${key.serviceName + ' / ' + key.name},data-delete-url=@{/keys/{id}/delete(id=${key.id})}">
-                                <i class="bi bi-trash" aria-hidden="true"></i><span class="visually-hidden">Delete</span>
-                            </button>
-                        </span>
+                    <td class="text-end text-nowrap">
+                        <a th:href="@{/keys/{id}/edit(id=${key.id})}" class="btn btn-sm btn-link" title="Edit"
+                           th:if="${mine}">
+                            <i class="bi bi-pencil" aria-hidden="true"></i><span class="visually-hidden">Edit</span>
+                        </a>
+                        <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" th:if="${mine}"
+                                data-bs-toggle="modal" data-bs-target="#deleteModal"
+                                th:attr="data-key-name=${key.serviceName + ' / ' + key.name},data-delete-url=@{/keys/{id}/delete(id=${key.id})}">
+                            <i class="bi bi-trash" aria-hidden="true"></i><span class="visually-hidden">Delete</span>
+                        </button>
                     </td>
                 </tr>
                 </tbody>
@@ -179,7 +161,7 @@
         </div>
     </div>
 
-    <nav aria-label="Key list pages" class="mt-4" th:if="${page.totalPages > 1}">
+    <nav aria-label="Key list pages" th:if="${page.totalPages > 1}">
         <ul class="pagination justify-content-center">
             <li class="page-item" th:classappend="${page.first} ? 'disabled'">
                 <a class="page-link" th:href="@{/keys(q=${q},service=${service},owner=${owner},sort=${sort},page=${page.number - 1})}">Previous</a>
@@ -201,22 +183,22 @@
                 <form method="post" id="deleteForm">
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="deleteModalLabel">Delete key?</h5>
+                        <h5 class="modal-title" id="deleteModalLabel">Delete this key?</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        <p class="mb-0"><strong id="deleteKeyName"></strong> will be permanently removed.
-                            This can't be undone.</p>
+                        <p class="mb-0"><strong id="deleteKeyName" class="text-body"></strong> will be permanently
+                            removed from the portal. This can't be undone.</p>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-danger">Delete</button>
+                        <button type="submit" class="btn btn-danger">Delete key</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
-</main>
+</div>
 
 <th:block layout:fragment="scripts">
     <script th:src="@{/js/keys.js}"></script>

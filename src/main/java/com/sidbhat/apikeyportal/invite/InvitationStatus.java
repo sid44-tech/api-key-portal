@@ -7,20 +7,20 @@ package com.sidbhat.apikeyportal.invite;
 public enum InvitationStatus {
 
     /** Sent, still within its day, not yet used. */
-    PENDING("Pending", "bg-primary"),
+    PENDING("Pending", "pill-accent"),
 
     /** The account exists. */
-    ACCEPTED("Accepted", "bg-success"),
+    ACCEPTED("Accepted", "pill-success"),
 
     /** The day elapsed. A fresh invitation can be sent to the same address. */
-    EXPIRED("Expired", "bg-secondary"),
+    EXPIRED("Expired", "pill-neutral"),
 
     /** Withdrawn by an administrator. */
-    REVOKED("Revoked", "bg-dark");
+    REVOKED("Revoked", "pill-warning");
 
     private final String label;
 
-    /** Bootstrap background class for the status badge. */
+    /** Pill class for the status badge. */
     private final String badgeClass;
 
     InvitationStatus(String label, String badgeClass) {

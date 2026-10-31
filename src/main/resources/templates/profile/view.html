@@ -6,26 +6,79 @@
     <title>My profile</title>
 </head>
 <body>
-<main layout:fragment="content">
+<div layout:fragment="content">
     <div class="row justify-content-center">
         <div class="col-lg-8">
-            <div class="page-header">
-                <h1 class="page-title">My profile</h1>
-                <p class="page-subtitle">How the rest of your group sees you, and how you sign in.</p>
+            <div class="kp-page-header">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="kp-avatar" aria-hidden="true" th:text="${#strings.substring(account.displayName, 0, 1)}">A</span>
+                    <div>
+                        <h1 th:text="${account.displayName}">Alex Carter</h1>
+                        <p class="kp-subtitle d-flex align-items-center gap-2 flex-wrap">
+                            <span th:replace="fragments/badges :: role(${account.role})"></span>
+                            <span th:text="${account.group != null ? account.group.name : 'Not in a group yet'}">Platform team</span>
+                        </p>
+                    </div>
+                </div>
             </div>
 
             <div class="card mb-4">
+                <div class="card-header">Your details</div>
+                <div class="card-body">
+                    <form th:action="@{/profile}" th:object="${form}" method="post" novalidate>
+                        <div class="row">
+                            <div class="mb-3 col-md-6">
+                                <label class="form-label" for="displayName">Name</label>
+                                <input type="text" class="form-control" th:field="*{displayName}"
+                                       th:errorclass="is-invalid" autocomplete="name" maxlength="100" required>
+                                <small class="form-text">Shown to the rest of your group next to the keys you own.</small>
+                                <div class="invalid-feedback" th:errors="*{displayName}"></div>
+                            </div>
+                            <div class="mb-3 col-md-6">
+                                <label class="form-label" for="jobTitle">Role or job title</label>
+                                <input type="text" class="form-control" th:field="*{jobTitle}"
+                                       th:errorclass="is-invalid" maxlength="100"
+                                       placeholder="e.g. Backend engineer">
+                                <small class="form-text">Optional. Helps the group work out who to ask about a key.</small>
+                                <div class="invalid-feedback" th:errors="*{jobTitle}"></div>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label" for="email">Email</label>
+                            <input type="email" class="form-control" th:field="*{email}"
+                                   th:errorclass="is-invalid" autocomplete="username" maxlength="255" required>
+                            <small class="form-text">You sign in with this, so changing it changes your login.</small>
+                            <div class="invalid-feedback" th:errors="*{email}"></div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Save changes</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                    <div th:if="${account.ssoLinked}">
+                        <h2 class="h6 mb-1">Single sign-on</h2>
+                        <p class="text-muted small mb-0">You sign in through your organisation's identity provider.
+                            While single sign-on is on, the password form won't accept this account,
+                            so there is no portal password to manage.</p>
+                    </div>
+                    <div th:unless="${account.ssoLinked}">
+                        <h2 class="h6 mb-1">Password</h2>
+                        <p class="text-muted small mb-0">Stored as a BCrypt hash &mdash; nobody can read it back,
+                            not even a super admin.</p>
+                    </div>
+                    <a th:unless="${account.ssoLinked}" th:href="@{/profile/password}"
+                       class="btn btn-secondary">Change password</a>
+                </div>
+            </div>
+
+            <div class="card">
                 <div class="card-header">Account</div>
                 <div class="card-body">
-                    <dl class="detail-list">
-                        <div>
-                            <dt>Group</dt>
-                            <dd th:text="${account.group != null ? account.group.name : 'Not in a group yet'}">Platform team</dd>
-                        </div>
-                        <div>
-                            <dt>Role</dt>
-                            <dd><span th:replace="fragments/badges :: role(${account.role})"></span></dd>
-                        </div>
+                    <dl class="kp-details">
                         <div>
                             <dt>Member since</dt>
                             <dd th:text="${#temporals.format(account.createdAt, 'MMMM d, yyyy')}">-</dd>
@@ -37,68 +90,8 @@
                     </dl>
                 </div>
             </div>
-
-            <form th:action="@{/profile}" th:object="${form}" method="post" novalidate>
-                <div class="card mb-4">
-                    <div class="card-header">Your details</div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label class="form-label" for="displayName">Name</label>
-                            <input type="text" class="form-control" th:field="*{displayName}"
-                                   th:errorclass="is-invalid" autocomplete="name" maxlength="100" required>
-                            <small class="form-text">Shown to the rest of your group next to the keys you own.</small>
-                            <div class="invalid-feedback" th:errors="*{displayName}"></div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label" for="email">Email</label>
-                            <input type="email" class="form-control" th:field="*{email}"
-                                   th:errorclass="is-invalid" autocomplete="username" maxlength="255" required>
-                            <small class="form-text">You sign in with this, so changing it changes your login.</small>
-                            <div class="invalid-feedback" th:errors="*{email}"></div>
-                        </div>
-
-                        <div class="mb-0">
-                            <label class="form-label" for="jobTitle">Role or job title</label>
-                            <input type="text" class="form-control" th:field="*{jobTitle}"
-                                   th:errorclass="is-invalid" maxlength="100"
-                                   placeholder="e.g. Backend engineer, Dad">
-                            <small class="form-text">Optional. Helps the group work out who to ask about a key.</small>
-                            <div class="invalid-feedback" th:errors="*{jobTitle}"></div>
-                        </div>
-                    </div>
-                    <div class="card-footer text-end">
-                        <button type="submit" class="btn btn-primary">Save changes</button>
-                    </div>
-                </div>
-            </form>
-
-            <div class="card">
-                <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
-                    <div th:if="${account.ssoLinked}">
-                        <h2 class="section-title">
-                            <i class="bi bi-shield-check me-1 text-primary" aria-hidden="true"></i> Single sign-on
-                        </h2>
-                        <p class="text-muted small mb-0">
-                            You sign in through your organisation's identity provider. While single sign-on
-                            is on, the password form won't accept this account, so there is no portal
-                            password to manage.
-                        </p>
-                    </div>
-                    <div th:unless="${account.ssoLinked}">
-                        <h2 class="section-title">
-                            <i class="bi bi-shield-lock me-1 text-primary" aria-hidden="true"></i> Password
-                        </h2>
-                        <p class="text-muted small mb-0">
-                            Stored as a BCrypt hash &mdash; nobody can read it back, not even a super admin.
-                        </p>
-                    </div>
-                    <a th:unless="${account.ssoLinked}" th:href="@{/profile/password}"
-                       class="btn btn-outline-secondary flex-shrink-0">Change password</a>
-                </div>
-            </div>
         </div>
     </div>
-</main>
+</div>
 </body>
 </html>

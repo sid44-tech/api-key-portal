@@ -6,133 +6,119 @@
     <title>Service integrations</title>
 </head>
 <body>
-<main layout:fragment="content">
-    <div class="page-header">
-        <h1 class="page-title">Service integrations</h1>
-        <p class="page-subtitle">
-            Shared with your group: connect a provider once, then anyone in the group can create keys
-            from the portal with one click.
-        </p>
+<div layout:fragment="content">
+    <div class="kp-page-header">
+        <div>
+            <h1>Integrations</h1>
+            <p class="kp-subtitle">
+                Shared with your group: connect a provider once, then anyone in the group can create keys
+                from the portal with one click.
+            </p>
+        </div>
     </div>
 
-    <div class="empty-state" th:if="${#lists.isEmpty(integrations) and !canManage}">
-        <div class="empty-state-icon"><i class="bi bi-plug" aria-hidden="true"></i></div>
-        <h2 class="empty-state-title">No providers connected</h2>
-        <p class="empty-state-text">
-            Your group hasn't connected a provider yet. Ask a group admin to set one up.
-        </p>
+    <div class="kp-empty" th:if="${#lists.isEmpty(integrations) and !canManage}">
+        <span class="kp-empty-icon" aria-hidden="true"><i class="bi bi-plug"></i></span>
+        <h2>No providers connected yet</h2>
+        <p>Your group hasn't connected a provider. Ask a group admin to set one up.</p>
     </div>
 
     <!-- One card per supported provider, rendered here when no integrations exist yet and
-         reused under "Add another integration" below the table otherwise. Connected providers
+         reused under "Add another" below the table otherwise. Connected providers
          create keys through their API; guided ones walk through the manual steps and verify
          the pasted key. -->
     <th:block th:if="${#lists.isEmpty(integrations) and canManage}">
-        <h2 class="section-title">Connect a provider</h2>
-        <p class="text-muted integration-blurb mb-3">
-            Connect to your service providers to simplify credential management.
-        </p>
-
-        <div th:fragment="provider-cards" class="row g-3 row-cols-1 row-cols-md-2 row-cols-xl-4">
-            <div class="col">
-                <div class="card provider-card card-interactive h-100">
-                    <div class="card-body d-flex flex-column">
-                        <span class="provider-glyph" aria-hidden="true"><i class="bi bi-microsoft"></i></span>
-                        <h3 class="section-title">Microsoft Azure AD</h3>
-                        <p class="mb-2"><span class="badge text-bg-primary">Creates keys for you</span></p>
-                        <p class="text-muted small">Registers clients and generates secrets in your tenant.</p>
-                        <a th:href="@{/integrations/new(provider='AZURE_AD')}"
-                           class="btn btn-primary btn-sm mt-auto align-self-start">Connect</a>
-                    </div>
-                </div>
-            </div>
-            <div class="col">
-                <div class="card provider-card card-interactive h-100">
-                    <div class="card-body d-flex flex-column">
-                        <span class="provider-glyph" aria-hidden="true"><i class="bi bi-google"></i></span>
-                        <h3 class="section-title">Google Cloud</h3>
-                        <p class="mb-2"><span class="badge text-bg-primary">Creates keys for you</span></p>
-                        <p class="text-muted small">Creates service accounts and keys in your project.</p>
-                        <a th:href="@{/integrations/new(provider='GOOGLE_CLOUD')}"
-                           class="btn btn-primary btn-sm mt-auto align-self-start">Connect</a>
-                    </div>
-                </div>
-            </div>
-            <div class="col">
-                <div class="card provider-card card-interactive h-100">
-                    <div class="card-body d-flex flex-column">
-                        <span class="provider-glyph" aria-hidden="true"><i class="bi bi-github"></i></span>
-                        <h3 class="section-title">GitHub</h3>
-                        <p class="mb-2"><span class="badge text-bg-secondary">Guided manual steps</span></p>
-                        <p class="text-muted small">Tokens are created on GitHub; the portal walks you through it
-                            and verifies the token.</p>
-                        <a th:href="@{/keys/guided/github}"
-                           class="btn btn-outline-secondary btn-sm mt-auto align-self-start">Start walk-through</a>
-                    </div>
-                </div>
-            </div>
-            <div class="col">
-                <div class="card provider-card card-interactive h-100">
-                    <div class="card-body d-flex flex-column">
-                        <span class="provider-glyph" aria-hidden="true"><i class="bi bi-robot"></i></span>
-                        <h3 class="section-title">Anthropic</h3>
-                        <p class="mb-2"><span class="badge text-bg-secondary">Guided manual steps</span></p>
-                        <p class="text-muted small">Keys are created in the Anthropic console; the portal walks you
-                            through it and verifies the key.</p>
-                        <a th:href="@{/keys/guided/anthropic}"
-                           class="btn btn-outline-secondary btn-sm mt-auto align-self-start">Start walk-through</a>
-                    </div>
+    <h2 class="kp-section-title mt-0">Create a new integration</h2>
+    <div th:fragment="provider-cards" class="row g-3 row-cols-1 row-cols-md-2 row-cols-xl-4">
+        <div class="col">
+            <div class="card h-100 kp-provider is-connected">
+                <div class="card-body d-flex flex-column">
+                    <span class="kp-provider-icon" aria-hidden="true"><i class="bi bi-microsoft"></i></span>
+                    <h3 class="h6 mb-1">Microsoft Azure AD</h3>
+                    <p class="mb-2"><span class="badge text-bg-primary">Creates keys for you</span></p>
+                    <p class="text-muted small">Registers clients and generates secrets in your tenant.</p>
+                    <a th:href="@{/integrations/new(provider='AZURE_AD')}" class="btn btn-primary btn-sm mt-auto align-self-start">Connect</a>
                 </div>
             </div>
         </div>
+        <div class="col">
+            <div class="card h-100 kp-provider is-connected">
+                <div class="card-body d-flex flex-column">
+                    <span class="kp-provider-icon" aria-hidden="true"><i class="bi bi-google"></i></span>
+                    <h3 class="h6 mb-1">Google Cloud</h3>
+                    <p class="mb-2"><span class="badge text-bg-primary">Creates keys for you</span></p>
+                    <p class="text-muted small">Creates service accounts and keys in your project.</p>
+                    <a th:href="@{/integrations/new(provider='GOOGLE_CLOUD')}" class="btn btn-primary btn-sm mt-auto align-self-start">Connect</a>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100 kp-provider">
+                <div class="card-body d-flex flex-column">
+                    <span class="kp-provider-icon" aria-hidden="true"><i class="bi bi-github"></i></span>
+                    <h3 class="h6 mb-1">GitHub</h3>
+                    <p class="mb-2"><span class="badge text-bg-secondary">Guided manual steps</span></p>
+                    <p class="text-muted small">Tokens are created on GitHub; the portal walks you through it
+                        and verifies the token.</p>
+                    <a th:href="@{/keys/guided/github}" class="btn btn-secondary btn-sm mt-auto align-self-start">Start walk-through</a>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100 kp-provider">
+                <div class="card-body d-flex flex-column">
+                    <span class="kp-provider-icon" aria-hidden="true"><i class="bi bi-robot"></i></span>
+                    <h3 class="h6 mb-1">Anthropic</h3>
+                    <p class="mb-2"><span class="badge text-bg-secondary">Guided manual steps</span></p>
+                    <p class="text-muted small">Keys are created in the Anthropic console; the portal walks you
+                        through it and verifies the key.</p>
+                    <a th:href="@{/keys/guided/anthropic}" class="btn btn-secondary btn-sm mt-auto align-self-start">Start walk-through</a>
+                </div>
+            </div>
+        </div>
+    </div>
     </th:block>
 
     <th:block th:unless="${#lists.isEmpty(integrations)}">
-        <div class="table-surface">
+        <div class="card kp-table-card">
             <div class="table-responsive">
-                <table class="table table-hover">
+                <table class="table table-hover align-middle">
                     <thead>
                     <tr>
-                        <th scope="col">Name</th>
-                        <th scope="col">Provider</th>
+                        <th scope="col">Integration</th>
                         <th scope="col">Tenant / project</th>
                         <th scope="col">Client ID / account</th>
                         <th scope="col">Last verified</th>
-                        <th scope="col" class="text-end">Actions</th>
+                        <th scope="col" class="text-end"><span class="visually-hidden">Actions</span></th>
                     </tr>
                     </thead>
                     <tbody>
                     <tr th:each="integration : ${integrations}">
-                        <td class="cell-primary" th:text="${integration.name}">Azure AD</td>
                         <td>
-                            <span class="service-chip">
-                                <span class="service-glyph" aria-hidden="true">
-                                    <i th:class="'bi ' + ${integration.provider.icon}"></i>
-                                </span>
+                            <span class="kp-cell-primary" th:text="${integration.name}">Azure AD</span>
+                            <div class="kp-cell-secondary">
+                                <i th:class="'bi me-1 ' + ${integration.provider.icon}" aria-hidden="true"></i>
                                 <span th:text="${integration.provider.label}">Microsoft Azure AD</span>
-                            </span>
+                            </div>
                         </td>
                         <td><code th:text="${integration.tenantId}">tenant</code></td>
                         <td><code th:text="${integration.clientId}">client</code></td>
-                        <td class="cell-sub" th:text="${integration.lastVerifiedAt != null
+                        <td th:text="${integration.lastVerifiedAt != null
                                 ? #temporals.format(integration.lastVerifiedAt.atZone(T(java.time.ZoneId).systemDefault()), 'MMM d, yyyy HH:mm')
                                 : 'Never'}">Never</td>
                         <td class="text-end" th:if="${canManage}">
-                            <span class="d-inline-flex align-items-center gap-1 justify-content-end">
-                                <form th:action="@{/integrations/{id}/test(id=${integration.id})}" method="post">
-                                    <button type="submit" class="btn btn-sm btn-outline-secondary"
-                                            title="Test connection">
-                                        <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i> Test
-                                    </button>
-                                </form>
-                                <button type="button" class="btn btn-icon btn-icon-danger" title="Remove"
-                                        data-bs-toggle="modal" data-bs-target="#deleteModal"
-                                        th:attr="data-key-name=${integration.name},data-delete-url=@{/integrations/{id}/delete(id=${integration.id})}">
-                                    <i class="bi bi-trash" aria-hidden="true"></i><span class="visually-hidden">Remove</span>
+                            <form th:action="@{/integrations/{id}/test(id=${integration.id})}" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-secondary" title="Test connection">
+                                    <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i> Test
                                 </button>
-                            </span>
+                            </form>
+                            <button type="button" class="btn btn-sm btn-outline-danger" title="Remove"
+                                    data-bs-toggle="modal" data-bs-target="#deleteModal"
+                                    th:attr="data-key-name=${integration.name},data-delete-url=@{/integrations/{id}/delete(id=${integration.id})}">
+                                <i class="bi bi-trash" aria-hidden="true"></i><span class="visually-hidden">Remove</span>
+                            </button>
                         </td>
-                        <td class="text-end cell-sub" th:unless="${canManage}">Group admins only</td>
+                        <td class="text-end kp-cell-secondary" th:unless="${canManage}">Group admins only</td>
                     </tr>
                     </tbody>
                 </table>
@@ -140,7 +126,7 @@
         </div>
 
         <th:block th:if="${canManage}">
-            <h2 class="section-title mt-5 mb-3">Add another integration</h2>
+            <h2 class="kp-section-title">Add another</h2>
             <div th:replace="~{:: provider-cards}"></div>
         </th:block>
 
@@ -150,11 +136,11 @@
                     <form method="post" id="deleteForm">
                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                         <div class="modal-header">
-                            <h5 class="modal-title" id="deleteModalLabel">Remove integration?</h5>
+                            <h5 class="modal-title" id="deleteModalLabel">Remove this integration?</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body">
-                            <p class="mb-0">The stored credentials for <strong id="deleteKeyName"></strong> will be
+                            <p class="mb-0">The stored credentials for <strong id="deleteKeyName" class="text-body"></strong> will be
                                 permanently removed from this portal. Nothing is changed in the provider, and keys
                                 already created through it stay.</p>
                         </div>
@@ -167,7 +153,7 @@
             </div>
         </div>
     </th:block>
-</main>
+</div>
 
 <th:block layout:fragment="scripts">
     <script th:src="@{/js/keys.js}"></script>
