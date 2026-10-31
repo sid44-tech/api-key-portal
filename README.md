@@ -375,11 +375,24 @@ The coverage report is written to `target/site/jacoco/index.html`.
 
 ## To do
 
-- Add 2-factor auth to login
-- Add better logging and error handling to the app
-- Build a deployment pipeline in GitHub
-- Add more service integrations (AWS, Stripe) for generating keys from the portal
-- Replace the key table with a card layout on phones (it scrolls sideways for now)
+- **More providers**
+  - Connected: AWS (IAM access keys), Cloudflare (API tokens), GitLab (project and group access tokens),
+    Twilio (API keys), SendGrid (API keys)
+  - Guided walk-through: Stripe, OpenAI, Atlassian
+- **Auto-generate replacement keys**
+  - Per-user toggle; when a key expires, create a new one in the provider
+  - Email the owner that the key expired and a replacement is ready
+  - Keep the just-expired key visible with a "Just expired" notice until the new key is copied
+  - Hide other expired keys behind a "Show expired" toggle, off by default
+- **Deploy the app and database together** as one containerized unit
+- **Publish releases**: build the Docker image and push it to GitHub's container registry on each release tag
+- **Better logging and error handling**
+  - Structured logs for sign-ins, reveals and errors
+  - Remove the "Not Found" banner from the 404 page
+- **Key cards on phones** in place of the sideways-scrolling table
+- **Limit failed sign-ins**: lock out for a short time after about 5 failures per account or IP
+- **Audit reveals and edits**: add `KEY_REVEALED` and `KEY_UPDATED` to History
+- **Rotate the encryption key**: store a key ID with each value, plus a re-encrypt command
 
 ## License
 
