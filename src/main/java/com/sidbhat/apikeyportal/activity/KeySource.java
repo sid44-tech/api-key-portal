@@ -15,7 +15,10 @@ public enum KeySource {
     PROVISIONED("Created via integration"),
 
     /** Created in the provider's own console, then verified and stored. */
-    GUIDED("Guided walk-through");
+    GUIDED("Guided walk-through"),
+
+    /** Minted by the portal itself, to replace a key that was about to expire. */
+    ROTATED("Replaced automatically");
 
     private final String label;
 

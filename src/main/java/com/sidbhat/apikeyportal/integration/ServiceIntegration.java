@@ -82,6 +82,14 @@ public class ServiceIntegration {
     @Column(name = "last_verified_at")
     private Instant lastVerifiedAt;
 
+    /**
+     * The group-level switch: off, and nobody in the group can mint keys through
+     * this integration until an admin switches it back on. The stored provider
+     * credential stays put, which is the point - pausing is not deleting.
+     */
+    @Column(nullable = false)
+    private boolean enabled = true;
+
     protected ServiceIntegration() {
         // for JPA
     }
@@ -141,6 +149,14 @@ public class ServiceIntegration {
 
     public Long getGroupId() {
         return group == null ? null : group.getId();
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
     }
 
     public void markVerified(Instant verifiedAt) {

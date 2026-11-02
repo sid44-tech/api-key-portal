@@ -52,6 +52,21 @@ final class ApiKeySpecifications {
         return (root, query, cb) -> cb.equal(root.get("owner").get("id"), ownerId);
     }
 
+    /**
+     * Hides keys that have already expired, unless asked for them. "Expired" here
+     * is {@link ExpirationStatus}'s definition - a key expiring today is already
+     * expired - so the list and the badge never disagree about which side of the
+     * line a key is on.
+     */
+    static Specification<ApiKey> expiredHidden(boolean showExpired, java.time.LocalDate today) {
+        if (showExpired) {
+            return Specification.unrestricted();
+        }
+        return (root, query, cb) -> cb.or(
+                cb.isNull(root.get("expiresOn")),
+                cb.greaterThan(root.get("expiresOn"), today));
+    }
+
     /** Exact match on service name. No-op for blank service. */
     static Specification<ApiKey> serviceIs(String serviceName) {
         if (!StringUtils.hasText(serviceName)) {

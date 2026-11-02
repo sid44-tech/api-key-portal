@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Add an Atlassian API token</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a th:href="@{/keys/new}">Add key</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Atlassian API token</li>
+                </ol>
+            </nav>
+
+            <h1 class="mb-2"><i class="bi bi-kanban-fill me-2" aria-hidden="true"></i>Add an Atlassian API token</h1>
+            <p class="text-muted mb-4">
+                Atlassian API tokens can only be created by hand in your Atlassian account settings - there is
+                no API for it. This walk-through covers the manual steps; afterwards the portal verifies the
+                token live against Atlassian and stores it encrypted. One token works across the suite:
+                Jira, Confluence, Bitbucket's Jira-backed APIs and the rest.
+            </p>
+
+            <form th:action="@{/keys/guided/atlassian}" th:object="${form}" method="post" novalidate>
+
+                <div class="alert alert-danger d-flex align-items-start" th:if="${#fields.hasGlobalErrors()}">
+                    <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>
+                    <div>
+                        <strong>Atlassian did not accept the token.</strong>
+                        <div th:each="err : ${#fields.globalErrors()}" th:text="${err}">Error</div>
+                        <div class="small text-muted mt-1">Nothing was stored locally.</div>
+                    </div>
+                </div>
+
+                <!-- Step 1 -->
+                <div class="card mb-3 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">1</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Create a token in your Atlassian account</h2>
+                            <ol class="mb-3">
+                                <li>Open the API tokens page with the button below and sign in.</li>
+                                <li>Press <strong>Create API token</strong>.</li>
+                                <li>Give it a descriptive label — it is how you'll recognise it later in the
+                                    list, and the only thing shown there once it's created.</li>
+                                <li>Pick an expiry. Atlassian allows up to a year; shorter is better practice,
+                                    and the portal will remind you before it runs out.</li>
+                                <li>Press <strong>Create</strong>.</li>
+                            </ol>
+                            <a href="https://id.atlassian.com/manage-profile/security/api-tokens"
+                               target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>
+                                Open "API tokens" in your Atlassian account
+                            </a>
+                            <p class="text-muted small mt-3 mb-0">
+                                <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+                                A token carries <strong>your own</strong> permissions in every Atlassian site
+                                you can reach — there is no way to scope one down. Prefer a dedicated
+                                service account over a person's login for anything shared.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="card mb-3 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">2</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Copy the token, and the email it belongs to</h2>
+                            <p>Atlassian shows the token exactly once, right after creating it. An Atlassian
+                                token is only half of the credential: calls authenticate as
+                                <strong>email plus token</strong>, so the portal needs both — and checks them
+                                together.</p>
+                            <div class="row">
+                                <div class="mb-3 col-md-6">
+                                    <label class="form-label" for="accountEmail">Atlassian account email</label>
+                                    <input type="email" class="form-control" th:field="*{accountEmail}"
+                                           th:errorclass="is-invalid" autocomplete="off" spellcheck="false"
+                                           placeholder="you@example.com" maxlength="255">
+                                    <small class="form-text">The address you signed in with above.</small>
+                                    <div class="invalid-feedback" th:errors="*{accountEmail}"></div>
+                                </div>
+                                <div class="mb-2 col-md-6">
+                                    <label class="form-label" for="keyValue">API token</label>
+                                    <input type="password" class="form-control font-monospace" th:field="*{keyValue}"
+                                           th:errorclass="is-invalid" autocomplete="off" spellcheck="false"
+                                           maxlength="4096">
+                                    <div class="invalid-feedback" th:errors="*{keyValue}"></div>
+                                </div>
+                            </div>
+                            <p class="text-muted small mb-0">
+                                <i class="bi bi-lock-fill me-1" aria-hidden="true"></i>
+                                The token is stored encrypted (AES-256-GCM); the email goes in the notes, since
+                                it is not a secret and whoever uses the token will need it.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="card mb-4 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">3</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Name it and save</h2>
+                            <div class="row">
+                                <div class="mb-3 col-md-6">
+                                    <label class="form-label" for="name">Key name</label>
+                                    <input type="text" class="form-control" th:field="*{name}"
+                                           th:errorclass="is-invalid" placeholder="e.g. Jira release bot"
+                                           maxlength="100" required>
+                                    <div class="invalid-feedback" th:errors="*{name}"></div>
+                                </div>
+                                <div class="mb-3 col-md-6">
+                                    <label class="form-label" for="expiresOn">Expires on</label>
+                                    <input type="date" class="form-control" th:field="*{expiresOn}"
+                                           th:errorclass="is-invalid">
+                                    <small class="form-text">Set this to the expiry you chose in step 1, and the
+                                        portal will remind you before it lapses.</small>
+                                    <div class="invalid-feedback" th:errors="*{expiresOn}"></div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="notes">Notes</label>
+                                <textarea class="form-control" th:field="*{notes}" rows="2" maxlength="700"
+                                          th:errorclass="is-invalid"
+                                          placeholder="Which site, what it's used for..."></textarea>
+                                <small class="form-text">Notes are not encrypted.</small>
+                                <div class="invalid-feedback" th:errors="*{notes}"></div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-patch-check me-1" aria-hidden="true"></i> Verify &amp; save
+                            </button>
+                            <a th:href="@{/keys/new}" class="btn btn-link">Cancel</a>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Connect AWS</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a th:href="@{/integrations}">Integrations</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Connect AWS</li>
+                </ol>
+            </nav>
+
+            <h1 class="mb-2"><i class="bi bi-amazon me-2" aria-hidden="true"></i>Connect Amazon Web Services</h1>
+            <p class="text-muted mb-4">
+                A one-time setup, done in about five minutes. You'll create one IAM user for this portal,
+                allowed to do exactly one thing: manage IAM users under the <code>/keyportal/</code> path.
+                Afterwards, the portal can create IAM users and access keys in your account with a single click.
+            </p>
+
+            <form th:action="@{/integrations/aws}" th:object="${form}" method="post" novalidate>
+
+                <div class="alert alert-danger d-flex align-items-start" th:if="${#fields.hasGlobalErrors()}">
+                    <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>
+                    <div>
+                        <strong>AWS did not accept the connection.</strong>
+                        <div th:each="err : ${#fields.globalErrors()}" th:text="${err}">Error</div>
+                    </div>
+                </div>
+
+                <!-- Step 1 -->
+                <div class="card mb-3 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">1</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Create a policy that scopes the portal down</h2>
+                            <p>Sign in to the AWS console as an administrator, open <strong>IAM → Policies →
+                                Create policy</strong>, switch to the <strong>JSON</strong> tab and paste:</p>
+<pre class="p-3 rounded bg-body-tertiary border font-monospace small mb-3">{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": [
+      "iam:CreateUser",
+      "iam:CreateAccessKey",
+      "iam:DeleteUser"
+    ],
+    "Resource": "arn:aws:iam::*:user/keyportal/*"
+  }]
+}</pre>
+                            <p class="mb-3">Name it <code>APIKeyPortalProvisioning</code> (any name works) and create it.</p>
+                            <p class="text-muted small mb-2">
+                                <i class="bi bi-shield-check me-1" aria-hidden="true"></i>
+                                This is the least-privileged option: every user this portal creates lives under the
+                                <code>/keyportal/</code> path, and the policy reaches that path and nothing else.
+                                The portal cannot touch any other user, role or resource in your account.
+                            </p>
+                            <a href="https://console.aws.amazon.com/iam/home#/policies/create"
+                               target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>
+                                Open "Create policy" in the AWS console
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="card mb-3 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">2</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Create an IAM user for the portal</h2>
+                            <ol class="mb-3">
+                                <li>Open <strong>IAM → Users → Create user</strong>.</li>
+                                <li>Name it <code>api-key-portal</code> (any name works).</li>
+                                <li>Leave <em>Provide user access to the AWS Management Console</em> unticked —
+                                    this user is for API calls only.</li>
+                                <li>On the permissions step choose <strong>Attach policies directly</strong> and
+                                    tick the policy from step 1, then create the user.</li>
+                            </ol>
+                            <a href="https://console.aws.amazon.com/iam/home#/users/create"
+                               target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>
+                                Open "Create user" in the AWS console
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="card mb-3 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">3</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Create that user's access key</h2>
+                            <ol class="mb-3">
+                                <li>Open the new user, choose <strong>Security credentials</strong> →
+                                    <strong>Create access key</strong>.</li>
+                                <li>Pick <em>Third-party service</em> as the use case and confirm.</li>
+                                <li>Copy both values below — AWS shows the secret only once.</li>
+                            </ol>
+                            <div class="row">
+                                <div class="mb-3 col-md-6">
+                                    <label class="form-label" for="accessKeyId">Access key ID</label>
+                                    <input type="text" class="form-control font-monospace" th:field="*{accessKeyId}"
+                                           th:errorclass="is-invalid" autocomplete="off" spellcheck="false"
+                                           placeholder="AKIAIOSFODNN7EXAMPLE" maxlength="128">
+                                    <div class="invalid-feedback" th:errors="*{accessKeyId}"></div>
+                                </div>
+                                <div class="mb-2 col-md-6">
+                                    <label class="form-label" for="secretAccessKey">Secret access key</label>
+                                    <input type="password" class="form-control font-monospace" th:field="*{secretAccessKey}"
+                                           th:errorclass="is-invalid" autocomplete="off" spellcheck="false" maxlength="256">
+                                    <div class="invalid-feedback" th:errors="*{secretAccessKey}"></div>
+                                </div>
+                            </div>
+                            <p class="text-muted small mb-0">
+                                <i class="bi bi-lock-fill me-1" aria-hidden="true"></i>
+                                Stored encrypted (AES-256-GCM) and never shown again in this portal either.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 4 -->
+                <div class="card mb-3 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">4</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Copy your account ID</h2>
+                            <p>Open the account menu (top right of the console); the twelve-digit
+                                <strong>Account ID</strong> is at the top of it. The portal checks the key you
+                                pasted really belongs to this account before saving anything.</p>
+                            <div class="mb-0 col-md-6">
+                                <label class="form-label" for="accountId">AWS account ID</label>
+                                <input type="text" class="form-control font-monospace" th:field="*{accountId}"
+                                       th:errorclass="is-invalid" autocomplete="off" spellcheck="false"
+                                       placeholder="123456789012" maxlength="12">
+                                <div class="invalid-feedback" th:errors="*{accountId}"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 5 -->
+                <div class="card mb-4 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">5</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Name it and connect</h2>
+                            <p>This name shows up in the provider dropdown on the Add key screen, and as the
+                                service name on keys created through it.</p>
+                            <div class="mb-3 col-md-6">
+                                <label class="form-label" for="name">Integration name</label>
+                                <input type="text" class="form-control" th:field="*{name}"
+                                       th:errorclass="is-invalid" maxlength="100">
+                                <div class="invalid-feedback" th:errors="*{name}"></div>
+                            </div>
+                            <p class="text-muted small">
+                                <i class="bi bi-magic me-1" aria-hidden="true"></i>
+                                The portal verifies the connection against AWS before anything is saved,
+                                so typos surface right here.
+                            </p>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-plug me-1" aria-hidden="true"></i> Verify &amp; connect
+                            </button>
+                            <a th:href="@{/integrations}" class="btn btn-link">Cancel</a>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+</html>

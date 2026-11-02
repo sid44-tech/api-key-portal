@@ -11,6 +11,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.sidbhat.apikeyportal.logging.AuditLog;
+
 @Service
 @Transactional(readOnly = true)
 public class UserAccountService {
@@ -23,12 +25,14 @@ public class UserAccountService {
     private final UserAccountRepository accounts;
     private final UserGroupRepository groups;
     private final PasswordEncoder passwordEncoder;
+    private final AuditLog audit;
 
     public UserAccountService(UserAccountRepository accounts, UserGroupRepository groups,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder, AuditLog audit) {
         this.accounts = accounts;
         this.groups = groups;
         this.passwordEncoder = passwordEncoder;
+        this.audit = audit;
     }
 
     /**
@@ -66,7 +70,10 @@ public class UserAccountService {
     public UserAccount getCurrent(PortalUser principal) {
         UserAccount account = getById(principal.getId());
         if (!account.isEnabled()) {
-            log.warn("Rejected request from {}, whose account is disabled", account);
+            // the session outlived the account being switched off, which is
+            // either an off-boarding working as intended or somebody still trying
+            audit.refused("request_by_disabled_account", account.getEmail(), account.getEmail(),
+                    "The account has been disabled");
             throw new AccessDeniedException("This account has been disabled");
         }
         return account;
@@ -118,10 +125,15 @@ public class UserAccountService {
         if (!email.equals(account.getEmail()) && accounts.existsByEmailIgnoreCase(email)) {
             throw new EmailAlreadyUsedException(email);
         }
+        String previousEmail = account.getEmail();
         account.setEmail(email);
         account.setDisplayName(details.displayName().trim());
         account.setJobTitle(trimToNull(details.jobTitle()));
-        log.info("Updated profile for {}", account);
+        // the email is the login identifier, so changing it is a change to how
+        // somebody signs in, not a cosmetic edit - the old one has to be written
+        // down or the trail breaks at the rename
+        audit.allowed("profile_updated", previousEmail, previousEmail,
+                email.equals(previousEmail) ? null : "Email changed to " + email);
         return account;
     }
 
@@ -135,14 +147,15 @@ public class UserAccountService {
     public UserAccount changePassword(Long id, String currentPassword, String newPassword) {
         UserAccount account = getById(id);
         if (!passwordEncoder.matches(currentPassword, account.getPasswordHash())) {
-            log.warn("Rejected password change for {}: current password did not match", account);
+            audit.refused("password_change", account.getEmail(), account.getEmail(),
+                    "The current password did not match");
             throw new IncorrectPasswordException();
         }
         requireAcceptablePassword(newPassword);
         account.setPasswordHash(passwordEncoder.encode(newPassword));
         // whatever they were handed is gone now, so the forced-change lock lifts
         account.setMustChangePassword(false);
-        log.info("Changed password for {}", account);
+        audit.allowed("password_change", account.getEmail(), account.getEmail(), null);
         return account;
     }
 
@@ -170,11 +183,17 @@ public class UserAccountService {
                 throw new AccessDeniedException("Only a super admin can move an account between groups");
             }
         }
+        UserRole previousRole = account.getRole();
+        boolean wasEnabled = account.isEnabled();
+        Long previousGroupId = account.getGroupId();
+
         account.setRole(role);
         account.setEnabled(enabled);
         account.setGroup(groupId == null ? null
                 : groups.findById(groupId).orElseThrow(() -> new IllegalArgumentException("No group " + groupId)));
-        log.info("{} updated {} to role {} in group {}", actor, account, role, groupId);
+
+        audit.allowed("account_administered", actor.getEmail(), account.getEmail(),
+                describeChange(previousRole, role, wasEnabled, enabled, previousGroupId, groupId));
         return account;
     }
 
@@ -182,6 +201,35 @@ public class UserAccountService {
     public void recordLogin(String email) {
         accounts.findByEmailIgnoreCase(UserAccount.normalizeEmail(email))
                 .ifPresent(account -> accounts.recordLogin(account.getId(), Instant.now()));
+    }
+
+    /**
+     * What an administrator actually changed about somebody else's account.
+     * Spelled out rather than logging the new state, because "set to MEMBER" and
+     * "demoted from SUPER_ADMIN to MEMBER" are not the same thing to read a month
+     * later - and disabling an account, which is how access is revoked, was not
+     * being written down at all.
+     */
+    private static String describeChange(UserRole previousRole, UserRole role, boolean wasEnabled, boolean enabled,
+            Long previousGroupId, Long groupId) {
+        StringBuilder changes = new StringBuilder();
+        if (previousRole != role) {
+            changes.append("role ").append(previousRole).append(" to ").append(role);
+        }
+        if (wasEnabled != enabled) {
+            append(changes, enabled ? "re-enabled" : "disabled");
+        }
+        if (!Objects.equals(previousGroupId, groupId)) {
+            append(changes, "group " + previousGroupId + " to " + groupId);
+        }
+        return changes.isEmpty() ? "No change" : changes.toString();
+    }
+
+    private static void append(StringBuilder changes, String change) {
+        if (!changes.isEmpty()) {
+            changes.append(", ");
+        }
+        changes.append(change);
     }
 
     private void requireAcceptablePassword(String password) {

@@ -99,6 +99,33 @@ public class ApiKey {
     @Column(name = "last_revealed_at", insertable = false, updatable = false)
     private Instant lastRevealedAt;
 
+    /**
+     * The integration this key was minted through, where there was one. A plain id
+     * rather than a relation: removing the integration must not take its keys with
+     * it, it just means no more replacements can be minted for them.
+     */
+    @Column(name = "integration_id")
+    private Long integrationId;
+
+    /**
+     * The provider-side resource the key hangs off - for Azure AD, the app
+     * registration's object id. A replacement secret is added to this same
+     * client, so rotation changes the secret and never the consumer's identity.
+     */
+    @Column(name = "provider_resource_id", length = 255)
+    private String providerResourceId;
+
+    /**
+     * The owner's per-key say on automatic replacement: null defers to their
+     * setting for the provider, true or false pins this one key regardless.
+     */
+    @Column(name = "auto_rotate")
+    private Boolean autoRotate;
+
+    /** Set on a replacement: the key this one was minted to take over from. */
+    @Column(name = "rotated_from_key_id")
+    private Long rotatedFromKeyId;
+
     protected ApiKey() {
         // for JPA
     }
@@ -113,6 +140,44 @@ public class ApiKey {
 
     public Long getId() {
         return id;
+    }
+
+    /**
+     * True if the portal still has everything it needs to mint a replacement:
+     * which integration to use and which provider resource to add the secret to.
+     * Whether it is *allowed* to is the owner's settings, checked elsewhere.
+     */
+    public boolean isRotatable() {
+        return integrationId != null && providerResourceId != null;
+    }
+
+    public Long getIntegrationId() {
+        return integrationId;
+    }
+
+    public String getProviderResourceId() {
+        return providerResourceId;
+    }
+
+    public Boolean getAutoRotate() {
+        return autoRotate;
+    }
+
+    public void setAutoRotate(Boolean autoRotate) {
+        this.autoRotate = autoRotate;
+    }
+
+    public Long getRotatedFromKeyId() {
+        return rotatedFromKeyId;
+    }
+
+    /** Where a provisioned or rotated key came from; set once, at creation. */
+    public void recordProvenance(Long integrationId, String providerResourceId, Boolean autoRotate,
+            Long rotatedFromKeyId) {
+        this.integrationId = integrationId;
+        this.providerResourceId = providerResourceId;
+        this.autoRotate = autoRotate;
+        this.rotatedFromKeyId = rotatedFromKeyId;
     }
 
     public String getName() {

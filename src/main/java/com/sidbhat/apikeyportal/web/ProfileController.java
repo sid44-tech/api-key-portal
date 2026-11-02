@@ -1,5 +1,8 @@
 package com.sidbhat.apikeyportal.web;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -13,8 +16,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import com.sidbhat.apikeyportal.integration.ServiceProvider;
+import com.sidbhat.apikeyportal.rotation.KeyRotationService;
 import com.sidbhat.apikeyportal.security.PrincipalRefresher;
 import com.sidbhat.apikeyportal.user.EmailAlreadyUsedException;
 import com.sidbhat.apikeyportal.user.IncorrectPasswordException;
@@ -31,10 +37,13 @@ public class ProfileController {
 
     private final UserAccountService userService;
     private final PrincipalRefresher principalRefresher;
+    private final KeyRotationService rotationService;
 
-    public ProfileController(UserAccountService userService, PrincipalRefresher principalRefresher) {
+    public ProfileController(UserAccountService userService, PrincipalRefresher principalRefresher,
+            KeyRotationService rotationService) {
         this.userService = userService;
         this.principalRefresher = principalRefresher;
+        this.rotationService = rotationService;
     }
 
     @GetMapping
@@ -44,7 +53,38 @@ public class ProfileController {
             model.addAttribute("form", ProfileForm.from(me));
         }
         model.addAttribute("account", me);
+        addRotationSettings(model, me);
         return "profile/view";
+    }
+
+    /**
+     * The owner's per-provider switch: may the portal mint replacements for their
+     * expiring keys there. Offered only for providers that support it.
+     */
+    @PostMapping("/rotation")
+    public String setRotationPreference(@AuthenticationPrincipal PortalUser principal,
+            @RequestParam("provider") ServiceProvider provider,
+            @RequestParam(value = "enabled", defaultValue = "false") boolean enabled,
+            RedirectAttributes redirectAttributes) {
+        if (!provider.supportsRotation()) {
+            throw new IllegalArgumentException(provider.getLabel() + " does not support automatic replacement");
+        }
+        rotationService.setPreference(userService.getCurrent(principal), provider, enabled);
+        redirectAttributes.addFlashAttribute("success", enabled
+                ? "Expiring " + provider.getLabel() + " keys you hold will be replaced automatically, "
+                        + "a week before they expire."
+                : "Your " + provider.getLabel() + " keys won't be replaced automatically.");
+        return "redirect:/profile";
+    }
+
+    private void addRotationSettings(Model model, UserAccount me) {
+        Map<ServiceProvider, Boolean> settings = new LinkedHashMap<>();
+        for (ServiceProvider provider : ServiceProvider.values()) {
+            if (provider.supportsRotation()) {
+                settings.put(provider, rotationService.isPreferenceEnabled(me, provider));
+            }
+        }
+        model.addAttribute("rotationSettings", settings);
     }
 
     @PostMapping
@@ -64,6 +104,7 @@ public class ProfileController {
             }
         }
         model.addAttribute("account", me);
+        addRotationSettings(model, me);
         return "profile/view";
     }
 

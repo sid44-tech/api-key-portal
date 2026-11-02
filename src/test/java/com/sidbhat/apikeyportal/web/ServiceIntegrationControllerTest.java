@@ -89,6 +89,9 @@ class ServiceIntegrationControllerTest {
                 .andExpect(content().string(Matchers.containsString("Create a new integration")))
                 .andExpect(content().string(Matchers.containsString("/integrations/new?provider=AZURE_AD")))
                 .andExpect(content().string(Matchers.containsString("/integrations/new?provider=GOOGLE_CLOUD")))
+                .andExpect(content().string(Matchers.containsString("/integrations/new?provider=AWS_IAM")))
+                .andExpect(content().string(Matchers.containsString("/integrations/new?provider=GITLAB")))
+                .andExpect(content().string(Matchers.containsString("/integrations/new?provider=CLOUDFLARE")))
                 .andExpect(content().string(Matchers.containsString("/keys/guided/github")))
                 .andExpect(content().string(Matchers.containsString("/keys/guided/anthropic")));
     }
@@ -102,6 +105,121 @@ class ServiceIntegrationControllerTest {
                 .andExpect(content().string(Matchers.containsString("portal.azure.com")))
                 .andExpect(content().string(Matchers.containsString("Application.ReadWrite.OwnedBy")))
                 .andExpect(content().string(Matchers.containsString("Grant admin consent")));
+    }
+
+    @Test
+    @WithPortalUser
+    void setupPageShowsWalkthroughWithAwsLinks() throws Exception {
+        mvc.perform(get("/integrations/new").param("provider", "AWS_IAM"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("integrations/aws-setup"))
+                .andExpect(content().string(Matchers.containsString("console.aws.amazon.com")))
+                // the wizard's whole security story: a policy scoped to the
+                // portal's own user path, nothing wider
+                .andExpect(content().string(Matchers.containsString("arn:aws:iam::*:user/keyportal/*")))
+                .andExpect(content().string(Matchers.containsString("iam:CreateUser")))
+                .andExpect(content().string(Matchers.containsString("Verify &amp; connect")));
+    }
+
+    @Test
+    @WithPortalUser
+    void connectAwsVerifiesAndSaves() throws Exception {
+        when(integrationService.connect(eq(ServiceProvider.AWS_IAM), eq("AWS production"), eq("123456789012"),
+                eq("AKIDEXAMPLE"), eq("aws-secret"), eq(alex)))
+                .thenReturn(new ServiceIntegration(ServiceProvider.AWS_IAM, "AWS production", "123456789012",
+                        "AKIDEXAMPLE", "aws-secret"));
+
+        mvc.perform(post("/integrations/aws").with(csrf())
+                        .param("name", "AWS production")
+                        .param("accountId", "123456789012")
+                        .param("accessKeyId", "AKIDEXAMPLE")
+                        .param("secretAccessKey", "aws-secret"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/integrations"))
+                .andExpect(flash().attribute("success", Matchers.containsString("Connected AWS production")));
+    }
+
+    @Test
+    @WithPortalUser
+    void connectAwsRejectsAMalformedAccountId() throws Exception {
+        mvc.perform(post("/integrations/aws").with(csrf())
+                        .param("name", "AWS production")
+                        .param("accountId", "not-an-account")
+                        .param("accessKeyId", "AKIDEXAMPLE")
+                        .param("secretAccessKey", "aws-secret"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("integrations/aws-setup"))
+                .andExpect(content().string(Matchers.containsString("exactly twelve digits")));
+
+        verify(integrationService, never()).connect(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @WithPortalUser
+    void setupPagesShowTheGitLabAndCloudflareWalkthroughs() throws Exception {
+        mvc.perform(get("/integrations/new").param("provider", "GITLAB"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("integrations/gitlab-setup"))
+                // least privilege is the point: a project token reaches one project
+                .andExpect(content().string(Matchers.containsString("Settings → Access tokens")))
+                .andExpect(content().string(Matchers.containsString("gitlab.com")));
+
+        mvc.perform(get("/integrations/new").param("provider", "CLOUDFLARE"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("integrations/cloudflare-setup"))
+                // the template-token idea carries the whole setup
+                .andExpect(content().string(Matchers.containsString("template token")))
+                .andExpect(content().string(Matchers.containsString("dash.cloudflare.com")));
+    }
+
+    @Test
+    @WithPortalUser
+    void connectGitLabVerifiesAndSaves() throws Exception {
+        when(integrationService.connect(eq(ServiceProvider.GITLAB), eq("GitLab CI"),
+                eq("https://gitlab.example.com"), eq("my-group/my-app"), eq("glpat-admin"), eq(alex)))
+                .thenReturn(new ServiceIntegration(ServiceProvider.GITLAB, "GitLab CI",
+                        "https://gitlab.example.com", "my-group/my-app", "glpat-admin"));
+
+        mvc.perform(post("/integrations/gitlab").with(csrf())
+                        .param("name", "GitLab CI")
+                        .param("baseUrl", "https://gitlab.example.com")
+                        .param("project", "my-group/my-app")
+                        .param("token", "glpat-admin"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/integrations"))
+                .andExpect(flash().attribute("success", Matchers.containsString("Connected GitLab CI")));
+    }
+
+    @Test
+    @WithPortalUser
+    void connectGitLabInsistsOnHttps() throws Exception {
+        mvc.perform(post("/integrations/gitlab").with(csrf())
+                        .param("name", "GitLab CI")
+                        .param("baseUrl", "http://gitlab.example.com")
+                        .param("project", "42")
+                        .param("token", "glpat-admin"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("integrations/gitlab-setup"))
+                .andExpect(content().string(Matchers.containsString("must start with https://")));
+
+        verify(integrationService, never()).connect(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @WithPortalUser
+    void connectCloudflareVerifiesAndSaves() throws Exception {
+        when(integrationService.connect(eq(ServiceProvider.CLOUDFLARE), eq("Cloudflare DNS"),
+                eq("tmpl-1"), eq("tmpl-1"), eq("cf-admin"), eq(alex)))
+                .thenReturn(new ServiceIntegration(ServiceProvider.CLOUDFLARE, "Cloudflare DNS",
+                        "tmpl-1", "tmpl-1", "cf-admin"));
+
+        mvc.perform(post("/integrations/cloudflare").with(csrf())
+                        .param("name", "Cloudflare DNS")
+                        .param("templateTokenId", "tmpl-1")
+                        .param("apiToken", "cf-admin"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/integrations"))
+                .andExpect(flash().attribute("success", Matchers.containsString("Connected Cloudflare DNS")));
     }
 
     @Test

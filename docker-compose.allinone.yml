@@ -1,0 +1,41 @@
+# The portal and its database as a single container.
+#
+#   docker compose -f docker-compose.allinone.yml up -d
+#
+# Then open http://localhost:8080 and sign in as admin@localhost / changeme,
+# which the portal makes you replace before it lets you do anything else.
+#
+# Nothing has to be configured first: the database is inside the image, and the
+# database password and encryption key are generated on the first start and kept
+# in the data volume. For anything you would mind losing, set
+# PORTAL_ENCRYPTION_KEY below and keep a copy of it somewhere else - see the
+# README. This file builds the image locally; to run a published one instead,
+# replace `build` with `image: ghcr.io/OWNER/api-key-portal:latest-allinone`.
+services:
+  portal:
+    build:
+      context: .
+      dockerfile: Dockerfile.allinone
+    ports:
+      - "8080:8080"
+    environment:
+      # Where the database, and anything else that has to survive a restart,
+      # is kept inside the container. The volume below is mounted on it.
+      PORTAL_DATA_DIR: /var/lib/keyportal
+      # Generated and kept in the volume if left unset. Set it - and back it
+      # up - and the data in the volume is no longer readable on its own.
+      PORTAL_ENCRYPTION_KEY: ${PORTAL_ENCRYPTION_KEY:-}
+      # Seeds the first account, which has to change its password at first
+      # sign-in. Only read while the portal has no accounts at all.
+      PORTAL_ADMIN_EMAIL: ${PORTAL_ADMIN_EMAIL:-admin@localhost}
+      PORTAL_ADMIN_PASSWORD: ${PORTAL_ADMIN_PASSWORD:-changeme}
+    volumes:
+      - keyportal-data:/var/lib/keyportal
+    restart: unless-stopped
+    # The portal is stopped first and the database second, which takes longer
+    # than Docker's ten second default. Cut short, the database is killed
+    # rather than asked to flush what it is holding.
+    stop_grace_period: 60s
+
+volumes:
+  keyportal-data:

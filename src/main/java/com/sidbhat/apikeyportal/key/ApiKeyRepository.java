@@ -21,6 +21,15 @@ public interface ApiKeyRepository extends JpaRepository<ApiKey, Long>, JpaSpecif
     @Query("select distinct k.serviceName from ApiKey k order by k.serviceName")
     List<String> findDistinctServiceNames();
 
+    /** True once a replacement has been minted for this key. */
+    boolean existsByRotatedFromKeyId(Long keyId);
+
+    /** The replacement minted for this key, if there is one. */
+    java.util.Optional<ApiKey> findByRotatedFromKeyId(Long keyId);
+
+    /** The replacements for any of these keys, for decorating one page of a list. */
+    List<ApiKey> findByRotatedFromKeyIdIn(java.util.Collection<Long> keyIds);
+
     /**
      * Bulk update rather than dirty checking so that revealing a key doesn't bump updated_at.
      */
@@ -46,6 +55,19 @@ public interface ApiKeyRepository extends JpaRepository<ApiKey, Long>, JpaSpecif
             + "and k.expiryNotificationsMuted = false and k.owner is not null and k.owner.enabled = true "
             + "order by k.expiresOn, k.id")
     List<ApiKey> findExpiringBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    /**
+     * Candidates for automatic replacement: expiring in the window, minted through
+     * an integration, not yet replaced. Deliberately not the reminder query above:
+     * muting the reminder emails for a key silences mail, it does not switch off
+     * rotation - that has its own settings.
+     */
+    @Query("select k from ApiKey k where k.expiresOn between :from and :to "
+            + "and k.integrationId is not null and k.providerResourceId is not null "
+            + "and k.owner is not null and k.owner.enabled = true "
+            + "and not exists (select r.id from ApiKey r where r.rotatedFromKeyId = k.id) "
+            + "order by k.expiresOn, k.id")
+    List<ApiKey> findRotationCandidates(@Param("from") LocalDate from, @Param("to") LocalDate to);
 
     /**
      * Hands keys that predate accounts to the bootstrap admin. Only ever matches

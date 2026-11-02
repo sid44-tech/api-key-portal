@@ -26,6 +26,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.sidbhat.apikeyportal.activity.ActivityService;
+import com.sidbhat.apikeyportal.logging.AuditLog;
 import com.sidbhat.apikeyportal.user.NewAccountDetails;
 import com.sidbhat.apikeyportal.user.TestUsers;
 import com.sidbhat.apikeyportal.user.UserAccount;
@@ -59,6 +60,9 @@ class InvitationServiceTest {
     @Mock
     private ActivityService activity;
 
+    @Mock
+    private AuditLog audit;
+
     private InvitationService service;
 
     private final UserGroup platformTeam = TestUsers.platformTeam();
@@ -67,7 +71,7 @@ class InvitationServiceTest {
     @BeforeEach
     void setUp() {
         service = new InvitationService(invitations, accounts, groups, userService, mailer,
-                new InvitationProperties(Duration.ofDays(1), "no-reply@example.com", BASE_URL), activity);
+                new InvitationProperties(Duration.ofDays(1), "no-reply@example.com", BASE_URL), activity, audit);
         when(groups.findById(2L)).thenReturn(Optional.of(platformTeam));
         when(groups.findById(3L)).thenReturn(Optional.of(okafors));
         when(invitations.save(any(UserInvitation.class))).thenAnswer(inv -> inv.getArgument(0));

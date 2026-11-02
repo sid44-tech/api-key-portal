@@ -119,6 +119,19 @@ class ActivityAndScopingIntegrationTest {
         return events.findAllByOrderByOccurredAtDesc(PageRequest.of(0, 50)).getContent();
     }
 
+    private List<ActivityEvent> eventsOf(ActivityAction action) {
+        return allEvents().stream().filter(event -> event.getAction() == action).toList();
+    }
+
+    /** Adds a key through the portal the way its owner would, and returns its id. */
+    private Long addAKeyAs(UserAccount owner) throws Exception {
+        mvc.perform(post("/keys").with(as(owner)).with(csrf())
+                        .param("serviceName", "Stripe").param("name", "Prod secret")
+                        .param("keyValue", "sk_live_fake0123456789").param("createdOn", "2026-01-01"))
+                .andExpect(status().is3xxRedirection());
+        return keys.findAll().get(0).getId();
+    }
+
     // ---------- who can set up an integration ----------
 
     @Test
@@ -177,6 +190,95 @@ class ActivityAndScopingIntegrationTest {
         assertThat(integrations.findById(shared.getId())).isEmpty();
     }
 
+    // ---------- switching an integration off for the group ----------
+
+    private boolean enabledInDb(Long id) {
+        return integrations.findById(id).orElseThrow().isEnabled();
+    }
+
+    @Test
+    void aGroupAdminCanSwitchTheirOwnGroupsIntegrationOffAndOn() throws Exception {
+        ServiceIntegration shared = integrationFor(platformTeam);
+
+        mvc.perform(post("/integrations/{id}/enabled", shared.getId()).with(as(alex)).with(csrf()))
+                .andExpect(redirectedUrl("/integrations"));
+        assertThat(enabledInDb(shared.getId())).isFalse();
+
+        mvc.perform(post("/integrations/{id}/enabled", shared.getId()).with(as(alex)).with(csrf())
+                        .param("enabled", "true"))
+                .andExpect(redirectedUrl("/integrations"));
+        assertThat(enabledInDb(shared.getId())).isTrue();
+    }
+
+    @Test
+    void neitherAMemberNorAnotherGroupsAdminCanTouchTheSwitch() throws Exception {
+        ServiceIntegration shared = integrationFor(platformTeam);
+
+        mvc.perform(post("/integrations/{id}/enabled", shared.getId()).with(as(sam)).with(csrf()))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/integrations/{id}/enabled", shared.getId()).with(as(jo)).with(csrf()))
+                .andExpect(status().isForbidden());
+
+        assertThat(enabledInDb(shared.getId())).isTrue();
+    }
+
+    @Test
+    void aSuperAdminCanSwitchAnyGroupsIntegration() throws Exception {
+        ServiceIntegration shared = integrationFor(platformTeam);
+
+        mvc.perform(post("/integrations/{id}/enabled", shared.getId()).with(as(superAdmin)).with(csrf()))
+                .andExpect(redirectedUrl("/integrations"));
+
+        assertThat(enabledInDb(shared.getId())).isFalse();
+    }
+
+    @Test
+    void aSwitchedOffIntegrationMintsNothingForAnybody() throws Exception {
+        ServiceIntegration shared = integrationFor(platformTeam);
+        mvc.perform(post("/integrations/{id}/enabled", shared.getId()).with(as(alex)).with(csrf()));
+
+        // a member posting the provision form directly, offered or not
+        mvc.perform(post("/keys/provision").with(as(sam)).with(csrf())
+                        .param("integrationId", shared.getId().toString())
+                        .param("name", "Sneaky key")
+                        .param("validity", "DAYS_180"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("switched off by a group admin")));
+
+        assertThat(keys.findAll()).isEmpty();
+    }
+
+    @Test
+    void theAddKeyPageStopsOfferingASwitchedOffIntegration() throws Exception {
+        ServiceIntegration shared = integrationFor(platformTeam);
+
+        mvc.perform(get("/keys/new").with(as(sam)))
+                .andExpect(content().string(containsString(shared.getName())));
+
+        mvc.perform(post("/integrations/{id}/enabled", shared.getId()).with(as(alex)).with(csrf()));
+
+        mvc.perform(get("/keys/new").with(as(sam)))
+                .andExpect(content().string(not(containsString(shared.getName()))));
+        // but the integrations page still shows it, marked, so it can come back
+        mvc.perform(get("/integrations").with(as(sam)))
+                .andExpect(content().string(containsString(shared.getName())))
+                .andExpect(content().string(containsString("Switched off")));
+    }
+
+    @Test
+    void flippingTheSwitchIsOnTheRecord() throws Exception {
+        ServiceIntegration shared = integrationFor(platformTeam);
+
+        mvc.perform(post("/integrations/{id}/enabled", shared.getId()).with(as(alex)).with(csrf()));
+        mvc.perform(post("/integrations/{id}/enabled", shared.getId()).with(as(alex)).with(csrf())
+                .param("enabled", "true"));
+
+        assertThat(allEvents()).extracting(ActivityEvent::getAction)
+                .contains(ActivityAction.INTEGRATION_DISABLED, ActivityAction.INTEGRATION_ENABLED);
+        assertThat(allEvents()).filteredOn(e -> e.getAction() == ActivityAction.INTEGRATION_DISABLED)
+                .allSatisfy(e -> assertThat(e.getActorEmail()).isEqualTo("alex@example.com"));
+    }
+
     // ---------- the audit trail ----------
 
     @Test
@@ -207,6 +309,109 @@ class ActivityAndScopingIntegrationTest {
 
         assertThat(allEvents()).extracting(ActivityEvent::getAction)
                 .containsExactly(ActivityAction.KEY_DELETED, ActivityAction.KEY_CREATED);
+    }
+
+    @Test
+    void revealingAKeyIsRecordedAgainstWhoeverRevealedIt() throws Exception {
+        Long keyId = addAKeyAs(sam);
+
+        mvc.perform(get("/keys/{id}/value", keyId).with(as(sam))).andExpect(status().isOk());
+
+        ActivityEvent event = eventsOf(ActivityAction.KEY_REVEALED).get(0);
+        assertThat(event.getActorEmail()).isEqualTo("sam@example.com");
+        assertThat(event.getTargetName()).isEqualTo("Stripe / Prod secret");
+        assertThat(event.getTargetId()).isEqualTo(keyId);
+        assertThat(event.getDetail()).isEqualTo("Shown on screen");
+    }
+
+    @Test
+    void copyingAKeyIsRecordedAsSuch() throws Exception {
+        Long keyId = addAKeyAs(sam);
+
+        mvc.perform(get("/keys/{id}/value", keyId).param("intent", "copied").with(as(sam)))
+                .andExpect(status().isOk());
+
+        assertThat(eventsOf(ActivityAction.KEY_REVEALED).get(0).getDetail())
+                .isEqualTo("Copied to the clipboard");
+    }
+
+    @Test
+    void everyRevealIsKeptSeparatelyRatherThanOverwritingTheLastOne() throws Exception {
+        Long keyId = addAKeyAs(sam);
+
+        for (int i = 0; i < 3; i++) {
+            mvc.perform(get("/keys/{id}/value", keyId).with(as(sam))).andExpect(status().isOk());
+        }
+
+        // "last revealed" on the key cannot answer who took the value out and when
+        assertThat(eventsOf(ActivityAction.KEY_REVEALED)).hasSize(3);
+    }
+
+    @Test
+    void aRefusedRevealIsNotRecordedAsOne() throws Exception {
+        Long keyId = addAKeyAs(sam);
+
+        // Alex can see Sam's key listed, but never its value
+        mvc.perform(get("/keys/{id}/value", keyId).with(as(alex))).andExpect(status().isForbidden());
+
+        assertThat(eventsOf(ActivityAction.KEY_REVEALED)).isEmpty();
+    }
+
+    @Test
+    void theRevealedValueNeverReachesTheHistory() throws Exception {
+        Long keyId = addAKeyAs(sam);
+
+        mvc.perform(get("/keys/{id}/value", keyId).with(as(sam))).andExpect(status().isOk());
+
+        assertThat(allEvents()).allSatisfy(event -> {
+            assertThat(event.getTargetName()).doesNotContain("sk_live_fake0123456789");
+            assertThat(String.valueOf(event.getDetail())).doesNotContain("sk_live_fake0123456789");
+        });
+        mvc.perform(get("/activity").with(as(alex)))
+                .andExpect(content().string(containsString("Key revealed")))
+                .andExpect(content().string(not(containsString("sk_live_fake0123456789"))));
+    }
+
+    @Test
+    void editingAKeyRecordsWhatWasChanged() throws Exception {
+        Long keyId = addAKeyAs(sam);
+
+        mvc.perform(post("/keys/{id}", keyId).with(as(sam)).with(csrf())
+                        .param("serviceName", "Stripe").param("name", "Prod secret")
+                        .param("keyValue", "").param("createdOn", "2026-01-01")
+                        .param("expiresOn", "2027-01-01").param("notes", "Rotated by hand"))
+                .andExpect(status().is3xxRedirection());
+
+        ActivityEvent event = eventsOf(ActivityAction.KEY_UPDATED).get(0);
+        assertThat(event.getActorEmail()).isEqualTo("sam@example.com");
+        assertThat(event.getTargetName()).isEqualTo("Stripe / Prod secret");
+        assertThat(event.getDetail()).isEqualTo("Changed expiry date, notes");
+    }
+
+    @Test
+    void replacingAValueSaysThatItChangedAndNothingMore() throws Exception {
+        Long keyId = addAKeyAs(sam);
+
+        mvc.perform(post("/keys/{id}", keyId).with(as(sam)).with(csrf())
+                        .param("serviceName", "Stripe").param("name", "Prod secret")
+                        .param("keyValue", "sk_live_rotated9876543210").param("createdOn", "2026-01-01"))
+                .andExpect(status().is3xxRedirection());
+
+        ActivityEvent event = eventsOf(ActivityAction.KEY_UPDATED).get(0);
+        assertThat(event.getDetail()).isEqualTo("Changed value");
+        assertThat(event.getDetail()).doesNotContain("sk_live_rotated9876543210");
+    }
+
+    @Test
+    void savingTheEditFormWithoutChangingAnythingRecordsNothing() throws Exception {
+        Long keyId = addAKeyAs(sam);
+
+        mvc.perform(post("/keys/{id}", keyId).with(as(sam)).with(csrf())
+                        .param("serviceName", "Stripe").param("name", "Prod secret")
+                        .param("keyValue", "").param("createdOn", "2026-01-01"))
+                .andExpect(status().is3xxRedirection());
+
+        assertThat(eventsOf(ActivityAction.KEY_UPDATED)).isEmpty();
     }
 
     @Test

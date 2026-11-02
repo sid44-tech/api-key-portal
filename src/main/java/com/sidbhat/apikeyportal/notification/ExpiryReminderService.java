@@ -51,6 +51,11 @@ public class ExpiryReminderService {
         }
         int sent = 0;
         for (ApiKey key : keys.findExpiringBetween(today, today.plusDays(ReminderThreshold.horizonDays()))) {
+            if (keys.existsByRotatedFromKeyId(key.getId())) {
+                // a replacement has already been minted and announced; warning
+                // about the old key expiring is the point of the whole exercise
+                continue;
+            }
             long daysRemaining = ChronoUnit.DAYS.between(today, key.getExpiresOn());
             ReminderThreshold threshold = ReminderThreshold.forDaysRemaining(daysRemaining).orElse(null);
             if (threshold == null || alreadySent(key, threshold)) {

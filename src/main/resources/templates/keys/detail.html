@@ -40,6 +40,26 @@
                 </div>
             </div>
 
+            <!-- the hand-over, from either end of it -->
+            <div class="alert alert-info d-flex align-items-start gap-2" th:if="${replacement != null}">
+                <i class="bi bi-arrow-repeat mt-1" aria-hidden="true"></i>
+                <div>
+                    A replacement for this key has been generated automatically -
+                    <a th:href="@{/keys/{id}(id=${replacement.id})}" class="alert-link">open it</a>
+                    to reveal or copy the new value. Both keys work until this one expires
+                    <span th:text="${'on ' + #temporals.format(key.expiresOn, 'MMMM d, yyyy')}">on March 1, 2026</span>,
+                    when it moves to the expired list.
+                </div>
+            </div>
+            <div class="alert alert-info d-flex align-items-start gap-2" th:if="${key.rotatedFromKeyId != null}">
+                <i class="bi bi-arrow-repeat mt-1" aria-hidden="true"></i>
+                <div>
+                    Generated automatically to replace
+                    <a th:href="@{/keys/{id}(id=${key.rotatedFromKeyId})}" class="alert-link">an expiring key</a>.
+                    Same client, fresh secret: nothing to reconfigure beyond the value itself.
+                </div>
+            </div>
+
             <div class="card mb-4">
                 <div class="card-header">Credential</div>
                 <div class="card-body">
@@ -49,14 +69,7 @@
                             <dd class="key-value">
                                 <code class="key-value-text" th:text="${key.maskedValue}">••••••••</code>
                                 <th:block th:if="${mine}">
-                                    <button type="button" class="btn btn-sm btn-link js-reveal" title="Show value"
-                                            th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">
-                                        <i class="bi bi-eye" aria-hidden="true"></i><span class="visually-hidden">Show value</span>
-                                    </button>
-                                    <button type="button" class="btn btn-sm btn-link js-copy" title="Copy to clipboard"
-                                            th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">
-                                        <i class="bi bi-clipboard" aria-hidden="true"></i><span class="visually-hidden">Copy to clipboard</span>
-                                    </button>
+                                    <th:block th:replace="fragments/keys :: valueControls(${key})"></th:block>
                                 </th:block>
                                 <div class="form-text" th:unless="${mine}">
                                     <i class="bi bi-lock me-1" aria-hidden="true"></i>
@@ -105,6 +118,43 @@
                             <input type="checkbox" class="form-check-input js-submit-on-change" role="switch"
                                    id="muteSwitch" th:checked="${key.expiryNotificationsMuted}">
                             <label class="form-check-label" for="muteSwitch">Mute expiration notifications</label>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mb-4" th:if="${mine and rotationSupported}" id="rotation">
+                <div class="card-header">Automatic replacement</div>
+                <div class="card-body">
+                    <form th:action="@{/keys/{id}/rotation(id=${key.id})}" method="post"
+                          class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                        <p class="text-muted mb-0">
+                            <th:block th:if="${rotationOverlaps}">The portal can mint a fresh secret on this
+                                same client a week before this key expires, and both work until this one
+                                expires.</th:block>
+                            <th:block th:unless="${rotationOverlaps}">Just before this key expires, the portal
+                                can have the provider issue a new value for it. The provider revokes the old
+                                value at the same moment, so whatever uses this key must be updated straight
+                                away - you'll get an email when it happens.</th:block>
+                            This key
+                            <th:block th:if="${key.autoRotate == null}">follows your provider setting, which is
+                                <strong th:text="${providerRotationOn ? 'on' : 'off'}">off</strong></th:block>
+                            <th:block th:if="${key.autoRotate != null}">is pinned
+                                <strong th:text="${key.autoRotate ? 'on' : 'off'}">on</strong>,
+                                regardless of your provider setting</th:block>.
+                        </p>
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="visually-hidden" for="autoRotate">Automatic replacement</label>
+                            <select class="form-select form-select-sm w-auto" id="autoRotate" name="autoRotate">
+                                <option value="" th:selected="${key.autoRotate == null}"
+                                        th:text="${'Use my provider setting (' + (providerRotationOn ? 'on' : 'off') + ')'}">
+                                    Use my provider setting (off)</option>
+                                <option value="true" th:selected="${key.autoRotate != null and key.autoRotate}">
+                                    Always replace this key</option>
+                                <option value="false" th:selected="${key.autoRotate != null and !key.autoRotate}">
+                                    Never replace this key</option>
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-secondary">Save</button>
                         </div>
                     </form>
                 </div>

@@ -20,6 +20,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import com.sidbhat.apikeyportal.logging.AuditLog;
+
 @ExtendWith(MockitoExtension.class)
 class UserAccountServiceTest {
 
@@ -29,6 +31,9 @@ class UserAccountServiceTest {
     @Mock
     private UserGroupRepository groups;
 
+    @Mock
+    private AuditLog audit;
+
     /** The real encoder, so the hashing the portal actually does is under test. */
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
@@ -36,7 +41,7 @@ class UserAccountServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new UserAccountService(accounts, groups, passwordEncoder);
+        service = new UserAccountService(accounts, groups, passwordEncoder, audit);
     }
 
     private void stubSave() {

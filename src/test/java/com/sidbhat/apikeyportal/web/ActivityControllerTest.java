@@ -1,5 +1,6 @@
 package com.sidbhat.apikeyportal.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -73,6 +74,31 @@ class ActivityControllerTest {
         mvc.perform(get("/activity")).andExpect(status().isForbidden());
 
         verify(activityService, never()).findVisibleTo(any(), any());
+    }
+
+    @Test
+    @WithPortalUser("alex")
+    void offersTheHistoryAsATableAndAsCards() throws Exception {
+        stubOneKeyEvent();
+
+        String html = mvc.perform(get("/activity")).andReturn().getResponse().getContentAsString();
+
+        // the table where its columns fit, cards below "lg" where it would
+        // scroll sideways; every event has to be in both
+        String table = section(html, "kp-table-card d-none d-lg-flex", "kp-row-cards d-lg-none");
+        String cards = section(html, "kp-row-cards d-lg-none", "</ul>");
+        for (String field : new String[] {"Azure AD / Reporting service", "alex@example.com",
+                "Created via integration"}) {
+            assertThat(table).contains(field);
+            assertThat(cards).contains(field);
+        }
+    }
+
+    /** The page between two markers, so the navigation bar cannot muddy a count. */
+    private static String section(String html, String from, String to) {
+        int start = html.indexOf(from);
+        assertThat(start).as("marker '%s'", from).isNotNegative();
+        return html.substring(start, html.indexOf(to, start));
     }
 
     @Test

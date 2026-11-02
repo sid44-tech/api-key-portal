@@ -2,14 +2,13 @@ package com.sidbhat.apikeyportal.activity;
 
 import java.time.Instant;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.sidbhat.apikeyportal.logging.AuditLog;
 import com.sidbhat.apikeyportal.user.UserAccount;
 import com.sidbhat.apikeyportal.user.UserRole;
 
@@ -25,12 +24,12 @@ import com.sidbhat.apikeyportal.user.UserRole;
 @Transactional(readOnly = true)
 public class ActivityService {
 
-    private static final Logger log = LoggerFactory.getLogger(ActivityService.class);
-
     private final ActivityEventRepository repository;
+    private final AuditLog audit;
 
-    public ActivityService(ActivityEventRepository repository) {
+    public ActivityService(ActivityEventRepository repository, AuditLog audit) {
         this.repository = repository;
+        this.audit = audit;
     }
 
     /**
@@ -62,6 +61,30 @@ public class ActivityService {
                 serviceName + " / " + keyName, origin.source(), origin.detail(), Instant.now()));
     }
 
+    /**
+     * Records that somebody read a key's value. The value itself never goes
+     * anywhere near this - only that it was asked for, by whom, and how.
+     */
+    @Transactional
+    public ActivityEvent recordKeyRevealed(UserAccount actor, Long keyId, String serviceName, String keyName,
+            RevealMethod method) {
+        return save(new ActivityEvent(ActivityAction.KEY_REVEALED, actor, keyId,
+                serviceName + " / " + keyName, null, method.getLabel(), Instant.now()));
+    }
+
+    /**
+     * Records an edit.
+     *
+     * @param changes which fields were changed, in words. Says that the value was
+     *                replaced where it was, never what it was replaced with.
+     */
+    @Transactional
+    public ActivityEvent recordKeyUpdated(UserAccount actor, Long keyId, String serviceName, String keyName,
+            String changes) {
+        return save(new ActivityEvent(ActivityAction.KEY_UPDATED, actor, keyId,
+                serviceName + " / " + keyName, null, changes, Instant.now()));
+    }
+
     @Transactional
     public ActivityEvent recordKeyDeleted(UserAccount actor, Long keyId, String serviceName, String keyName) {
         return save(new ActivityEvent(ActivityAction.KEY_DELETED, actor, keyId,
@@ -79,9 +102,20 @@ public class ActivityService {
         return save(new ActivityEvent(action, actor, targetId, targetName, null, detail, Instant.now()));
     }
 
+    /**
+     * Writes the event to the history table and to the audit log.
+     * <p>
+     * Both, because they answer to different people. The history page is for the
+     * group's administrator and lives in the database, where it can be paged
+     * through and where deleting a key does not delete the record of it. The log
+     * line is for whoever is watching the portal from outside it, and goes
+     * wherever the rest of the logs go - somewhere the portal's own
+     * administrators cannot quietly edit.
+     */
     private ActivityEvent save(ActivityEvent event) {
         ActivityEvent saved = repository.save(event);
-        log.info("Recorded {}", saved);
+        audit.allowed(saved.getAction().name().toLowerCase(java.util.Locale.ROOT), saved.getActorEmail(),
+                saved.getTargetName(), saved.getDetail());
         return saved;
     }
 

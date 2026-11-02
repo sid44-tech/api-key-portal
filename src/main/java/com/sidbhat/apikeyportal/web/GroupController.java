@@ -62,9 +62,10 @@ public class GroupController {
     }
 
     @PostMapping("/{id}/delete")
-    public String delete(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+    public String delete(@PathVariable Long id, @AuthenticationPrincipal PortalUser principal,
+            RedirectAttributes redirectAttributes) {
         try {
-            groupService.delete(id);
+            groupService.delete(id, userService.getCurrent(principal));
             redirectAttributes.addFlashAttribute("success", "Group deleted.");
         } catch (GroupNotEmptyException e) {
             redirectAttributes.addFlashAttribute("error", e.getMessage());

@@ -63,7 +63,8 @@
             flash(button, 'bi-x-lg', 'Clipboard not supported');
             return;
         }
-        fetchValue(button.dataset.valueUrl)
+        // tells the history this value went to the clipboard rather than the screen
+        fetchValue(button.dataset.valueUrl + '?intent=copied')
             .then(function (value) {
                 return navigator.clipboard.writeText(value);
             })

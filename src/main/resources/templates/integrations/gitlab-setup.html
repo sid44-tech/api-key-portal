@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Connect GitLab</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a th:href="@{/integrations}">Integrations</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Connect GitLab</li>
+                </ol>
+            </nav>
+
+            <h1 class="mb-2"><i class="bi bi-gitlab me-2" aria-hidden="true"></i>Connect GitLab</h1>
+            <p class="text-muted mb-4">
+                A one-time setup per project, done in a couple of minutes. You'll create one access token for
+                this portal in the project. Afterwards, the portal can mint project access tokens there with a
+                single click — each one a bot member of that project and nothing else.
+            </p>
+
+            <form th:action="@{/integrations/gitlab}" th:object="${form}" method="post" novalidate>
+
+                <div class="alert alert-danger d-flex align-items-start" th:if="${#fields.hasGlobalErrors()}">
+                    <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>
+                    <div>
+                        <strong>GitLab did not accept the connection.</strong>
+                        <div th:each="err : ${#fields.globalErrors()}" th:text="${err}">Error</div>
+                    </div>
+                </div>
+
+                <!-- Step 1 -->
+                <div class="card mb-3 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">1</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Say which GitLab and which project</h2>
+                            <p>The URL is your GitLab's address — keep <code>https://gitlab.com</code> unless you
+                                run your own. The project is the numeric <strong>Project ID</strong> from the
+                                project's overview page (under its name), or the full path like
+                                <code>my-group/my-app</code>.</p>
+                            <div class="row">
+                                <div class="mb-3 col-md-6">
+                                    <label class="form-label" for="baseUrl">GitLab URL</label>
+                                    <input type="text" class="form-control font-monospace" th:field="*{baseUrl}"
+                                           th:errorclass="is-invalid" autocomplete="off" spellcheck="false"
+                                           maxlength="100">
+                                    <div class="invalid-feedback" th:errors="*{baseUrl}"></div>
+                                </div>
+                                <div class="mb-0 col-md-6">
+                                    <label class="form-label" for="project">Project ID or path</label>
+                                    <input type="text" class="form-control font-monospace" th:field="*{project}"
+                                           th:errorclass="is-invalid" autocomplete="off" spellcheck="false"
+                                           placeholder="my-group/my-app" maxlength="100">
+                                    <div class="invalid-feedback" th:errors="*{project}"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="card mb-3 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">2</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Create the portal's own access token in that project</h2>
+                            <ol class="mb-3">
+                                <li>In the project, open <strong>Settings → Access tokens</strong>
+                                    (you need at least the Maintainer role to see it).</li>
+                                <li>Press <strong>Add new token</strong>, name it <code>api-key-portal</code>.</li>
+                                <li>Pick an expiry (GitLab requires one — put a reminder key in this portal!).</li>
+                                <li>Role <strong>Maintainer</strong>, scope <strong>api</strong>, then create it.</li>
+                                <li>Copy the token immediately — GitLab shows it only once — and paste it below.</li>
+                            </ol>
+                            <div class="mb-2 col-md-6">
+                                <label class="form-label" for="token">Project access token</label>
+                                <input type="password" class="form-control font-monospace" th:field="*{token}"
+                                       th:errorclass="is-invalid" autocomplete="off" spellcheck="false" maxlength="256">
+                                <div class="invalid-feedback" th:errors="*{token}"></div>
+                            </div>
+                            <p class="text-muted small mb-0">
+                                <i class="bi bi-shield-check me-1" aria-hidden="true"></i>
+                                A <em>project</em> access token can only act inside that one project, so this is
+                                the least-privileged option: the portal can mint tokens there and touch nothing
+                                else on your GitLab.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="card mb-4 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">3</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Name it and connect</h2>
+                            <p>This name shows up in the provider dropdown on the Add key screen, and as the
+                                service name on keys created through it.</p>
+                            <div class="mb-3 col-md-6">
+                                <label class="form-label" for="name">Integration name</label>
+                                <input type="text" class="form-control" th:field="*{name}"
+                                       th:errorclass="is-invalid" maxlength="100">
+                                <div class="invalid-feedback" th:errors="*{name}"></div>
+                            </div>
+                            <p class="text-muted small">
+                                <i class="bi bi-magic me-1" aria-hidden="true"></i>
+                                The portal verifies the connection against GitLab before anything is saved,
+                                so typos surface right here.
+                            </p>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-plug me-1" aria-hidden="true"></i> Verify &amp; connect
+                            </button>
+                            <a th:href="@{/integrations}" class="btn btn-link">Cancel</a>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+</html>

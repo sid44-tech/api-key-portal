@@ -23,6 +23,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.sidbhat.apikeyportal.rotation.KeyRotationService;
 import com.sidbhat.apikeyportal.security.PrincipalRefresher;
 import com.sidbhat.apikeyportal.security.SecurityConfig;
 import com.sidbhat.apikeyportal.user.EmailAlreadyUsedException;
@@ -44,6 +45,9 @@ class ProfileControllerTest {
 
     @MockitoBean
     private PrincipalRefresher principalRefresher;
+
+    @MockitoBean
+    private KeyRotationService rotationService;
 
     @BeforeEach
     void stubCurrentUser() {
@@ -136,5 +140,21 @@ class ProfileControllerTest {
                 .andExpect(model().attributeHasFieldErrors("form", "confirmPasswordMatching", "newPasswordDifferent"));
 
         verify(userService, never()).changePassword(any(), any(), any());
+    }
+
+    @Test
+    @WithPortalUser
+    void offersTheAutomaticReplacementToggleAndSavesIt() throws Exception {
+        mvc.perform(get("/profile"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(Matchers.containsString("Automatic key replacement")))
+                .andExpect(content().string(Matchers.containsString("Microsoft Azure AD")));
+
+        mvc.perform(post("/profile/rotation").with(csrf())
+                        .param("provider", "AZURE_AD").param("enabled", "true"))
+                .andExpect(redirectedUrl("/profile"));
+
+        verify(rotationService).setPreference(any(), eq(com.sidbhat.apikeyportal.integration.ServiceProvider.AZURE_AD),
+                eq(true));
     }
 }

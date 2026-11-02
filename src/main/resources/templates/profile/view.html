@@ -75,6 +75,34 @@
                 </div>
             </div>
 
+            <div class="card mb-4">
+                <div class="card-header">Automatic key replacement</div>
+                <div class="card-body">
+                    <p class="text-muted small">
+                        Where a provider supports it, the portal can mint a fresh secret for a key of yours a
+                        week before it expires &mdash; same client, new secret, and an email telling you it's
+                        ready. The old key keeps working until its own expiry, so you switch over whenever
+                        suits. You can also pin any single key on or off from that key's page.
+                    </p>
+                    <form th:each="setting : ${rotationSettings}" th:action="@{/profile/rotation}" method="post"
+                          class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                        <input type="hidden" name="provider" th:value="${setting.key}">
+                        <!-- the submitted value is the state to move to, so one form serves both ways -->
+                        <input type="hidden" name="enabled" th:value="${!setting.value}">
+                        <span>
+                            <i th:class="${'bi ' + setting.key.icon + ' me-1'}" aria-hidden="true"></i>
+                            <span th:text="${setting.key.label}">Microsoft Azure AD (Entra ID)</span>
+                        </span>
+                        <div class="form-check form-switch mb-0">
+                            <input type="checkbox" class="form-check-input js-submit-on-change" role="switch"
+                                   th:id="${'rotate-' + setting.key}" th:checked="${setting.value}">
+                            <label class="form-check-label" th:for="${'rotate-' + setting.key}"
+                                   th:text="${setting.value ? 'On' : 'Off'}">Off</label>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
             <div class="card">
                 <div class="card-header">Account</div>
                 <div class="card-body">
@@ -93,5 +121,9 @@
         </div>
     </div>
 </div>
+
+<th:block layout:fragment="scripts">
+    <script th:src="@{/js/keys.js}"></script>
+</th:block>
 </body>
 </html>

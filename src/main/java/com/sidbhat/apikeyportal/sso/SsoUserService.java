@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.sidbhat.apikeyportal.activity.ActivityAction;
 import com.sidbhat.apikeyportal.activity.ActivityService;
+import com.sidbhat.apikeyportal.logging.AuditLog;
 import com.sidbhat.apikeyportal.user.UserAccount;
 import com.sidbhat.apikeyportal.user.UserAccountRepository;
 import com.sidbhat.apikeyportal.user.UserRole;
@@ -56,14 +57,16 @@ public class SsoUserService extends OidcUserService {
     private final UserAccountRepository accounts;
     private final ActivityService activity;
     private final PasswordEncoder passwordEncoder;
+    private final AuditLog audit;
     private final SecureRandom random = new SecureRandom();
 
     public SsoUserService(SsoService ssoService, UserAccountRepository accounts, ActivityService activity,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder, AuditLog audit) {
         this.ssoService = ssoService;
         this.accounts = accounts;
         this.activity = activity;
         this.passwordEncoder = passwordEncoder;
+        this.audit = audit;
     }
 
     @Override
@@ -87,8 +90,7 @@ public class SsoUserService extends OidcUserService {
         // Only an explicit "no". Entra does not send the claim at all, so requiring
         // a true would turn the most likely provider away.
         if (Boolean.FALSE.equals(claims.get("email_verified"))) {
-            log.warn("Refused SSO sign-in for subject {}: the provider reports the email as unverified",
-                    oidcUser.getSubject());
+            audit.refused("sso_sign_in", email, email, "The provider reports the email as unverified");
             throw refuse(SsoError.UNVERIFIED_EMAIL);
         }
         String displayName = firstNonBlank(oidcUser.getFullName(), stringClaim(claims, "name"), email);
@@ -117,14 +119,15 @@ public class SsoUserService extends OidcUserService {
             if (byEmail.isSsoLinked()) {
                 // a second provider identity presenting an email that already belongs
                 // to a linked account: re-pointing it would hand that account over
-                log.warn("Refused SSO sign-in for subject {}: {} is already linked to another subject",
-                        subject, byEmail);
+                audit.refused("sso_sign_in", email, email,
+                        "The account is already linked to a different provider identity");
                 throw refuse(SsoError.ALREADY_LINKED);
             }
             if (byEmail.isSuperAdmin()) {
                 // the one account that administers every group stays on its password,
                 // so whoever runs the directory cannot take the portal with it
-                log.warn("Refused SSO sign-in for subject {}: {} is the super admin", subject, byEmail);
+                audit.refused("sso_sign_in", email, email,
+                        "The super admin signs in with its portal password");
                 throw refuse(SsoError.SUPER_ADMIN_NOT_LINKABLE);
             }
             byEmail.setSsoSubject(subject);
@@ -154,7 +157,7 @@ public class SsoUserService extends OidcUserService {
     private UserAccount refresh(UserAccount account, String email, String displayName, Set<String> groups,
             SsoConfiguration config) {
         if (!account.isEnabled()) {
-            log.warn("Refused SSO sign-in for {}: the account is disabled", account);
+            audit.refused("sso_sign_in", account.getEmail(), account.getEmail(), "The account is disabled");
             throw refuse(SsoError.ACCOUNT_DISABLED);
         }
         account.setEmail(email);
@@ -176,13 +179,16 @@ public class SsoUserService extends OidcUserService {
 
     void requireMembership(Map<String, Object> claims, SsoConfiguration config, String subject) {
         if (isGroupsOverage(claims, config)) {
-            log.warn("Refused SSO sign-in for subject {}: the provider sent a group overage claim instead of "
-                    + "group membership", subject);
+            // the subject, not an email: membership is checked before the portal
+            // has worked out who this is
+            audit.refused("sso_sign_in", null, "subject " + subject,
+                    "The provider sent a group overage claim instead of group membership");
             throw refuse(SsoError.TOO_MANY_GROUPS);
         }
         Set<String> groups = groupsFrom(claims, config);
         if (!groups.contains(normalize(config.getRequiredGroup()))) {
-            log.warn("Refused SSO sign-in for subject {}: not a member of the required group", subject);
+            audit.refused("sso_sign_in", null, "subject " + subject,
+                    "Not a member of the required group");
             throw refuse(SsoError.NOT_IN_GROUP);
         }
     }

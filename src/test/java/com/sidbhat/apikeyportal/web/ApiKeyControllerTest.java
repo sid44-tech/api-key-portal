@@ -2,6 +2,7 @@ package com.sidbhat.apikeyportal.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -19,6 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
 
 import org.hamcrest.Matchers;
@@ -31,9 +33,11 @@ import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.sidbhat.apikeyportal.activity.KeyOrigin;
+import com.sidbhat.apikeyportal.activity.RevealMethod;
 import com.sidbhat.apikeyportal.integration.ServiceIntegrationService;
 import com.sidbhat.apikeyportal.key.ApiKey;
 import com.sidbhat.apikeyportal.key.ApiKeyDetails;
@@ -41,6 +45,7 @@ import com.sidbhat.apikeyportal.key.ApiKeyNotFoundException;
 import com.sidbhat.apikeyportal.key.ApiKeyService;
 import com.sidbhat.apikeyportal.key.ApiKeySort;
 import com.sidbhat.apikeyportal.key.KeySummary;
+import com.sidbhat.apikeyportal.rotation.KeyRotationService;
 import com.sidbhat.apikeyportal.security.SecurityConfig;
 import com.sidbhat.apikeyportal.user.PortalUser;
 import com.sidbhat.apikeyportal.user.TestUsers;
@@ -63,6 +68,9 @@ class ApiKeyControllerTest {
 
     @MockitoBean
     private UserAccountService userService;
+
+    @MockitoBean
+    private KeyRotationService rotationService;
 
     private final UserAccount alex = TestUsers.alex();
     private final UserAccount sam = TestUsers.sam();
@@ -92,7 +100,7 @@ class ApiKeyControllerTest {
     @WithPortalUser
     void listsKeysWithoutRenderingValues() throws Exception {
         List<ApiKey> keys = List.of(alexKey());
-        when(apiKeyService.search(any(), eq(null), eq(null), eq(null), eq(ApiKeySort.SERVICE), eq(0)))
+        when(apiKeyService.search(any(), eq(null), eq(null), eq(null), eq(ApiKeySort.SERVICE), eq(false), eq(0)))
                 .thenReturn(new PageImpl<>(keys));
         when(apiKeyService.getSummary(any())).thenReturn(KeySummary.of(keys));
 
@@ -107,7 +115,7 @@ class ApiKeyControllerTest {
     @WithPortalUser("sam")
     void showsGroupMembersKeysButNotTheirValueControls() throws Exception {
         List<ApiKey> keys = List.of(alexKey());
-        when(apiKeyService.search(any(), any(), any(), any(), any(), eq(0))).thenReturn(new PageImpl<>(keys));
+        when(apiKeyService.search(any(), any(), any(), any(), any(), anyBoolean(), eq(0))).thenReturn(new PageImpl<>(keys));
         when(apiKeyService.getSummary(any())).thenReturn(KeySummary.of(keys));
 
         mvc.perform(get("/keys"))
@@ -120,10 +128,94 @@ class ApiKeyControllerTest {
                 .andExpect(content().string(Matchers.not(Matchers.containsString("fake-github-token-1234"))));
     }
 
+    // ---------- the key list at two widths ----------
+
+    @Test
+    @WithPortalUser
+    void offersTheKeyListAsATableAndAsCards() throws Exception {
+        stubList(List.of(alexKey()));
+
+        String html = mvc.perform(get("/keys")).andReturn().getResponse().getContentAsString();
+
+        // the table for a screen with room for six columns, cards for one
+        // without; Bootstrap's display utilities pick between them
+        assertThat(html).contains("kp-table-card d-none d-lg-flex");
+        assertThat(html).contains("kp-row-cards d-lg-none");
+    }
+
+    @Test
+    @WithPortalUser
+    void everyKeyAppearsInBothLayouts() throws Exception {
+        stubList(List.of(alexKey()));
+
+        String html = mvc.perform(get("/keys")).andReturn().getResponse().getContentAsString();
+
+        // once in the table and once as a card - a key that reached only one of
+        // them would be invisible at half the window sizes
+        assertThat(countOf(html, ">CI<")).isEqualTo(2);
+        assertThat(countOf(html, "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u20221234")).isEqualTo(2);
+    }
+
+    @Test
+    @WithPortalUser
+    void theCardOffersTheSameActionsAsTheRow() throws Exception {
+        // a key of the signed-in user's own, so everything is on offer
+        ApiKey mine = new ApiKey("Deploy", "Stripe", "sk_live_fake0123456789", LocalDate.now(), null);
+        mine.assignTo(alex, alex.getGroup());
+        // an id, so the links the two layouts build can be compared
+        ReflectionTestUtils.setField(mine, "id", 1L);
+        stubList(List.of(mine));
+
+        String html = mvc.perform(get("/keys")).andReturn().getResponse().getContentAsString();
+
+        assertThat(countOf(html, "js-reveal")).isEqualTo(2);
+        assertThat(countOf(html, "js-copy")).isEqualTo(2);
+        assertThat(countOf(html, "/keys/1/edit")).isEqualTo(2);
+        // both delete buttons drive the single confirmation modal on the page
+        assertThat(countOf(html, "data-delete-url=\"/keys/1/delete\"")).isEqualTo(2);
+        assertThat(countOf(html, "id=\"deleteModal\"")).isEqualTo(1);
+    }
+
+    @Test
+    @WithPortalUser("sam")
+    void theCardSaysWhoHoldsAValueItWillNotShow() throws Exception {
+        stubList(List.of(alexKey()));
+
+        mvc.perform(get("/keys"))
+                .andExpect(content().string(Matchers.containsString("kp-row-card-locked")))
+                .andExpect(content().string(Matchers.containsString("can see this")));
+    }
+
+    @Test
+    @WithPortalUser
+    void anExpiredKeyIsMarkedOnItsCardToo() throws Exception {
+        ApiKey expired = new ApiKey("Old", "GitHub", "fake-github-token-1234",
+                LocalDate.now().minusYears(2), LocalDate.now().minusDays(1));
+        expired.assignTo(alex, alex.getGroup());
+        stubList(List.of(expired));
+
+        mvc.perform(get("/keys"))
+                .andExpect(content().string(Matchers.containsString("kp-row-card is-quiet")));
+    }
+
+    private void stubList(List<ApiKey> keys) {
+        when(apiKeyService.search(any(), any(), any(), any(), any(), anyBoolean(), eq(0))).thenReturn(new PageImpl<>(keys));
+        when(apiKeyService.getSummary(any())).thenReturn(KeySummary.of(keys));
+        when(apiKeyService.findReplacements(any())).thenReturn(Collections.emptyMap());
+    }
+
+    private static int countOf(String html, String fragment) {
+        int count = 0;
+        for (int at = html.indexOf(fragment); at >= 0; at = html.indexOf(fragment, at + 1)) {
+            count++;
+        }
+        return count;
+    }
+
     @Test
     @WithPortalUser
     void sendsContentSecurityPolicy() throws Exception {
-        when(apiKeyService.search(any(), any(), any(), any(), any(), eq(0))).thenReturn(new PageImpl<>(List.of()));
+        when(apiKeyService.search(any(), any(), any(), any(), any(), anyBoolean(), eq(0))).thenReturn(new PageImpl<>(List.of()));
         when(apiKeyService.getSummary(any())).thenReturn(KeySummary.of(List.of()));
 
         mvc.perform(get("/keys"))
@@ -239,7 +331,7 @@ class ApiKeyControllerTest {
     @Test
     @WithPortalUser
     void valueEndpointReturnsDecryptedValueAndIsNotCached() throws Exception {
-        when(apiKeyService.revealValue(eq(1L), eq(alex))).thenReturn("ghp_abc");
+        when(apiKeyService.revealValue(eq(1L), eq(alex), eq(RevealMethod.SHOWN))).thenReturn("ghp_abc");
 
         mvc.perform(get("/keys/1/value"))
                 .andExpect(status().isOk())
@@ -250,7 +342,7 @@ class ApiKeyControllerTest {
     @Test
     @WithPortalUser("sam")
     void valueEndpointIsForbiddenForSomeoneElsesKey() throws Exception {
-        when(apiKeyService.revealValue(eq(1L), any()))
+        when(apiKeyService.revealValue(eq(1L), any(), any()))
                 .thenThrow(new AccessDeniedException("Only the owner can reveal this key"));
 
         mvc.perform(get("/keys/1/value"))

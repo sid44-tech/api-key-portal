@@ -68,6 +68,24 @@ public class ServiceIntegrationController {
                 }
                 yield "integrations/google-setup";
             }
+            case AWS_IAM -> {
+                if (!model.containsAttribute("form")) {
+                    model.addAttribute("form", new AwsIntegrationForm());
+                }
+                yield "integrations/aws-setup";
+            }
+            case GITLAB -> {
+                if (!model.containsAttribute("form")) {
+                    model.addAttribute("form", new GitLabIntegrationForm());
+                }
+                yield "integrations/gitlab-setup";
+            }
+            case CLOUDFLARE -> {
+                if (!model.containsAttribute("form")) {
+                    model.addAttribute("form", new CloudflareIntegrationForm());
+                }
+                yield "integrations/cloudflare-setup";
+            }
         };
     }
 
@@ -119,6 +137,88 @@ public class ServiceIntegrationController {
                     + " Double-check the roles from step 2 were granted and the JSON key from step 3 is current.");
             return "integrations/google-setup";
         }
+    }
+
+    @PostMapping("/aws")
+    public String connectAws(@AuthenticationPrincipal PortalUser principal,
+            @Valid @ModelAttribute("form") AwsIntegrationForm form,
+            BindingResult bindingResult, RedirectAttributes redirectAttributes) {
+        if (bindingResult.hasErrors()) {
+            return "integrations/aws-setup";
+        }
+        try {
+            ServiceIntegration integration = integrationService.connect(ServiceProvider.AWS_IAM, form.getName(),
+                    form.getAccountId(), form.getAccessKeyId(), form.getSecretAccessKey(),
+                    userService.getCurrent(principal));
+            redirectAttributes.addFlashAttribute("success",
+                    "Connected " + integration.getName() + ". The credentials were verified and stored encrypted.");
+            return "redirect:/integrations";
+        } catch (ProvisioningException e) {
+            bindingResult.reject("aws.connect.failed", e.getMessage()
+                    + " Double-check the access key pair from step 3 and the account ID from step 4.");
+            return "integrations/aws-setup";
+        }
+    }
+
+    @PostMapping("/gitlab")
+    public String connectGitLab(@AuthenticationPrincipal PortalUser principal,
+            @Valid @ModelAttribute("form") GitLabIntegrationForm form,
+            BindingResult bindingResult, RedirectAttributes redirectAttributes) {
+        if (bindingResult.hasErrors()) {
+            return "integrations/gitlab-setup";
+        }
+        try {
+            ServiceIntegration integration = integrationService.connect(ServiceProvider.GITLAB, form.getName(),
+                    form.getBaseUrl(), form.getProject(), form.getToken(), userService.getCurrent(principal));
+            redirectAttributes.addFlashAttribute("success",
+                    "Connected " + integration.getName() + ". The credentials were verified and stored encrypted.");
+            return "redirect:/integrations";
+        } catch (ProvisioningException e) {
+            bindingResult.reject("gitlab.connect.failed", e.getMessage()
+                    + " Double-check the URL, the project from step 1 and the token from step 2.");
+            return "integrations/gitlab-setup";
+        }
+    }
+
+    @PostMapping("/cloudflare")
+    public String connectCloudflare(@AuthenticationPrincipal PortalUser principal,
+            @Valid @ModelAttribute("form") CloudflareIntegrationForm form,
+            BindingResult bindingResult, RedirectAttributes redirectAttributes) {
+        if (bindingResult.hasErrors()) {
+            return "integrations/cloudflare-setup";
+        }
+        try {
+            // template token id doubles as the integration's "tenant": it is the
+            // one provider-side thing the integration revolves around
+            ServiceIntegration integration = integrationService.connect(ServiceProvider.CLOUDFLARE,
+                    form.getName(), form.getTemplateTokenId(), form.getTemplateTokenId(), form.getApiToken(),
+                    userService.getCurrent(principal));
+            redirectAttributes.addFlashAttribute("success",
+                    "Connected " + integration.getName() + ". The credentials were verified and stored encrypted.");
+            return "redirect:/integrations";
+        } catch (ProvisioningException e) {
+            bindingResult.reject("cloudflare.connect.failed", e.getMessage()
+                    + " Double-check the token from step 1 and the template token ID from step 2.");
+            return "integrations/cloudflare-setup";
+        }
+    }
+
+    /**
+     * The group-level switch on one integration. Authorisation lives in the
+     * service (super admin: any group; group admin: their own), same as test
+     * and remove.
+     */
+    @PostMapping("/{id}/enabled")
+    public String setEnabled(@PathVariable Long id, @AuthenticationPrincipal PortalUser principal,
+            @RequestParam(value = "enabled", defaultValue = "false") boolean enabled,
+            RedirectAttributes redirectAttributes) {
+        ServiceIntegration integration = integrationService.setEnabled(id, enabled,
+                userService.getCurrent(principal));
+        redirectAttributes.addFlashAttribute("success", enabled
+                ? integration.getName() + " is back on. Everyone in the group can create keys through it again."
+                : integration.getName() + " is switched off. Nobody in the group can create keys through it "
+                        + "until it's switched back on; the stored credential and existing keys are untouched.");
+        return "redirect:/integrations";
     }
 
     @PostMapping("/{id}/test")

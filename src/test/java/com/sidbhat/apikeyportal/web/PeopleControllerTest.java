@@ -1,5 +1,6 @@
 package com.sidbhat.apikeyportal.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
@@ -64,6 +65,30 @@ class PeopleControllerTest {
         mvc.perform(get("/people"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
+    @WithPortalUser("sam")
+    void offersThePeopleListAsATableAndAsCards() throws Exception {
+        when(userService.findVisibleTo(any())).thenReturn(List.of(alex, sam));
+
+        String html = mvc.perform(get("/people")).andReturn().getResponse().getContentAsString();
+
+        // the table where its columns fit, cards below "lg" where it would
+        // scroll sideways; every person has to be in both
+        String table = section(html, "kp-table-card d-none d-lg-flex", "kp-row-cards d-lg-none");
+        String cards = section(html, "kp-row-cards d-lg-none", "</ul>");
+        for (String person : new String[] {"Alex Carter", "Sam Diaz"}) {
+            assertThat(table).contains(person);
+            assertThat(cards).contains(person);
+        }
+    }
+
+    /** The page between two markers, so the navigation bar cannot muddy a count. */
+    private static String section(String html, String from, String to) {
+        int start = html.indexOf(from);
+        assertThat(start).as("marker '%s'", from).isNotNegative();
+        return html.substring(start, html.indexOf(to, start));
     }
 
     @Test

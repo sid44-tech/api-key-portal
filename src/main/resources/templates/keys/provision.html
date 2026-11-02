@@ -20,6 +20,29 @@
                 <code th:text="${integration.tenantId}">project</code>, generate a JSON key for it, and store
                 the key here encrypted. You never have to touch the Google Cloud console or copy anything.
             </p>
+            <p class="text-muted mb-4" th:if="${integration.provider.name() == 'GITLAB'}">
+                The portal will create a project access token in
+                <code th:text="${integration.clientId}">project</code> (scope <code>api</code>, role Maintainer)
+                and store it here encrypted. You never have to touch GitLab or copy anything.
+            </p>
+            <p class="text-muted mb-4" th:if="${integration.provider.name() == 'CLOUDFLARE'}">
+                The portal will create an API token copying the permissions of your template token, and store
+                it here encrypted. You never have to touch the Cloudflare dashboard or copy anything.
+            </p>
+            <p class="text-muted mb-4" th:if="${integration.provider.name() == 'AWS_IAM'}">
+                The portal will create a new IAM user in account
+                <code th:text="${integration.tenantId}">account</code>, generate an access key pair for it, and
+                store the pair here encrypted. You never have to touch the AWS console or copy anything.
+            </p>
+
+            <div class="alert alert-warning d-flex align-items-start gap-2" th:unless="${integration.enabled}">
+                <i class="bi bi-plug mt-1" aria-hidden="true"></i>
+                <div>
+                    This integration has been switched off by a group admin, so no keys can be created
+                    through it right now. The portal will refuse the form below until it's switched back on
+                    under <a th:href="@{/integrations}" class="alert-link">Integrations</a>.
+                </div>
+            </div>
 
             <form th:action="@{/keys/provision}" th:object="${form}" method="post" novalidate>
                 <input type="hidden" th:field="*{integrationId}">
@@ -41,16 +64,27 @@
                         Used as the app registration's display name in Azure and as the key name here.</small>
                     <small class="form-text" th:if="${integration.provider.name() == 'GOOGLE_CLOUD'}">
                         Used as the service account's display name in Google Cloud and as the key name here.</small>
+                    <small class="form-text" th:if="${integration.provider.name() == 'AWS_IAM'}">
+                        Used (sanitised) as the IAM user's name in AWS and as the key name here.
+                        AWS access keys don't expire on their own.</small>
+                    <small class="form-text" th:if="${integration.provider.name() == 'GITLAB'}">
+                        Used as the token's name in GitLab and as the key name here.</small>
+                    <small class="form-text" th:if="${integration.provider.name() == 'CLOUDFLARE'}">
+                        Used as the token's name in Cloudflare and as the key name here.</small>
                     <div class="invalid-feedback" th:errors="*{name}"></div>
                 </div>
 
-                <div class="mb-3 col-md-6" th:if="${integration.provider.name() == 'AZURE_AD'}">
+                <div class="mb-3 col-md-6" th:if="${integration.provider.supportsValidityChoice()}">
                     <label class="form-label" for="validity">Secret valid for</label>
                     <select class="form-select" th:field="*{validity}" th:errorclass="is-invalid">
                         <option th:each="v : ${validities}" th:value="${v}" th:text="${v.label}">180 days</option>
                     </select>
-                    <small class="form-text">The expiry is set in Azure and tracked here, so you'll see it
-                        coming up for renewal.</small>
+                    <small class="form-text" th:if="${integration.provider.name() == 'AZURE_AD'}">The expiry is
+                        set in Azure and tracked here, so you'll see it coming up for renewal.</small>
+                    <small class="form-text" th:if="${integration.provider.name() == 'GITLAB'}">GitLab caps
+                        tokens at one year; a longer choice becomes a year.</small>
+                    <small class="form-text" th:if="${integration.provider.name() == 'CLOUDFLARE'}">The expiry
+                        is set on the token and tracked here.</small>
                     <div class="invalid-feedback" th:errors="*{validity}"></div>
                 </div>
 

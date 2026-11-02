@@ -140,9 +140,14 @@ public class ActivityEvent {
         return detail;
     }
 
-    /** True if the target is still worth linking to from the history page. */
+    /**
+     * True if the target is still worth linking to from the history page. A
+     * deleted key is not: the link would only ever lead to "not found".
+     */
     public boolean isKeyEvent() {
-        return action == ActivityAction.KEY_CREATED;
+        return action == ActivityAction.KEY_CREATED
+                || action == ActivityAction.KEY_REVEALED
+                || action == ActivityAction.KEY_UPDATED;
     }
 
     @Override

@@ -10,10 +10,14 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter;
 
+import com.sidbhat.apikeyportal.logging.AccessDeniedLogger;
+import com.sidbhat.apikeyportal.logging.AuditLog;
+import com.sidbhat.apikeyportal.logging.PrincipalLogContextFilter;
 import com.sidbhat.apikeyportal.sso.PasswordLoginFailureHandler;
 import com.sidbhat.apikeyportal.sso.SsoAuthenticationFailureHandler;
 import com.sidbhat.apikeyportal.sso.SsoDisabledRedirectFilter;
@@ -22,7 +26,7 @@ import com.sidbhat.apikeyportal.sso.SsoUserService;
 
 @Configuration
 @EnableWebSecurity
-@EnableConfigurationProperties(SecurityProperties.class)
+@EnableConfigurationProperties({SecurityProperties.class, LockoutProperties.class})
 public class SecurityConfig {
 
     /** No inline scripts or styles; everything is served from this app. */
@@ -46,14 +50,32 @@ public class SecurityConfig {
     private final ObjectProvider<SsoService> ssoService;
     private final ObjectProvider<PasswordLoginFailureHandler> passwordFailureHandler;
 
+    /** Optional for the same reason; without it the chain simply does not throttle. */
+    private final ObjectProvider<LoginAttemptService> loginAttempts;
+
+    /** Optional likewise; without it refusals still 403, they are just not written down. */
+    private final ObjectProvider<AccessDeniedLogger> accessDeniedLogger;
+
+    /** Optional likewise; without it log lines carry no signed-in user. */
+    private final ObjectProvider<LoginAuditListener> loginAudit;
+
+    private final ObjectProvider<AuditLog> audit;
+
     public SecurityConfig(ObjectProvider<SsoUserService> ssoUserService,
             ObjectProvider<SsoAuthenticationFailureHandler> ssoFailureHandler,
             ObjectProvider<SsoService> ssoService,
-            ObjectProvider<PasswordLoginFailureHandler> passwordFailureHandler) {
+            ObjectProvider<PasswordLoginFailureHandler> passwordFailureHandler,
+            ObjectProvider<LoginAttemptService> loginAttempts,
+            ObjectProvider<AccessDeniedLogger> accessDeniedLogger,
+            ObjectProvider<LoginAuditListener> loginAudit, ObjectProvider<AuditLog> audit) {
         this.ssoUserService = ssoUserService;
         this.ssoFailureHandler = ssoFailureHandler;
         this.ssoService = ssoService;
         this.passwordFailureHandler = passwordFailureHandler;
+        this.loginAttempts = loginAttempts;
+        this.accessDeniedLogger = accessDeniedLogger;
+        this.loginAudit = loginAudit;
+        this.audit = audit;
     }
 
     @Bean
@@ -82,7 +104,9 @@ public class SecurityConfig {
                         // integrations everyone in a group then uses
                         .requestMatchers("/activity/**").hasAnyRole("SUPER_ADMIN", "GROUP_ADMIN")
                         .requestMatchers("/integrations/new", "/integrations/azure-ad",
-                                "/integrations/google-cloud").hasAnyRole("SUPER_ADMIN", "GROUP_ADMIN")
+                                "/integrations/google-cloud", "/integrations/aws",
+                                "/integrations/gitlab", "/integrations/cloudflare")
+                                .hasAnyRole("SUPER_ADMIN", "GROUP_ADMIN")
                         // connecting the organisation's identity provider is the one
                         // thing only the super admin can do: it decides who gets in
                         .requestMatchers("/sso/**").hasRole("SUPER_ADMIN")
@@ -94,18 +118,37 @@ public class SecurityConfig {
                     // the button, instead of a flat "invalid email or password"
                     passwordFailureHandler.ifAvailable(form::failureHandler);
                 })
-                .logout(logout -> logout
-                        .logoutSuccessUrl("/login?logout")
-                        .permitAll())
+                .logout(logout -> {
+                    logout.logoutSuccessUrl("/login?logout").permitAll();
+                    // signing out is half of "when was this account in use"
+                    loginAudit.ifAvailable(logout::addLogoutHandler);
+                })
                 // a new session id on sign-in, so a pre-login session can't be reused
                 .sessionManagement(session -> session
                         .sessionFixation(fixation -> fixation.changeSessionId()))
+                // every refusal written down in one place, rather than in each
+                // of the twenty services that can refuse something
+                .exceptionHandling(exceptions ->
+                        accessDeniedLogger.ifAvailable(exceptions::accessDeniedHandler))
                 .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp.policyDirectives(CONTENT_SECURITY_POLICY))
                         .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.SAME_ORIGIN)))
                 // after authorization, so it only ever sees requests that were going
                 // to be served anyway
-                .addFilterAfter(new PasswordChangeRequiredFilter(), AuthorizationFilter.class);
+                .addFilterAfter(new PasswordChangeRequiredFilter(), AuthorizationFilter.class)
+                // likewise after authorization, which is the first point at which
+                // "who is this" has an answer to put in the logging context
+                .addFilterAfter(new PrincipalLogContextFilter(), AuthorizationFilter.class);
+
+        // Turns a submitted sign-in away while that account or address is locked
+        // out. Before the authentication filter, so no password is ever checked
+        // while a lockout is in force.
+        LoginAttemptService attempts = loginAttempts.getIfAvailable();
+        AuditLog auditLog = audit.getIfAvailable();
+        if (attempts != null && auditLog != null) {
+            http.addFilterBefore(new LoginAttemptFilter(attempts, auditLog),
+                    UsernamePasswordAuthenticationFilter.class);
+        }
 
         // Single sign-on, when a super admin has connected a provider. The client
         // registration is read from the database, so this stays wired up whether or

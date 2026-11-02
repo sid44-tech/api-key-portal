@@ -10,7 +10,11 @@ import org.springframework.stereotype.Service;
 
 import com.sidbhat.apikeyportal.activity.ActivityAction;
 import com.sidbhat.apikeyportal.activity.ActivityService;
+import com.sidbhat.apikeyportal.logging.AuditLog;
+import com.sidbhat.apikeyportal.integration.aws.AwsIamClient;
 import com.sidbhat.apikeyportal.integration.azure.AzureGraphClient;
+import com.sidbhat.apikeyportal.integration.cloudflare.CloudflareClient;
+import com.sidbhat.apikeyportal.integration.gitlab.GitLabClient;
 import com.sidbhat.apikeyportal.integration.google.GoogleIamClient;
 import com.sidbhat.apikeyportal.user.UserAccount;
 import com.sidbhat.apikeyportal.user.UserRole;
@@ -28,14 +32,23 @@ public class ServiceIntegrationService {
     private final ServiceIntegrationRepository repository;
     private final AzureGraphClient graphClient;
     private final GoogleIamClient googleIamClient;
+    private final AwsIamClient awsIamClient;
+    private final GitLabClient gitLabClient;
+    private final CloudflareClient cloudflareClient;
     private final ActivityService activity;
+    private final AuditLog audit;
 
     public ServiceIntegrationService(ServiceIntegrationRepository repository, AzureGraphClient graphClient,
-            GoogleIamClient googleIamClient, ActivityService activity) {
+            GoogleIamClient googleIamClient, AwsIamClient awsIamClient, GitLabClient gitLabClient,
+            CloudflareClient cloudflareClient, ActivityService activity, AuditLog audit) {
         this.repository = repository;
         this.graphClient = graphClient;
         this.googleIamClient = googleIamClient;
+        this.awsIamClient = awsIamClient;
+        this.gitLabClient = gitLabClient;
+        this.cloudflareClient = cloudflareClient;
         this.activity = activity;
+        this.audit = audit;
     }
 
     /** True if this person may connect, re-test or remove integrations for their group. */
@@ -100,8 +113,43 @@ public class ServiceIntegrationService {
         verifyWithProvider(integration);
         integration.markVerified(Instant.now());
         ServiceIntegration saved = repository.save(integration);
-        log.info("Verified connection for {}", saved);
+        // an admin exercising a stored provider credential; the credential
+        // itself is never named, only the integration holding it
+        audit.allowed("integration_verified", admin.getEmail(), saved.getName(),
+                saved.getProvider().getLabel());
         return saved;
+    }
+
+    /**
+     * The group-level switch. Off, nobody in the group can mint keys through this
+     * integration - the provision form refuses, the add-key page stops offering
+     * it, and automatic rotation skips keys minted through it. The credential
+     * stays stored, so switching back on is one click, not a re-setup.
+     * <p>
+     * Who may flip it is the same rule as test and remove: a super admin for any
+     * group, a group admin for their own.
+     */
+    public ServiceIntegration setEnabled(Long id, boolean enabled, UserAccount admin) {
+        ServiceIntegration integration = requireAdministrable(id, admin);
+        if (integration.isEnabled() == enabled) {
+            return integration;
+        }
+        integration.setEnabled(enabled);
+        ServiceIntegration saved = repository.save(integration);
+        activity.record(enabled ? ActivityAction.INTEGRATION_ENABLED : ActivityAction.INTEGRATION_DISABLED,
+                admin, saved.getId(), saved.getName(), saved.getProvider().getLabel());
+        log.info("{} switched {} {}", admin.getEmail(), saved, enabled ? "on" : "off");
+        return saved;
+    }
+
+    /**
+     * The integrations {@code viewer} can actually mint keys through right now:
+     * their group's, minus the switched-off ones. The add-key page offers these;
+     * the integrations page itself uses {@link #findAll} so an admin can still
+     * see - and re-enable - what is off.
+     */
+    public List<ServiceIntegration> findUsable(UserAccount viewer) {
+        return findAll(viewer).stream().filter(ServiceIntegration::isEnabled).toList();
     }
 
     /** Called after another operation has already proven the credentials work. */
@@ -152,6 +200,23 @@ public class ServiceIntegrationService {
                     integration.getClientSecret());
             case GOOGLE_CLOUD -> googleIamClient.acquireToken(integration.getClientId(),
                     integration.getClientSecret());
+            case GITLAB -> gitLabClient.verifyProjectAccess(integration.getTenantId(),
+                    integration.getClientSecret(), integration.getClientId());
+            case CLOUDFLARE -> {
+                cloudflareClient.verifyToken(integration.getClientSecret());
+                // reading the template proves it exists and has policies to copy
+                cloudflareClient.templateToken(integration.getClientSecret(), integration.getTenantId());
+            }
+            case AWS_IAM -> {
+                // STS says whose credentials these are; a key from the wrong
+                // account would otherwise fail much later, on first provisioning
+                String account = awsIamClient.callerAccount(integration.getClientId(),
+                        integration.getClientSecret());
+                if (!account.equals(integration.getTenantId())) {
+                    throw new ProvisioningException("That access key belongs to AWS account " + account
+                            + ", not " + integration.getTenantId() + " - double-check the account ID.");
+                }
+            }
         }
     }
 }

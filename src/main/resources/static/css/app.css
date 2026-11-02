@@ -613,6 +613,195 @@ a.kp-metric:hover {
     white-space: pre-line;
 }
 
+/* "A replacement is ready" / "replaces an expiring key", in a list row or card */
+.kp-handover {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.8rem;
+    color: var(--kp-amber);
+}
+
+.kp-handover a {
+    color: inherit;
+    font-weight: 500;
+}
+
+/* the replacement's side of the link is news, not a warning */
+.kp-handover.is-new {
+    color: var(--kp-green);
+}
+
+.kp-toolbar .kp-toolbar-switch {
+    display: flex;
+    align-items: center;
+    padding-left: 2.75em;
+    margin-bottom: 0;
+    color: var(--kp-ink-2);
+    font-size: 0.875rem;
+}
+
+/* --------------------------------------------------------------------------
+   Row cards (the key, people and history lists below the "lg" breakpoint)
+
+   The same rows as each page's table, stacked. A phone has room for about two
+   of a table's five or six columns, so the tables scrolled sideways - on the
+   key list taking the value and its buttons with them. Here each row is a
+   card: a head line, the fields underneath, and on the key list the value
+   strip with its buttons. Nothing is off-screen and nothing is behind a swipe.
+
+   Which of the two is shown is left to Bootstrap's d-none/d-lg-flex on the
+   markup, so the breakpoint is stated where the two layouts are.
+   -------------------------------------------------------------------------- */
+
+.kp-row-cards {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.75rem;
+}
+
+.kp-row-card {
+    padding: 1rem 1.1rem;
+    background: var(--kp-surface);
+    border: 1px solid var(--kp-hairline);
+    border-radius: var(--kp-radius);
+    box-shadow: var(--kp-shadow);
+}
+
+/* Expired keys and disabled accounts stay legible but stop competing */
+.kp-row-card.is-quiet {
+    background: var(--kp-surface-muted);
+}
+
+.kp-row-card.is-quiet .kp-row-card-title a,
+.kp-row-card.is-quiet .kp-row-card-meta dd {
+    color: var(--kp-ink-3);
+}
+
+.kp-row-card-meta dd a {
+    font-weight: 500;
+}
+
+.kp-row-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.kp-row-card-title a,
+.kp-row-card-title > span:not(.pill) {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--kp-ink);
+}
+
+.kp-row-card-title a:hover {
+    color: var(--kp-accent);
+}
+
+/* The status pill must not be squeezed to one word per line by a long name */
+.kp-row-card-head .pill {
+    flex-shrink: 0;
+}
+
+/* A quiet date or similar on the head's right-hand side */
+.kp-row-card-head .kp-row-card-aside {
+    flex-shrink: 0;
+    color: var(--kp-ink-3);
+    font-size: 0.8rem;
+    margin-top: 0.15rem;
+}
+
+/* Pills sitting in a title line, after the name */
+.kp-row-card-title .pill {
+    vertical-align: 0.15em;
+    margin-left: 0.35rem;
+}
+
+.kp-row-card-subtitle {
+    color: var(--kp-ink-3);
+    font-size: 0.8rem;
+    margin-top: 0.1rem;
+}
+
+.kp-key-card-value {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.75rem;
+    padding: 0.4rem 0.6rem;
+    background: var(--kp-surface-muted);
+    border: 1px solid var(--kp-hairline);
+    border-radius: var(--kp-radius-sm);
+    /* overrides .key-value, which keeps the table column from wrapping */
+    min-width: 0;
+    white-space: normal;
+}
+
+.kp-key-card-value code {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* Reveal and copy: finger-sized here, where the pointer is a finger */
+.kp-key-card-value .btn-link {
+    flex-shrink: 0;
+    padding: 0.35rem 0.55rem;
+    font-size: 1rem;
+}
+
+.kp-row-card-locked {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--kp-ink-3);
+    font-size: 0.8rem;
+}
+
+.kp-row-card-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+    gap: 0.6rem 1rem;
+    margin: 0.85rem 0 0;
+}
+
+.kp-row-card-meta dt {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--kp-ink-3);
+}
+
+.kp-row-card-meta dd {
+    margin: 0.1rem 0 0;
+    font-size: 0.875rem;
+    color: var(--kp-ink-2);
+}
+
+.kp-row-card-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--kp-hairline);
+}
+
+/* Big enough to hit without aiming; the table's icon buttons are not */
+.kp-row-card-actions .btn {
+    padding: 0.4rem 0.9rem;
+}
+
+.kp-row-card-actions .btn-link {
+    color: var(--kp-ink-2);
+}
+
 /* --------------------------------------------------------------------------
    Pills (status badges)
    -------------------------------------------------------------------------- */

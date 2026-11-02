@@ -29,6 +29,7 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.sidbhat.apikeyportal.activity.ActivityService;
+import com.sidbhat.apikeyportal.logging.AuditLog;
 import com.sidbhat.apikeyportal.user.TestUsers;
 import com.sidbhat.apikeyportal.user.UserAccount;
 import com.sidbhat.apikeyportal.user.UserAccountRepository;
@@ -65,7 +66,7 @@ class SsoUserServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SsoUserService(ssoService, accounts, activity, passwordEncoder);
+        service = new SsoUserService(ssoService, accounts, activity, passwordEncoder, new AuditLog());
         config = new SsoConfiguration("Contoso", "https://issuer.example.com", "client", "secret");
         config.setEnabled(true);
         config.setRequiredGroup("portal-users");

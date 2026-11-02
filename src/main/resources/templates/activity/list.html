@@ -12,10 +12,10 @@
             <h1>History</h1>
             <p class="kp-subtitle">
                 <th:block th:if="${currentUser.superAdmin}">
-                    Everything created across every group, newest first.
+                    Everything done across every group, newest first.
                 </th:block>
                 <th:block th:unless="${currentUser.superAdmin}">
-                    Everything created in
+                    Everything done in
                     <span th:text="${currentUser.group != null ? currentUser.group.name : 'your group'}">your group</span>,
                     newest first.
                 </th:block>
@@ -26,10 +26,12 @@
     <div class="kp-empty" th:if="${page.totalElements == 0}">
         <span class="kp-empty-icon" aria-hidden="true"><i class="bi bi-clock-history"></i></span>
         <h2>Nothing yet</h2>
-        <p>Keys, integrations and invitations will show up here as people create them.</p>
+        <p>Keys, integrations and invitations will show up here as people create and use them.</p>
     </div>
 
-    <div class="card kp-table-card" th:if="${page.totalElements > 0}">
+    <!-- The same events twice: a table where there is room for its columns,
+         cards below "lg" where it would scroll sideways instead -->
+    <div class="card kp-table-card d-none d-lg-flex" th:if="${page.totalElements > 0}">
         <div class="table-responsive">
             <table class="table table-hover align-middle">
                 <thead>
@@ -71,6 +73,45 @@
             </table>
         </div>
     </div>
+
+    <ul class="kp-row-cards d-lg-none" th:if="${page.totalElements > 0}">
+        <li th:each="event : ${page.content}" class="kp-row-card">
+            <div class="kp-row-card-head">
+                <div>
+                    <span th:replace="fragments/badges :: activity(${event.action})"></span>
+                    <div class="kp-row-card-subtitle" th:if="${event.keySource != null}"
+                         th:text="${event.keySource.label}">Created via integration</div>
+                </div>
+                <span class="kp-row-card-aside"
+                      th:text="${#temporals.format(event.occurredAt, 'MMM d, yyyy h:mm a')}">-</span>
+            </div>
+
+            <div class="kp-row-card-title mt-2">
+                <a th:if="${event.keyEvent and event.targetId != null}"
+                   th:href="@{/keys/{id}(id=${event.targetId})}"
+                   th:text="${event.targetName}">GitHub / CI deploy token</a>
+                <span th:unless="${event.keyEvent and event.targetId != null}"
+                      th:text="${event.targetName}">GitHub / CI deploy token</span>
+                <div class="kp-row-card-subtitle" th:if="${event.detail != null}" th:text="${event.detail}">
+                    Azure AD production
+                </div>
+            </div>
+
+            <dl class="kp-row-card-meta">
+                <div>
+                    <dt>Who</dt>
+                    <dd>
+                        <span th:text="${event.actorName}">Alex Carter</span>
+                        <div class="kp-row-card-subtitle" th:text="${event.actorEmail}">alex@example.com</div>
+                    </dd>
+                </div>
+                <div th:if="${currentUser.superAdmin}">
+                    <dt>Group</dt>
+                    <dd th:text="${event.groupName != null ? event.groupName : '-'}">Platform team</dd>
+                </div>
+            </dl>
+        </li>
+    </ul>
 
     <nav aria-label="History pages" th:if="${page.totalPages > 1}">
         <ul class="pagination justify-content-center">

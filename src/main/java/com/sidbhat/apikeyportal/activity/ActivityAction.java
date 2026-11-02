@@ -9,9 +9,15 @@ package com.sidbhat.apikeyportal.activity;
 public enum ActivityAction {
 
     KEY_CREATED("Key created", "bi-key", "pill-success"),
+    /** The value left the portal - the most sensitive thing anyone can do here. */
+    KEY_REVEALED("Key revealed", "bi-eye", "pill-warning"),
+    KEY_UPDATED("Key updated", "bi-pencil", "pill-accent"),
     KEY_DELETED("Key deleted", "bi-trash", "pill-danger"),
     INTEGRATION_CONNECTED("Integration connected", "bi-plug", "pill-accent"),
     INTEGRATION_REMOVED("Integration removed", "bi-plug", "pill-danger"),
+    /** Paused for the whole group; the credential stays stored. */
+    INTEGRATION_DISABLED("Integration switched off", "bi-plug", "pill-warning"),
+    INTEGRATION_ENABLED("Integration switched on", "bi-plug", "pill-success"),
     INVITATION_SENT("Invitation sent", "bi-envelope", "pill-neutral"),
     ACCOUNT_CREATED("Account created", "bi-person-plus", "pill-success"),
     ACCOUNT_LINKED_TO_SSO("Account linked to SSO", "bi-shield-check", "pill-neutral"),

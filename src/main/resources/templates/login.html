@@ -16,6 +16,12 @@
         <div class="card">
             <div class="card-body">
                 <div th:if="${param.error}" class="alert alert-danger">Invalid email or password.</div>
+                <!-- says nothing about whether the account exists: the same message
+                     appears whether the lock is on the account or on this address -->
+                <div th:if="${param.lockedOut}" class="alert alert-warning">
+                    Too many failed sign-in attempts. Try again in
+                    <span th:text="${lockoutMinutes == 1} ? '1 minute' : |${lockoutMinutes} minutes|">15 minutes</span>.
+                </div>
                 <div th:if="${param.logout}" class="alert alert-success">You have been signed out.</div>
                 <div th:if="${param.registered}" class="alert alert-success">
                     Your account is ready. Sign in to get started.

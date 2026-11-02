@@ -15,6 +15,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import com.sidbhat.apikeyportal.activity.ActivityAction;
 import com.sidbhat.apikeyportal.activity.ActivityService;
+import com.sidbhat.apikeyportal.logging.AuditLog;
 import com.sidbhat.apikeyportal.user.NewAccountDetails;
 import com.sidbhat.apikeyportal.user.UserAccount;
 import com.sidbhat.apikeyportal.user.UserAccountRepository;
@@ -48,10 +49,11 @@ public class InvitationService {
     private final InvitationMailer mailer;
     private final InvitationProperties properties;
     private final ActivityService activity;
+    private final AuditLog audit;
 
     public InvitationService(UserInvitationRepository invitations, UserAccountRepository accounts,
             UserGroupRepository groups, UserAccountService userService, InvitationMailer mailer,
-            InvitationProperties properties, ActivityService activity) {
+            InvitationProperties properties, ActivityService activity, AuditLog audit) {
         this.invitations = invitations;
         this.accounts = accounts;
         this.groups = groups;
@@ -59,6 +61,7 @@ public class InvitationService {
         this.mailer = mailer;
         this.properties = properties;
         this.activity = activity;
+        this.audit = audit;
     }
 
     /**
@@ -150,10 +153,19 @@ public class InvitationService {
      * @throws InvalidInvitationException if it is unknown, used, withdrawn or expired
      */
     public UserInvitation requirePending(String token) {
-        UserInvitation invitation = invitations.findByTokenHash(InvitationTokens.hash(token))
-                .orElseThrow(() -> new InvalidInvitationException(
-                        "This invitation link isn't valid. Ask whoever invited you to send a new one."));
+        // The token itself is never logged - it is the credential, and the whole
+        // of it is in the link. Which invitation was tried is recorded where it
+        // is known, and "unknown" where it is not, which is itself the
+        // interesting case: somebody guessing at tokens produces a run of them.
+        UserInvitation invitation = invitations.findByTokenHash(InvitationTokens.hash(token)).orElse(null);
+        if (invitation == null) {
+            audit.refused("invitation_accepted", null, "unknown invitation", "No invitation for that link");
+            throw new InvalidInvitationException(
+                    "This invitation link isn't valid. Ask whoever invited you to send a new one.");
+        }
         if (!invitation.isPending(Instant.now())) {
+            audit.refused("invitation_accepted", null, invitation.getEmail(),
+                    "The invitation is " + invitation.statusAt(Instant.now()).name().toLowerCase(java.util.Locale.ROOT));
             // deliberately the same wording as an unknown token
             throw new InvalidInvitationException(
                     "This invitation link isn't valid. Ask whoever invited you to send a new one.");

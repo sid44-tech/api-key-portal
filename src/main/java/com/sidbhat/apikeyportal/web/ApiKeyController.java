@@ -20,6 +20,7 @@ import com.sidbhat.apikeyportal.integration.ServiceIntegrationService;
 import com.sidbhat.apikeyportal.key.ApiKey;
 import com.sidbhat.apikeyportal.key.ApiKeyService;
 import com.sidbhat.apikeyportal.key.ApiKeySort;
+import com.sidbhat.apikeyportal.rotation.KeyRotationService;
 import com.sidbhat.apikeyportal.user.PortalUser;
 import com.sidbhat.apikeyportal.user.UserAccount;
 import com.sidbhat.apikeyportal.user.UserAccountService;
@@ -31,12 +32,14 @@ public class ApiKeyController {
     private final ApiKeyService apiKeyService;
     private final ServiceIntegrationService integrationService;
     private final UserAccountService userService;
+    private final KeyRotationService rotationService;
 
     public ApiKeyController(ApiKeyService apiKeyService, ServiceIntegrationService integrationService,
-            UserAccountService userService) {
+            UserAccountService userService, KeyRotationService rotationService) {
         this.apiKeyService = apiKeyService;
         this.integrationService = integrationService;
         this.userService = userService;
+        this.rotationService = rotationService;
     }
 
     /**
@@ -49,10 +52,15 @@ public class ApiKeyController {
             @RequestParam(name = "service", required = false) String service,
             @RequestParam(name = "owner", required = false) Long ownerId,
             @RequestParam(name = "sort", defaultValue = "SERVICE") ApiKeySort sort,
+            @RequestParam(name = "showExpired", defaultValue = "false") boolean showExpired,
             @RequestParam(name = "page", defaultValue = "0") int page, Model model) {
         UserAccount me = userService.getCurrent(principal);
-        Page<ApiKey> keys = apiKeyService.search(me, query, service, ownerId, sort, page);
+        Page<ApiKey> keys = apiKeyService.search(me, query, service, ownerId, sort, showExpired, page);
         model.addAttribute("keys", keys.getContent());
+        // which of the listed keys already have a replacement minted, so an
+        // expiring key can point at its successor
+        model.addAttribute("replacements", apiKeyService.findReplacements(keys.getContent()));
+        model.addAttribute("showExpired", showExpired);
         model.addAttribute("page", keys);
         model.addAttribute("summary", apiKeyService.getSummary(me));
         model.addAttribute("services", apiKeyService.findServiceNames(me));
@@ -69,16 +77,41 @@ public class ApiKeyController {
     @GetMapping("/{id}")
     public String detail(@PathVariable Long id, @AuthenticationPrincipal PortalUser principal, Model model) {
         UserAccount me = userService.getCurrent(principal);
-        model.addAttribute("key", apiKeyService.getById(id, me));
+        ApiKey key = apiKeyService.getById(id, me);
+        model.addAttribute("key", key);
+        model.addAttribute("replacement", apiKeyService.findReplacement(id));
+        model.addAttribute("rotationSupported", rotationService.supportsRotation(key));
+        // the two kinds of rotation promise different things; the page must not
+        // promise an overlap the provider will not give
+        model.addAttribute("rotationOverlaps", rotationService.rotationOverlaps(key));
+        model.addAttribute("providerRotationOn", rotationService.isEnabledForProviderOf(key, me));
         model.addAttribute("currentUser", me);
         return "keys/detail";
+    }
+
+    /**
+     * The per-key say on automatic replacement: an empty value hands the key back
+     * to the owner's setting for the provider, true or false pins it.
+     */
+    @PostMapping("/{id}/rotation")
+    public String setRotation(@PathVariable Long id, @AuthenticationPrincipal PortalUser principal,
+            @RequestParam(value = "autoRotate", required = false) String autoRotate,
+            RedirectAttributes redirectAttributes) {
+        Boolean override = (autoRotate == null || autoRotate.isBlank()) ? null : Boolean.valueOf(autoRotate);
+        apiKeyService.setAutoRotate(id, override, userService.getCurrent(principal));
+        redirectAttributes.addFlashAttribute("success", override == null
+                ? "This key follows your provider setting for automatic replacement again."
+                : (override ? "This key will be replaced automatically before it expires."
+                        : "This key won't be replaced automatically."));
+        return "redirect:/keys/" + id;
     }
 
     @GetMapping("/new")
     public String newKey(@AuthenticationPrincipal PortalUser principal, Model model) {
         model.addAttribute("form", new ApiKeyForm());
-        // offers "create it in the provider instead" when the group has integrations set up
-        model.addAttribute("integrations", integrationService.findAll(userService.getCurrent(principal)));
+        // offers "create it in the provider instead" - only through integrations
+        // that are switched on; paused ones stay visible on the integrations page
+        model.addAttribute("integrations", integrationService.findUsable(userService.getCurrent(principal)));
         return "keys/form";
     }
 

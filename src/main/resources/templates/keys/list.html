@@ -40,7 +40,7 @@
                 <div class="kp-metric-label">Expiring in the next 30 days</div>
             </div>
         </a>
-        <a th:href="@{/keys(sort=EXPIRES)}" class="kp-metric" th:classappend="${summary.expired == 0} ? 'is-quiet'">
+        <a th:href="@{/keys(sort=EXPIRES,showExpired=true)}" class="kp-metric" th:classappend="${summary.expired == 0} ? 'is-quiet'">
             <span class="kp-metric-icon" th:classappend="${summary.expired > 0} ? 'is-red'" aria-hidden="true">
                 <i class="bi bi-exclamation-octagon"></i>
             </span>
@@ -78,9 +78,16 @@
         </select>
         <button type="submit" class="btn btn-secondary">Search</button>
         <a th:if="${filtered}" th:href="@{/keys}" class="btn btn-link">Clear</a>
+        <!-- expired keys are clutter until the day they are the whole point -->
+        <div class="form-check form-switch kp-toolbar-switch" th:if="${summary.expired > 0 or showExpired}">
+            <input type="checkbox" class="form-check-input js-autosubmit" role="switch" id="showExpired"
+                   name="showExpired" value="true" th:checked="${showExpired}">
+            <label class="form-check-label" for="showExpired"
+                   th:text="${'Show expired (' + summary.expired + ')'}">Show expired (3)</label>
+        </div>
     </form>
 
-    <div th:if="${#lists.isEmpty(keys)}" class="kp-empty">
+    <div th:if="${#lists.isEmpty(keys) and (filtered or showExpired or summary.expired == 0)}" class="kp-empty">
         <th:block th:unless="${filtered}">
             <span class="kp-empty-icon" aria-hidden="true"><i class="bi bi-key"></i></span>
             <h2>No keys yet</h2>
@@ -98,7 +105,26 @@
         </th:block>
     </div>
 
-    <div class="card kp-table-card" th:unless="${#lists.isEmpty(keys)}">
+    <!-- every key there is has expired, and expired keys are hidden: without
+         this branch the page would claim there are no keys at all -->
+    <div th:if="${#lists.isEmpty(keys) and !filtered and !showExpired and summary.expired > 0}" class="kp-empty">
+        <span class="kp-empty-icon" aria-hidden="true"><i class="bi bi-hourglass-bottom"></i></span>
+        <h2>Nothing current</h2>
+        <p>Every key here has expired. They're hidden from the list, not gone.</p>
+        <a th:href="@{/keys(showExpired=true)}" class="btn btn-secondary"
+           th:text="${'Show expired (' + summary.expired + ')'}">Show expired</a>
+    </div>
+
+    <!--
+      The same keys twice, laid out for the room available, with one hidden at
+      any width. Six columns do not fit on a phone: the table would scroll
+      sideways, which hides the value and the buttons that act on it behind a
+      swipe. Below "lg" the list becomes a stack of cards instead.
+
+      The pieces that carry behaviour - reveal, copy, edit, delete - come from
+      fragments/keys so that both layouts are offering the same thing.
+    -->
+    <div class="card kp-table-card d-none d-lg-flex" th:unless="${#lists.isEmpty(keys)}">
         <div class="table-responsive">
             <table class="table table-hover align-middle">
                 <thead>
@@ -117,6 +143,15 @@
                     <td>
                         <a th:href="@{/keys/{id}(id=${key.id})}" th:text="${key.name}">Deploy token</a>
                         <div class="kp-cell-secondary" th:text="${key.serviceName}">GitHub</div>
+                        <a th:if="${replacements.containsKey(key.id)}" class="kp-handover"
+                           title="A replacement has been generated. This key moves to the expired list when it expires."
+                           th:href="@{/keys/{id}(id=${replacements.get(key.id).id})}">
+                            <i class="bi bi-arrow-repeat" aria-hidden="true"></i> Replacement ready
+                        </a>
+                        <span th:if="${key.rotatedFromKeyId != null}" class="kp-handover is-new">
+                            <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+                            <a th:href="@{/keys/{id}(id=${key.rotatedFromKeyId})}">Replaces an expiring key</a>
+                        </span>
                     </td>
                     <td>
                         <span th:if="${mine}">You</span>
@@ -125,15 +160,9 @@
                     </td>
                     <td class="key-value">
                         <code class="key-value-text" th:text="${key.maskedValue}">••••••••</code>
+                        <!-- nested: th:replace outranks th:if on the same tag -->
                         <th:block th:if="${mine}">
-                            <button type="button" class="btn btn-sm btn-link js-reveal" title="Show value"
-                                    th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">
-                                <i class="bi bi-eye" aria-hidden="true"></i><span class="visually-hidden">Show value</span>
-                            </button>
-                            <button type="button" class="btn btn-sm btn-link js-copy" title="Copy to clipboard"
-                                    th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">
-                                <i class="bi bi-clipboard" aria-hidden="true"></i><span class="visually-hidden">Copy to clipboard</span>
-                            </button>
+                            <th:block th:replace="fragments/keys :: valueControls(${key})"></th:block>
                         </th:block>
                         <i class="bi bi-lock text-muted ms-1" th:unless="${mine}"
                            th:title="|Only ${key.ownerName} can see this value|" aria-hidden="true"></i>
@@ -145,15 +174,9 @@
                         <span th:replace="fragments/badges :: expiration(${key})"></span>
                     </td>
                     <td class="text-end text-nowrap">
-                        <a th:href="@{/keys/{id}/edit(id=${key.id})}" class="btn btn-sm btn-link" title="Edit"
-                           th:if="${mine}">
-                            <i class="bi bi-pencil" aria-hidden="true"></i><span class="visually-hidden">Edit</span>
-                        </a>
-                        <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" th:if="${mine}"
-                                data-bs-toggle="modal" data-bs-target="#deleteModal"
-                                th:attr="data-key-name=${key.serviceName + ' / ' + key.name},data-delete-url=@{/keys/{id}/delete(id=${key.id})}">
-                            <i class="bi bi-trash" aria-hidden="true"></i><span class="visually-hidden">Delete</span>
-                        </button>
+                        <th:block th:if="${mine}">
+                            <th:block th:replace="fragments/keys :: listActions(${key}, false)"></th:block>
+                        </th:block>
                     </td>
                 </tr>
                 </tbody>
@@ -161,18 +184,76 @@
         </div>
     </div>
 
+    <ul class="kp-row-cards d-lg-none" th:unless="${#lists.isEmpty(keys)}">
+        <li th:each="key : ${keys}" class="kp-row-card"
+            th:classappend="${key.expirationStatus.name() == 'EXPIRED'} ? 'is-quiet'"
+            th:with="mine=${key.ownerId != null and key.ownerId == currentUser.id}">
+            <div class="kp-row-card-head">
+                <div class="kp-row-card-title">
+                    <div class="kp-eyebrow" th:text="${key.serviceName}">GitHub</div>
+                    <a th:href="@{/keys/{id}(id=${key.id})}" th:text="${key.name}">Deploy token</a>
+                </div>
+                <span th:replace="fragments/badges :: expiration(${key})"></span>
+            </div>
+
+            <div class="kp-handover kp-row-card-subtitle" th:if="${replacements.containsKey(key.id)}">
+                <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+                <a th:href="@{/keys/{id}(id=${replacements.get(key.id).id})}">A replacement is ready</a> -
+                this key moves to the expired list when it expires.
+            </div>
+            <div class="kp-handover kp-row-card-subtitle is-new" th:if="${key.rotatedFromKeyId != null}">
+                <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+                Replaces <a th:href="@{/keys/{id}(id=${key.rotatedFromKeyId})}">an expiring key</a>.
+            </div>
+
+            <div class="key-value kp-key-card-value">
+                <code class="key-value-text" th:text="${key.maskedValue}">••••••••</code>
+                <th:block th:if="${mine}">
+                    <th:block th:replace="fragments/keys :: valueControls(${key})"></th:block>
+                </th:block>
+                <span class="kp-row-card-locked" th:unless="${mine}">
+                    <i class="bi bi-lock" aria-hidden="true"></i>
+                    <span>Only <span th:text="${key.ownerName}">Alex Carter</span> can see this</span>
+                </span>
+            </div>
+
+            <dl class="kp-row-card-meta">
+                <div>
+                    <dt>Owner</dt>
+                    <dd>
+                        <span th:if="${mine}">You</span>
+                        <a th:unless="${mine}" th:href="@{/keys(owner=${key.ownerId})}"
+                           th:text="${key.ownerName}">Alex Carter</a>
+                    </dd>
+                </div>
+                <div>
+                    <dt>Created</dt>
+                    <dd th:text="${#temporals.format(key.createdOn, 'MMM d, yyyy')}">Jan 1, 2021</dd>
+                </div>
+                <div>
+                    <dt>Expires</dt>
+                    <dd th:text="${key.expiresOn != null ? #temporals.format(key.expiresOn, 'MMM d, yyyy') : 'Never'}">Never</dd>
+                </div>
+            </dl>
+
+            <div class="kp-row-card-actions" th:if="${mine}">
+                <th:block th:replace="fragments/keys :: listActions(${key}, true)"></th:block>
+            </div>
+        </li>
+    </ul>
+
     <nav aria-label="Key list pages" th:if="${page.totalPages > 1}">
         <ul class="pagination justify-content-center">
             <li class="page-item" th:classappend="${page.first} ? 'disabled'">
-                <a class="page-link" th:href="@{/keys(q=${q},service=${service},owner=${owner},sort=${sort},page=${page.number - 1})}">Previous</a>
+                <a class="page-link" th:href="@{/keys(q=${q},service=${service},owner=${owner},sort=${sort},showExpired=${showExpired},page=${page.number - 1})}">Previous</a>
             </li>
             <li class="page-item" th:each="i : ${#numbers.sequence(0, page.totalPages - 1)}"
                 th:classappend="${i == page.number} ? 'active'">
-                <a class="page-link" th:href="@{/keys(q=${q},service=${service},owner=${owner},sort=${sort},page=${i})}"
+                <a class="page-link" th:href="@{/keys(q=${q},service=${service},owner=${owner},sort=${sort},showExpired=${showExpired},page=${i})}"
                    th:text="${i + 1}">1</a>
             </li>
             <li class="page-item" th:classappend="${page.last} ? 'disabled'">
-                <a class="page-link" th:href="@{/keys(q=${q},service=${service},owner=${owner},sort=${sort},page=${page.number + 1})}">Next</a>
+                <a class="page-link" th:href="@{/keys(q=${q},service=${service},owner=${owner},sort=${sort},showExpired=${showExpired},page=${page.number + 1})}">Next</a>
             </li>
         </ul>
     </nav>

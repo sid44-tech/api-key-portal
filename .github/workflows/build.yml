@@ -3,6 +3,7 @@ name: Build
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
 
@@ -28,3 +29,152 @@ jobs:
         with:
           name: jacoco-report
           path: target/site/jacoco/
+
+      - name: Upload jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-key-portal-jar
+          path: target/api-key-portal-*.jar
+
+  # Two images from the same source: the plain one, which is the app on its own
+  # and expects a database to point at, and the all-in-one, which carries
+  # PostgreSQL with it. On a pull request they are built but not pushed - enough
+  # to know the Dockerfiles still work without publishing from an untrusted fork.
+  images:
+    runs-on: ubuntu-latest
+    needs: build
+
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: standalone
+            dockerfile: Dockerfile
+            suffix: ''
+          - name: all-in-one
+            dockerfile: Dockerfile.allinone
+            suffix: '-allinone'
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Sign in to the GitHub container registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Tags: "main" for the branch, "v1.2.3" and "1.2" for a release tag, and
+      # "latest" only for a release - so pulling :latest never lands somebody on
+      # whatever was merged an hour ago. Each gets the variant's suffix, so the
+      # all-in-one image is :latest-allinone, :v1.2.3-allinone and so on.
+      - name: Work out the tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          flavor: |
+            latest=false
+            suffix=${{ matrix.suffix }},onlatest=true
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+          labels: |
+            org.opencontainers.image.title=API Key Portal (${{ matrix.name }})
+            org.opencontainers.image.description=Self-hosted portal for managing API keys and secrets
+
+      - name: Build the ${{ matrix.name }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          # amd64 only: both images build the app from source, and doing that
+          # under emulation for a second architecture costs far more than it is
+          # worth here. Build locally from the Dockerfile for anything else.
+          platforms: linux/amd64
+          # Into the local daemon first, so the image can be run before anybody
+          # else is offered it. The push below is the same build, from cache.
+          load: true
+          tags: api-key-portal:ci
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+      # An image that builds is not the same as an image that runs. This starts
+      # the thing and asks it for a page, which for the all-in-one means the
+      # database came up, Flyway migrated it, Hibernate's schema validation
+      # passed against PostgreSQL and the first admin account was seeded - none
+      # of which the test suite covers, since it runs against SQLite.
+      - name: Smoke test the ${{ matrix.name }} image
+        run: |
+          set -euo pipefail
+
+          if [ "${{ matrix.name }}" = "all-in-one" ]; then
+            # Deliberately no configuration at all: "ready to run" is the claim
+            # this image makes, and this is the test of it.
+            docker run -d --name portal-smoke -p 8080:8080 api-key-portal:ci
+          else
+            docker run -d --name portal-smoke -p 8080:8080 \
+              -e PORTAL_ENCRYPTION_KEY="$(head -c 32 /dev/urandom | base64)" \
+              api-key-portal:ci
+          fi
+
+          wait_for_portal() {
+            local waited=0
+            until curl -fsS http://localhost:8080/login -o /tmp/login.html; do
+              if ! docker ps --filter name=portal-smoke --filter status=running --quiet | grep -q .; then
+                echo "The container stopped before it served a page."
+                return 1
+              fi
+              if [ "$waited" -ge 180 ]; then
+                echo "No page after ${waited}s."
+                return 1
+              fi
+              sleep 3
+              waited=$((waited + 3))
+            done
+            grep -q "Sign in to API Key Portal" /tmp/login.html
+            echo "The portal answered after ${waited}s."
+          }
+
+          wait_for_portal
+
+          # The second start is the branch that reuses an existing database
+          # rather than creating one, and it is the one every restart after
+          # today will take.
+          # -t 60 so the shutdown is the orderly one, not a SIGKILL partway
+          # through it, which is also what proves the stop path works at all.
+          docker restart -t 60 portal-smoke
+          wait_for_portal
+
+      - name: Show the container log if the smoke test failed
+        if: failure()
+        run: docker logs portal-smoke || true
+
+      - name: Stop the smoke test container
+        if: always()
+        run: docker rm --force portal-smoke || true
+
+      - name: Push the ${{ matrix.name }} image
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.name }}

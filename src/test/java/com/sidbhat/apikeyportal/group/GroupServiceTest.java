@@ -18,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.sidbhat.apikeyportal.activity.ActivityService;
+import com.sidbhat.apikeyportal.logging.AuditLog;
 import com.sidbhat.apikeyportal.integration.ServiceIntegrationRepository;
 import com.sidbhat.apikeyportal.invite.UserInvitationRepository;
 import com.sidbhat.apikeyportal.key.ApiKeyRepository;
@@ -48,11 +49,14 @@ class GroupServiceTest {
     @Mock
     private ActivityService activity;
 
+    @Mock
+    private AuditLog audit;
+
     private GroupService service;
 
     @BeforeEach
     void setUp() {
-        service = new GroupService(groups, accounts, keys, integrations, invitations, activity);
+        service = new GroupService(groups, accounts, keys, integrations, invitations, activity, audit);
     }
 
     @Test
@@ -79,7 +83,7 @@ class GroupServiceTest {
         when(keys.countByGroup_Id(2L)).thenReturn(0L);
         when(integrations.countByGroup_Id(2L)).thenReturn(0L);
 
-        service.delete(2L);
+        service.delete(2L, TestUsers.superAdmin());
 
         verify(groups).delete(group);
     }
@@ -89,7 +93,7 @@ class GroupServiceTest {
         when(groups.findById(2L)).thenReturn(Optional.of(TestUsers.platformTeam()));
         when(accounts.countByGroup_Id(2L)).thenReturn(3L);
 
-        assertThatThrownBy(() -> service.delete(2L))
+        assertThatThrownBy(() -> service.delete(2L, TestUsers.superAdmin()))
                 .isInstanceOf(GroupNotEmptyException.class)
                 .hasMessageContaining("3 members");
         verify(groups, never()).delete(any());
@@ -102,7 +106,7 @@ class GroupServiceTest {
         when(accounts.countByGroup_Id(2L)).thenReturn(0L);
         when(keys.countByGroup_Id(2L)).thenReturn(1L);
 
-        assertThatThrownBy(() -> service.delete(2L))
+        assertThatThrownBy(() -> service.delete(2L, TestUsers.superAdmin()))
                 .isInstanceOf(GroupNotEmptyException.class)
                 .hasMessageContaining("1 key");
         verify(groups, never()).delete(any());
@@ -115,7 +119,7 @@ class GroupServiceTest {
         when(keys.countByGroup_Id(2L)).thenReturn(0L);
         when(integrations.countByGroup_Id(2L)).thenReturn(2L);
 
-        assertThatThrownBy(() -> service.delete(2L))
+        assertThatThrownBy(() -> service.delete(2L, TestUsers.superAdmin()))
                 .isInstanceOf(GroupNotEmptyException.class)
                 .hasMessageContaining("2 integrations");
     }
@@ -129,7 +133,7 @@ class GroupServiceTest {
         when(integrations.countByGroup_Id(2L)).thenReturn(0L);
         when(invitations.countPendingInGroup(eq(2L), any())).thenReturn(1L);
 
-        assertThatThrownBy(() -> service.delete(2L))
+        assertThatThrownBy(() -> service.delete(2L, TestUsers.superAdmin()))
                 .isInstanceOf(GroupNotEmptyException.class)
                 .hasMessageContaining("1 pending invitation");
         verify(groups, never()).delete(any());
@@ -139,7 +143,7 @@ class GroupServiceTest {
     void deletingAGroupThatIsNotThereIsANotFound() {
         when(groups.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.delete(99L)).isInstanceOf(GroupNotFoundException.class);
+        assertThatThrownBy(() -> service.delete(99L, TestUsers.superAdmin())).isInstanceOf(GroupNotFoundException.class);
     }
 
     @Test

@@ -26,4 +26,9 @@ public record KeyOrigin(KeySource source, String detail) {
     public static KeyOrigin guidedBy(String providerLabel) {
         return new KeyOrigin(KeySource.GUIDED, providerLabel);
     }
+
+    /** @param integrationName the integration the replacement was minted through */
+    public static KeyOrigin rotatedBy(String integrationName) {
+        return new KeyOrigin(KeySource.ROTATED, integrationName);
+    }
 }

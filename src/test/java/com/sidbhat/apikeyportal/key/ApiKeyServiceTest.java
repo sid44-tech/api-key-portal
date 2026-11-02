@@ -3,8 +3,10 @@ package com.sidbhat.apikeyportal.key;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
@@ -13,11 +15,13 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 
 import com.sidbhat.apikeyportal.activity.KeyOrigin;
+import com.sidbhat.apikeyportal.activity.RevealMethod;
 import com.sidbhat.apikeyportal.activity.ActivityService;
 import com.sidbhat.apikeyportal.user.TestUsers;
 import com.sidbhat.apikeyportal.user.UserAccount;
@@ -100,14 +104,62 @@ class ApiKeyServiceTest {
     void onlyTheOwnerCanRevealTheValue() {
         when(repository.findById(1L)).thenReturn(Optional.of(alexKey("ghp_secret")));
 
-        assertThat(service.revealValue(1L, alex)).isEqualTo("ghp_secret");
+        assertThat(service.revealValue(1L, alex, RevealMethod.SHOWN)).isEqualTo("ghp_secret");
+    }
+
+    @Test
+    void revealingAValueIsBothMarkedOnTheKeyAndRecordedInTheHistory() {
+        ApiKey key = alexKey("ghp_secret");
+        when(repository.findById(1L)).thenReturn(Optional.of(key));
+
+        service.revealValue(1L, alex, RevealMethod.COPIED);
+
+        verify(repository).markRevealed(eq(1L), any());
+        verify(activity).recordKeyRevealed(alex, key.getId(), "GitHub", "Deploy", RevealMethod.COPIED);
+    }
+
+    @Test
+    void aRefusedRevealIsNotRecordedAsOne() {
+        when(repository.findById(1L)).thenReturn(Optional.of(alexKey("ghp_secret")));
+
+        assertThatThrownBy(() -> service.revealValue(1L, sam, RevealMethod.SHOWN))
+                .isInstanceOf(AccessDeniedException.class);
+
+        verifyNoInteractions(activity);
+    }
+
+    @Test
+    void anEditRecordsTheFieldsThatChangedAndNotTheNewValue() {
+        ApiKey key = alexKey("ghp_old");
+        when(repository.findById(1L)).thenReturn(Optional.of(key));
+
+        service.update(1L, new ApiKeyDetails("Deploy", "GitHub", "ghp_new",
+                key.getCreatedOn(), LocalDate.of(2027, 1, 1), "A note"), alex);
+
+        ArgumentCaptor<String> changes = ArgumentCaptor.forClass(String.class);
+        verify(activity).recordKeyUpdated(eq(alex), any(), eq("GitHub"), eq("Deploy"), changes.capture());
+        assertThat(changes.getValue()).isEqualTo("Changed value, expiry date, notes");
+        assertThat(changes.getValue()).doesNotContain("ghp_new");
+    }
+
+    @Test
+    void anEditThatChangesNothingRecordsNothing() {
+        ApiKey key = alexKey("ghp_old");
+        when(repository.findById(1L)).thenReturn(Optional.of(key));
+
+        // a blank value means "keep the current one", so this is the form as it loaded
+        service.update(1L, new ApiKeyDetails("Deploy", "GitHub", "  ",
+                key.getCreatedOn(), null, null), alex);
+
+        verifyNoInteractions(activity);
     }
 
     @Test
     void groupMembersCannotRevealTheValue() {
         when(repository.findById(1L)).thenReturn(Optional.of(alexKey("ghp_secret")));
 
-        assertThatThrownBy(() -> service.revealValue(1L, sam)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> service.revealValue(1L, sam, RevealMethod.SHOWN))
+                .isInstanceOf(AccessDeniedException.class);
         verify(repository, never()).markRevealed(any(), any());
     }
 
@@ -115,7 +167,7 @@ class ApiKeyServiceTest {
     void notEvenASuperAdminCanRevealSomeoneElsesValue() {
         when(repository.findById(1L)).thenReturn(Optional.of(alexKey("ghp_secret")));
 
-        assertThatThrownBy(() -> service.revealValue(1L, TestUsers.superAdmin()))
+        assertThatThrownBy(() -> service.revealValue(1L, TestUsers.superAdmin(), RevealMethod.SHOWN))
                 .isInstanceOf(AccessDeniedException.class);
     }
 

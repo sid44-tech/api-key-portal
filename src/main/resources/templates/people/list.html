@@ -34,7 +34,9 @@
         </a>
     </div>
 
-    <div class="card kp-table-card" th:unless="${#lists.size(people) == 1}">
+    <!-- The same people twice: a table where there is room for its columns,
+         cards below "lg" where it would scroll sideways instead -->
+    <div class="card kp-table-card d-none d-lg-flex" th:unless="${#lists.size(people) == 1}">
         <div class="table-responsive">
             <table class="table table-hover align-middle">
                 <thead>
@@ -72,6 +74,44 @@
             </table>
         </div>
     </div>
+
+    <ul class="kp-row-cards d-lg-none" th:unless="${#lists.size(people) == 1}">
+        <li th:each="person : ${people}" class="kp-row-card"
+            th:classappend="${!person.enabled} ? 'is-quiet'">
+            <div class="kp-row-card-head">
+                <div class="kp-row-card-title">
+                    <a th:href="@{/people/{id}(id=${person.id})}" th:text="${person.displayName}">Alex Carter</a>
+                    <span class="pill pill-neutral" th:if="${person.id == currentUser.id}">You</span>
+                    <span class="pill pill-neutral" th:unless="${person.enabled}">Disabled</span>
+                    <div class="kp-row-card-subtitle">
+                        <span th:text="${person.email}">alex@example.com</span>
+                        <th:block th:if="${person.jobTitle != null}"> · <span th:text="${person.jobTitle}">Backend engineer</span></th:block>
+                    </div>
+                </div>
+                <span th:replace="fragments/badges :: role(${person.role})"></span>
+            </div>
+
+            <dl class="kp-row-card-meta">
+                <div th:if="${currentUser.superAdmin}">
+                    <dt>Group</dt>
+                    <dd th:text="${person.group != null ? person.group.name : '-'}">Platform team</dd>
+                </div>
+                <div>
+                    <dt>Keys</dt>
+                    <dd>
+                        <a th:href="@{/keys(owner=${person.id})}"
+                           th:text="${keyCounts.getOrDefault(person.id, 0)}">0</a>
+                    </dd>
+                </div>
+                <div>
+                    <dt>Last signed in</dt>
+                    <dd th:text="${person.lastLoginAt != null ? #temporals.format(person.lastLoginAt, 'MMM d, yyyy') : 'Never'}">
+                        Never
+                    </dd>
+                </div>
+            </dl>
+        </li>
+    </ul>
 </div>
 </body>
 </html>

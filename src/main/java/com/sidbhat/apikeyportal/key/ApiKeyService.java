@@ -2,8 +2,11 @@ package com.sidbhat.apikeyportal.key;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -17,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.sidbhat.apikeyportal.activity.ActivityService;
 import com.sidbhat.apikeyportal.activity.KeyOrigin;
+import com.sidbhat.apikeyportal.activity.RevealMethod;
 import com.sidbhat.apikeyportal.user.UserAccount;
 
 /**
@@ -52,14 +56,36 @@ public class ApiKeyService {
      * @param page zero-based page number
      */
     public Page<ApiKey> search(UserAccount viewer, String text, String serviceName, Long ownerId, ApiKeySort sort,
-            int page) {
+            boolean showExpired, int page) {
         // ordering is applied by the specification, so the PageRequest stays unsorted
         return repository.findAll(Specification.allOf(ApiKeySpecifications.visibleTo(viewer),
                         ApiKeySpecifications.textContains(text),
                         ApiKeySpecifications.serviceIs(serviceName),
                         ApiKeySpecifications.ownedBy(ownerId),
+                        ApiKeySpecifications.expiredHidden(showExpired, LocalDate.now()),
                         ApiKeySpecifications.orderBy(sort != null ? sort : ApiKeySort.SERVICE)),
                 PageRequest.of(Math.max(page, 0), PAGE_SIZE));
+    }
+
+    /**
+     * The replacements already minted for any of {@code keys}, by the id of the key
+     * they replace. The list page uses this to point an expiring key at its
+     * successor without a query per row.
+     */
+    public Map<Long, ApiKey> findReplacements(List<ApiKey> keys) {
+        List<Long> ids = keys.stream().map(ApiKey::getId).filter(Objects::nonNull).toList();
+        if (ids.isEmpty()) {
+            // Collections.emptyMap, not Map.of: the template asks it about ids
+            // that can be null, which Map.of refuses on principle
+            return Collections.emptyMap();
+        }
+        return repository.findByRotatedFromKeyIdIn(ids).stream()
+                .collect(Collectors.toMap(ApiKey::getRotatedFromKeyId, replacement -> replacement));
+    }
+
+    /** The replacement minted for this key, if any - for the key's own page. */
+    public ApiKey findReplacement(Long keyId) {
+        return repository.findByRotatedFromKeyId(keyId).orElse(null);
     }
 
     /**
@@ -96,14 +122,22 @@ public class ApiKeyService {
     /**
      * Returns the decrypted value of a key and records that it was revealed. Only the
      * owner can do this - being a group admin, or even a super admin, is not enough.
+     * <p>
+     * Recorded twice over, on purpose: "last revealed" on the key answers "is this
+     * value still only ever been seen by its owner, and when did they last need
+     * it", while the history keeps every reveal separately so an audit can show
+     * who took a value out of the portal, when, and whether it went to their
+     * clipboard. The second question is the one that matters after a leak, and the
+     * date on the key cannot answer it.
      *
      * @throws AccessDeniedException if {@code viewer} doesn't own the key
      */
     @Transactional
-    public String revealValue(Long id, UserAccount viewer) {
+    public String revealValue(Long id, UserAccount viewer, RevealMethod method) {
         ApiKey key = requireOwnership(id, viewer, "reveal");
         repository.markRevealed(id, Instant.now());
-        log.info("Value of {} revealed by {}", key, viewer.getEmail());
+        activity.recordKeyRevealed(viewer, key.getId(), key.getServiceName(), key.getName(), method);
+        log.info("Value of {} revealed by {} ({})", key, viewer.getEmail(), method);
         return key.getKeyValue();
     }
 
@@ -117,32 +151,109 @@ public class ApiKeyService {
      */
     @Transactional
     public ApiKey create(ApiKeyDetails details, UserAccount owner, KeyOrigin origin) {
+        return create(details, owner, origin, KeyProvenance.none());
+    }
+
+    /**
+     * As {@link #create(ApiKeyDetails, UserAccount, KeyOrigin)}, for keys with a
+     * provider behind them: the provenance makes the key rotatable later, and for
+     * a rotation carries the link back to the key being replaced.
+     */
+    @Transactional
+    public ApiKey create(ApiKeyDetails details, UserAccount owner, KeyOrigin origin, KeyProvenance provenance) {
         ApiKey newKey = new ApiKey(details.getName().trim(), details.getServiceName().trim(),
                 details.getKeyValue().trim(),
                 details.getCreatedOn() != null ? details.getCreatedOn() : LocalDate.now(),
                 details.getExpiresOn());
         newKey.setNotes(trimToNull(details.getNotes()));
-        newKey.assignTo(owner, owner.getGroup());
+        newKey.assignTo(owner, provenance.group() != null ? provenance.group() : owner.getGroup());
+        newKey.recordProvenance(provenance.integrationId(), provenance.providerResourceId(),
+                provenance.autoRotate(), provenance.rotatedFromKeyId());
         ApiKey key = repository.save(newKey);
         activity.recordKeyCreated(owner, key.getId(), key.getServiceName(), key.getName(), origin);
         log.info("Created {} for {} ({})", key, owner.getEmail(), origin.source());
         return key;
     }
 
+    /**
+     * Swaps a key's value for a freshly rotated one, keeping everything else.
+     * <p>
+     * For providers whose rotation revokes the old credential as it issues the
+     * new one (GitLab), there is nothing to hand over: the key simply holds a
+     * different value from now on. Recorded as an edit of the key, because that
+     * is exactly what it is - the owner should see it in the history.
+     *
+     * @param providerResourceId the provider's new handle for the credential,
+     *                           so the next rotation targets the right one
+     */
+    @Transactional
+    public ApiKey replaceValueInPlace(Long id, String newValue, LocalDate expiresOn,
+            String providerResourceId) {
+        ApiKey key = repository.findById(id).orElseThrow(() -> new ApiKeyNotFoundException(id));
+        key.setKeyValue(newValue);
+        key.setExpiresOn(expiresOn);
+        key.recordProvenance(key.getIntegrationId(), providerResourceId, key.getAutoRotate(),
+                key.getRotatedFromKeyId());
+        activity.recordKeyUpdated(key.getOwner(), key.getId(), key.getServiceName(), key.getName(),
+                "Token rotated automatically; the previous value was revoked by the provider");
+        log.info("Rotated the value of {} in place", key);
+        return key;
+    }
+
+    /**
+     * The owner's per-key say on automatic replacement: null returns the key to
+     * their setting for the provider, true or false pins it. Owner-only for the
+     * same reason revealing is - this decides whether new credentials get minted
+     * in a provider on their behalf.
+     */
+    @Transactional
+    public ApiKey setAutoRotate(Long id, Boolean autoRotate, UserAccount viewer) {
+        ApiKey key = requireOwnership(id, viewer, "change automatic replacement for");
+        key.setAutoRotate(autoRotate);
+        log.info("{} set automatic replacement for {} to {}", viewer.getEmail(), key,
+                autoRotate == null ? "their provider setting" : autoRotate);
+        return key;
+    }
+
+    /**
+     * Applies an edit and records what was changed in the history. Saving a form
+     * nobody touched changes nothing and records nothing, so the history stays a
+     * list of edits rather than of visits to the edit page.
+     */
     @Transactional
     public ApiKey update(Long id, ApiKeyDetails details, UserAccount viewer) {
         ApiKey key = requireOwnership(id, viewer, "edit");
-        key.setName(details.getName().trim());
-        key.setServiceName(details.getServiceName().trim());
+        String name = details.getName().trim();
+        String serviceName = details.getServiceName().trim();
         // blank means "keep the current value"
         String keyValue = trimToNull(details.getKeyValue());
+        String notes = trimToNull(details.getNotes());
+
+        List<String> changes = new ArrayList<>();
+        addIfChanged(changes, "name", key.getName(), name);
+        addIfChanged(changes, "service", key.getServiceName(), serviceName);
+        if (keyValue != null && !keyValue.equals(key.getKeyValue())) {
+            // that it changed, never to what: this goes into an audit record
+            changes.add("value");
+        }
+        addIfChanged(changes, "created date", key.getCreatedOn(), details.getCreatedOn());
+        addIfChanged(changes, "expiry date", key.getExpiresOn(), details.getExpiresOn());
+        addIfChanged(changes, "notes", key.getNotes(), notes);
+
+        key.setName(name);
+        key.setServiceName(serviceName);
         if (keyValue != null) {
             key.setKeyValue(keyValue);
         }
         key.setCreatedOn(details.getCreatedOn());
         key.setExpiresOn(details.getExpiresOn());
-        key.setNotes(trimToNull(details.getNotes()));
-        log.info("Updated {}", key);
+        key.setNotes(notes);
+
+        if (!changes.isEmpty()) {
+            activity.recordKeyUpdated(viewer, key.getId(), key.getServiceName(), key.getName(),
+                    "Changed " + String.join(", ", changes));
+            log.info("Updated {}: changed {}", key, String.join(", ", changes));
+        }
         return key;
     }
 
@@ -195,5 +306,12 @@ public class ApiKeyService {
 
     private static String trimToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    /** Notes the field by name if the edit actually changed it. */
+    private static void addIfChanged(List<String> changes, String field, Object before, Object after) {
+        if (!Objects.equals(before, after)) {
+            changes.add(field);
+        }
     }
 }

@@ -22,6 +22,13 @@ spring:
 
 server:
   port: 8080
+  # Whether X-Forwarded-For and friends are believed. Off by default, because
+  # believing a header anyone can set would let one caller spread their failed
+  # sign-ins across a thousand invented addresses. Set it to "framework" when the
+  # portal really is behind a reverse proxy that sets those headers - otherwise
+  # every request appears to come from the proxy, and one person guessing badly
+  # would lock out everybody behind it.
+  forward-headers-strategy: ${PORTAL_FORWARD_HEADERS:none}
   servlet:
     session:
       timeout: 30m
@@ -30,6 +37,38 @@ server:
       enabled: false
     include-stacktrace: never
     include-message: never
+
+logging:
+  # Every line carries the request it belongs to, who was signed in and where
+  # they called from, so a reveal, the sign-in before it and the refusal after
+  # it can be tied together. Put in the logging context by AuditContextFilter;
+  # empty for work nobody asked for, like the nightly expiry sweep.
+  pattern:
+    level: "%5p [%X{requestId:-........} %X{user:-anonymous} %X{clientIp:--}]"
+  level:
+    # The audit trail: sign-ins, reveals, key changes, refusals. Named separately
+    # from the application packages so it can be routed and kept on its own -
+    # point this logger at its own appender in a logback-spring.xml, or ship
+    # lines matching "event=" from wherever the logs already go.
+    portal.audit: INFO
+    com.sidbhat.apikeyportal: ${PORTAL_LOG_LEVEL:INFO}
+    # These print HTTP request and response bodies at DEBUG, and on this portal
+    # those bodies are key values, provider credentials and pasted secrets.
+    # Pinned at INFO so that turning the application's own logging up - or
+    # setting a DEBUG root level to chase a problem - cannot quietly start
+    # writing secrets to disk. Raise them deliberately, on a box where that is
+    # acceptable, and not for long.
+    org.springframework.web.servlet.mvc.method.annotation: INFO
+    org.springframework.http.converter: INFO
+    org.springframework.web.client: INFO
+  # Logs go to the console, which is where a container wants them. Set
+  # LOGGING_FILE_NAME=/var/lib/keyportal/logs/portal.log to also write a file;
+  # these decide how it is rolled once you do.
+  logback:
+    rollingpolicy:
+      max-file-size: ${PORTAL_LOG_MAX_SIZE:50MB}
+      max-history: ${PORTAL_LOG_MAX_HISTORY:90}
+      total-size-cap: ${PORTAL_LOG_TOTAL_SIZE:2GB}
 
 # Secrets come from environment variables or a local .env file (see .env.example).
 # The app refuses to start if they're missing.
@@ -47,6 +86,14 @@ portal:
     admin-password: ${PORTAL_ADMIN_PASSWORD:changeme}
     admin-password-hash: ${PORTAL_ADMIN_PASSWORD_HASH:${PORTAL_PASSWORD_HASH:}}
     admin-group-name: ${PORTAL_ADMIN_GROUP:Administrators}
+    lockout:
+      # Failed password sign-ins are counted per account and per calling address,
+      # and either count reaching the limit refuses further attempts for a while.
+      # The same span is the window failures are counted over, so an occasional
+      # typo never adds up to a lockout. Counters are in memory, so a restart
+      # clears them.
+      max-attempts: ${PORTAL_LOCKOUT_MAX_ATTEMPTS:5}
+      lockout-for: ${PORTAL_LOCKOUT_FOR:15m}
   invitations:
     # How long an invitation link works for, and who it comes from.
     valid-for: ${PORTAL_INVITE_VALID_FOR:24h}
@@ -61,6 +108,27 @@ portal:
     cron: ${PORTAL_EXPIRY_REMINDER_CRON:0 0 8 * * *}
     from-address: ${PORTAL_MAIL_FROM:no-reply@localhost}
     base-url: ${PORTAL_BASE_URL:http://localhost:8080}
+  rotation:
+    # Mints a replacement for an expiring key a week ahead, for owners who have
+    # switched it on - per provider on their profile, or per key on its page.
+    # Runs an hour before the reminder sweep so a replaced key's owner gets one
+    # email ("a replacement is ready") instead of that plus a plain warning.
+    # Only providers the portal can mint fresh secrets in take part (Azure AD).
+    enabled: ${PORTAL_AUTO_ROTATION:true}
+    cron: ${PORTAL_AUTO_ROTATION_CRON:0 0 7 * * *}
+    lead-days: ${PORTAL_AUTO_ROTATION_LEAD_DAYS:7}
   encryption:
     # Base64 encoded 256-bit key. Generate one with: openssl rand -base64 32
+    # This single key is all a portal that never rotates needs, and values
+    # written under it are stored exactly as they always have been.
     key: ${PORTAL_ENCRYPTION_KEY:}
+    # Rotation: name additional keys, then point active-key at the one new
+    # values should use. Every value records which key encrypted it, so the old
+    # key keeps opening old values while the portal keeps running. Finish with
+    #   java -jar api-key-portal.jar --portal.encryption.reencrypt=true
+    # and only then drop the old key from configuration.
+    #   PORTAL_ENCRYPTION_KEYS_2026A=<base64 key>
+    #   PORTAL_ENCRYPTION_ACTIVE_KEY=2026a
+    active-key: ${PORTAL_ENCRYPTION_ACTIVE_KEY:}
+    # Set by the re-encrypt command only; the portal serves no traffic when true
+    reencrypt: ${PORTAL_ENCRYPTION_REENCRYPT:false}

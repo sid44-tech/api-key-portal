@@ -20,11 +20,16 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.sidbhat.apikeyportal.activity.KeyOrigin;
 import com.sidbhat.apikeyportal.guided.AnthropicClient;
+import com.sidbhat.apikeyportal.guided.AtlassianClient;
+import com.sidbhat.apikeyportal.guided.AtlassianClient.AccountInfo;
 import com.sidbhat.apikeyportal.guided.GitHubClient;
 import com.sidbhat.apikeyportal.guided.GitHubClient.TokenInfo;
 import com.sidbhat.apikeyportal.guided.GuidedProvider;
+import com.sidbhat.apikeyportal.guided.OpenAiClient;
+import com.sidbhat.apikeyportal.guided.StripeClient;
 import com.sidbhat.apikeyportal.integration.ProvisioningException;
 import com.sidbhat.apikeyportal.key.ApiKey;
+import com.sidbhat.apikeyportal.logging.AuditLog;
 import com.sidbhat.apikeyportal.key.ApiKeyDetails;
 import com.sidbhat.apikeyportal.key.ApiKeyService;
 import com.sidbhat.apikeyportal.user.PortalUser;
@@ -44,14 +49,23 @@ public class GuidedKeyController {
     private final ApiKeyService apiKeyService;
     private final GitHubClient gitHubClient;
     private final AnthropicClient anthropicClient;
+    private final AtlassianClient atlassianClient;
+    private final OpenAiClient openAiClient;
+    private final StripeClient stripeClient;
     private final UserAccountService userService;
+    private final AuditLog audit;
 
     public GuidedKeyController(ApiKeyService apiKeyService, GitHubClient gitHubClient,
-            AnthropicClient anthropicClient, UserAccountService userService) {
+            AnthropicClient anthropicClient, AtlassianClient atlassianClient, OpenAiClient openAiClient,
+            StripeClient stripeClient, UserAccountService userService, AuditLog audit) {
         this.apiKeyService = apiKeyService;
         this.gitHubClient = gitHubClient;
         this.anthropicClient = anthropicClient;
+        this.atlassianClient = atlassianClient;
+        this.openAiClient = openAiClient;
+        this.stripeClient = stripeClient;
         this.userService = userService;
+        this.audit = audit;
     }
 
     @GetMapping("/{provider}")
@@ -74,16 +88,31 @@ public class GuidedKeyController {
         if (bindingResult.hasErrors()) {
             return template(provider);
         }
+        // the email half is only asked for where the token is useless without it
+        if (provider == GuidedProvider.ATLASSIAN && !StringUtils.hasText(form.getAccountEmail())) {
+            bindingResult.rejectValue("accountEmail", "guided.email.required",
+                    "must be filled in - an Atlassian token only works together with its account email");
+            return template(provider);
+        }
         UserAccount me = userService.getCurrent(principal);
         try {
             ApiKey key = switch (provider) {
                 case GITHUB -> storeGitHub(form, me);
                 case ANTHROPIC -> storeAnthropic(form, me);
+                case ATLASSIAN -> storeAtlassian(form, me);
+                case OPENAI -> storeOpenAi(form, me);
+                case STRIPE -> storeStripe(form, me);
             };
             redirectAttributes.addFlashAttribute("success", "Verified the " + provider.getLabel() + " "
                     + provider.getCredentialName().toLowerCase() + " and stored it encrypted.");
             return "redirect:/keys/" + key.getId();
         } catch (ProvisioningException e) {
+            // The key the person pasted was rejected by the provider. Worth
+            // recording: a run of these is somebody pasting the wrong thing, or
+            // a provider that has stopped answering, and neither shows up
+            // anywhere else - a key that fails verification is never stored, so
+            // it leaves no history entry behind.
+            audit.refused("guided_key_verification", me.getEmail(), provider.getLabel(), e.getMessage());
             bindingResult.reject("guided.verify.failed", e.getMessage());
             return template(provider);
         }
@@ -98,11 +127,77 @@ public class GuidedKeyController {
                 owner, KeyOrigin.guidedBy(GuidedProvider.GITHUB.getLabel()));
     }
 
+    private ApiKey storeOpenAi(GuidedKeyForm form, UserAccount owner) {
+        openAiClient.verifyKey(form.getKeyValue().trim());
+        return apiKeyService.create(new ApiKeyDetails(form.getName(), GuidedProvider.OPENAI.getServiceName(),
+                form.getKeyValue(), LocalDate.now(), form.getExpiresOn(), form.getNotes()),
+                owner, KeyOrigin.guidedBy(GuidedProvider.OPENAI.getLabel()));
+    }
+
+    private ApiKey storeStripe(GuidedKeyForm form, UserAccount owner) {
+        StripeClient.AccountInfo account = stripeClient.verifyKey(form.getKeyValue().trim());
+        return apiKeyService.create(new ApiKeyDetails(form.getName(), GuidedProvider.STRIPE.getServiceName(),
+                form.getKeyValue(), LocalDate.now(), form.getExpiresOn(),
+                stripeNotes(form.getNotes(), account)),
+                owner, KeyOrigin.guidedBy(GuidedProvider.STRIPE.getLabel()));
+    }
+
+    /**
+     * Records which Stripe account the key is for and, crucially, whether it is a
+     * live key: test and live keys sit side by side in a list looking identical,
+     * and only one of them moves real money.
+     */
+    private static String stripeNotes(String userNotes, StripeClient.AccountInfo account) {
+        StringBuilder notes = new StringBuilder();
+        if (StringUtils.hasText(userNotes)) {
+            notes.append(userNotes.trim()).append("\n\n");
+        }
+        notes.append("Verified against Stripe on save.");
+        if (StringUtils.hasText(account.id())) {
+            notes.append("\nAccount: ").append(account.id());
+            if (account.businessProfile() != null && StringUtils.hasText(account.businessProfile().name())) {
+                notes.append(" (").append(account.businessProfile().name()).append(')');
+            }
+        }
+        if (account.livemode() != null) {
+            notes.append("\nMode: ").append(account.livemode() ? "LIVE - this key moves real money" : "test");
+        }
+        return notes.toString();
+    }
+
     private ApiKey storeAnthropic(GuidedKeyForm form, UserAccount owner) {
         anthropicClient.verifyKey(form.getKeyValue().trim());
         return apiKeyService.create(new ApiKeyDetails(form.getName(), GuidedProvider.ANTHROPIC.getServiceName(),
                 form.getKeyValue(), LocalDate.now(), form.getExpiresOn(), form.getNotes()),
                 owner, KeyOrigin.guidedBy(GuidedProvider.ANTHROPIC.getLabel()));
+    }
+
+    /**
+     * Stores the token alone as the value, with the account email in the notes.
+     * The email is not a secret - it is the person's own address, and it is the
+     * one thing someone holding the token still needs to use it, so it belongs
+     * where the rest of the "how do I use this" context lives.
+     */
+    private ApiKey storeAtlassian(GuidedKeyForm form, UserAccount owner) {
+        AccountInfo account = atlassianClient.verifyToken(form.getAccountEmail(),
+                form.getKeyValue().trim());
+        return apiKeyService.create(new ApiKeyDetails(form.getName(), GuidedProvider.ATLASSIAN.getServiceName(),
+                form.getKeyValue(), LocalDate.now(), form.getExpiresOn(),
+                atlassianNotes(form.getNotes(), form.getAccountEmail(), account)),
+                owner, KeyOrigin.guidedBy(GuidedProvider.ATLASSIAN.getLabel()));
+    }
+
+    private static String atlassianNotes(String userNotes, String accountEmail, AccountInfo account) {
+        StringBuilder notes = new StringBuilder();
+        if (StringUtils.hasText(userNotes)) {
+            notes.append(userNotes.trim()).append("\n\n");
+        }
+        notes.append("Verified against Atlassian on save");
+        if (StringUtils.hasText(account.name())) {
+            notes.append(" as ").append(account.name());
+        }
+        notes.append(".\nUse as HTTP Basic auth: ").append(accountEmail).append(" + this token.");
+        return notes.toString();
     }
 
     private static String gitHubNotes(String userNotes, TokenInfo info) {
@@ -134,6 +229,9 @@ public class GuidedKeyController {
         return switch (provider) {
             case GITHUB -> "keys/guided-github";
             case ANTHROPIC -> "keys/guided-anthropic";
+            case ATLASSIAN -> "keys/guided-atlassian";
+            case OPENAI -> "keys/guided-openai";
+            case STRIPE -> "keys/guided-stripe";
         };
     }
 }

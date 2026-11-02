@@ -31,6 +31,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.sidbhat.apikeyportal.group.GroupNotEmptyException;
 import com.sidbhat.apikeyportal.group.GroupService;
 import com.sidbhat.apikeyportal.group.GroupUsage;
+import com.sidbhat.apikeyportal.logging.AuditLog;
 import com.sidbhat.apikeyportal.security.SecurityConfig;
 import com.sidbhat.apikeyportal.user.GroupNameAlreadyUsedException;
 import com.sidbhat.apikeyportal.user.PortalUser;
@@ -39,7 +40,7 @@ import com.sidbhat.apikeyportal.user.TestUsers;
 import com.sidbhat.apikeyportal.user.WithPortalUser;
 
 @WebMvcTest(controllers = GroupController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, AuditLog.class})
 class GroupControllerTest {
 
     @Autowired
@@ -75,7 +76,7 @@ class GroupControllerTest {
         mvc.perform(post("/groups/2/delete").with(csrf())).andExpect(status().isForbidden());
 
         verify(groupService, never()).create(anyString(), any());
-        verify(groupService, never()).delete(any());
+        verify(groupService, never()).delete(any(), any());
     }
 
     @Test
@@ -125,14 +126,14 @@ class GroupControllerTest {
                 .andExpect(redirectedUrl("/groups"))
                 .andExpect(flash().attributeExists("success"));
 
-        verify(groupService).delete(9L);
+        verify(groupService).delete(eq(9L), any());
     }
 
     @Test
     @WithPortalUser("superadmin")
     void saysWhatIsInTheWayWhenTheGroupIsNotEmpty() throws Exception {
         doThrow(new GroupNotEmptyException(new GroupUsage(TestUsers.platformTeam(), 2, 5, 0, 0)))
-                .when(groupService).delete(2L);
+                .when(groupService).delete(eq(2L), any());
 
         mvc.perform(post("/groups/2/delete").with(csrf()))
                 .andExpect(redirectedUrl("/groups"))
@@ -147,6 +148,6 @@ class GroupControllerTest {
         mvc.perform(post("/groups/9/delete")).andExpect(status().isForbidden());
 
         verify(groupService, never()).create(anyString(), any());
-        verify(groupService, never()).delete(any());
+        verify(groupService, never()).delete(any(), any());
     }
 }

@@ -52,15 +52,24 @@
             <div class="card border-primary-subtle h-100">
                 <div class="card-body">
                     <h2 class="h6"><i class="bi bi-signpost me-1" aria-hidden="true"></i>
-                        Adding a GitHub token or Anthropic API key?</h2>
+                        Adding a GitHub, Anthropic, Atlassian, OpenAI or Stripe key?</h2>
                     <p class="text-muted small mb-2">Those can only be created in the provider's own console.
                         A guided walk-through covers the steps, then the portal verifies the key against the
                         provider before storing it.</p>
-                    <a th:href="@{/keys/guided/github}" class="btn btn-outline-primary btn-sm me-1">
+                    <a th:href="@{/keys/guided/github}" class="btn btn-outline-primary btn-sm me-1 mb-1">
                         <i class="bi bi-github me-1" aria-hidden="true"></i> GitHub token
                     </a>
-                    <a th:href="@{/keys/guided/anthropic}" class="btn btn-outline-primary btn-sm">
-                        <i class="bi bi-robot me-1" aria-hidden="true"></i> Anthropic API key
+                    <a th:href="@{/keys/guided/anthropic}" class="btn btn-outline-primary btn-sm me-1 mb-1">
+                        <i class="bi bi-robot me-1" aria-hidden="true"></i> Anthropic (Claude) API key
+                    </a>
+                    <a th:href="@{/keys/guided/atlassian}" class="btn btn-outline-primary btn-sm me-1 mb-1">
+                        <i class="bi bi-kanban-fill me-1" aria-hidden="true"></i> Atlassian API token
+                    </a>
+                    <a th:href="@{/keys/guided/openai}" class="btn btn-outline-primary btn-sm me-1 mb-1">
+                        <i class="bi bi-openai me-1" aria-hidden="true"></i> OpenAI API key
+                    </a>
+                    <a th:href="@{/keys/guided/stripe}" class="btn btn-outline-primary btn-sm mb-1">
+                        <i class="bi bi-stripe me-1" aria-hidden="true"></i> Stripe API key
                     </a>
                 </div>
             </div>

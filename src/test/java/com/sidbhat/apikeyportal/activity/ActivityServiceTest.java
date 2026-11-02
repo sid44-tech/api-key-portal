@@ -18,6 +18,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 
+import com.sidbhat.apikeyportal.logging.AuditLog;
 import com.sidbhat.apikeyportal.user.TestUsers;
 import com.sidbhat.apikeyportal.user.UserAccount;
 
@@ -27,13 +28,16 @@ class ActivityServiceTest {
     @Mock
     private ActivityEventRepository repository;
 
+    @Mock
+    private AuditLog audit;
+
     private ActivityService service;
 
     private final Pageable firstPage = PageRequest.of(0, 20);
 
     @BeforeEach
     void setUp() {
-        service = new ActivityService(repository);
+        service = new ActivityService(repository, audit);
     }
 
     private ActivityEvent recorded() {
@@ -81,6 +85,50 @@ class ActivityServiceTest {
         ActivityEvent event = recorded();
         assertThat(event.getGroupId()).isEqualTo(TestUsers.platformTeam().getId());
         assertThat(event.getGroupName()).isEqualTo("Platform team");
+    }
+
+    @Test
+    void aRevealRecordsWhoSawTheValueAndHowTheyTookIt() {
+        stubSave();
+
+        service.recordKeyRevealed(TestUsers.alex(), 42L, "GitHub", "CI token", RevealMethod.COPIED);
+
+        ActivityEvent event = recorded();
+        assertThat(event.getAction()).isEqualTo(ActivityAction.KEY_REVEALED);
+        assertThat(event.getActorEmail()).isEqualTo("alex@example.com");
+        assertThat(event.getTargetName()).isEqualTo("GitHub / CI token");
+        assertThat(event.getDetail()).isEqualTo("Copied to the clipboard");
+        // a reveal is of an existing key, so the history can still link to it
+        assertThat(event.isKeyEvent()).isTrue();
+    }
+
+    @Test
+    void anEditRecordsWhatChanged() {
+        stubSave();
+
+        service.recordKeyUpdated(TestUsers.alex(), 42L, "GitHub", "CI token", "Changed value, expiry date");
+
+        ActivityEvent event = recorded();
+        assertThat(event.getAction()).isEqualTo(ActivityAction.KEY_UPDATED);
+        assertThat(event.getDetail()).isEqualTo("Changed value, expiry date");
+        assertThat(event.isKeyEvent()).isTrue();
+    }
+
+    @Test
+    void aDeletedKeyIsNotLinkedToBecauseItIsGone() {
+        stubSave();
+
+        service.recordKeyDeleted(TestUsers.alex(), 42L, "GitHub", "CI token");
+
+        assertThat(recorded().isKeyEvent()).isFalse();
+    }
+
+    @Test
+    void anUnreadableRevealHintIsTakenAsAPlainReveal() {
+        // an old page still open, or somebody calling the endpoint by hand
+        assertThat(RevealMethod.fromParameter(null)).isEqualTo(RevealMethod.SHOWN);
+        assertThat(RevealMethod.fromParameter("nonsense")).isEqualTo(RevealMethod.SHOWN);
+        assertThat(RevealMethod.fromParameter(" Copied ")).isEqualTo(RevealMethod.COPIED);
     }
 
     @Test

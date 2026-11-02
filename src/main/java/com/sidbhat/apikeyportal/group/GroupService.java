@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.sidbhat.apikeyportal.activity.ActivityAction;
 import com.sidbhat.apikeyportal.activity.ActivityService;
+import com.sidbhat.apikeyportal.logging.AuditLog;
 import com.sidbhat.apikeyportal.integration.ServiceIntegrationRepository;
 import com.sidbhat.apikeyportal.invite.UserInvitationRepository;
 import com.sidbhat.apikeyportal.key.ApiKeyRepository;
@@ -39,16 +40,18 @@ public class GroupService {
     private final ServiceIntegrationRepository integrations;
     private final UserInvitationRepository invitations;
     private final ActivityService activity;
+    private final AuditLog audit;
 
     public GroupService(UserGroupRepository groups, UserAccountRepository accounts, ApiKeyRepository keys,
             ServiceIntegrationRepository integrations, UserInvitationRepository invitations,
-            ActivityService activity) {
+            ActivityService activity, AuditLog audit) {
         this.groups = groups;
         this.accounts = accounts;
         this.keys = keys;
         this.integrations = integrations;
         this.invitations = invitations;
         this.activity = activity;
+        this.audit = audit;
     }
 
     /** Every group with what it currently holds, for the groups page. */
@@ -86,10 +89,11 @@ public class GroupService {
      * first: deleting a group out from under a key would leave it visible to
      * nobody, which looks exactly like the portal having lost it.
      *
+     * @param actor who is deleting it, for the audit trail
      * @throws GroupNotEmptyException if accounts, keys or integrations still belong to it
      */
     @Transactional
-    public void delete(Long id) {
+    public void delete(Long id, UserAccount actor) {
         UserGroup group = groups.findById(id).orElseThrow(() -> new GroupNotFoundException(id));
         GroupUsage usage = new GroupUsage(group, accounts.countByGroup_Id(id), keys.countByGroup_Id(id),
                 integrations.countByGroup_Id(id), invitations.countPendingInGroup(id, Instant.now()));
@@ -97,7 +101,10 @@ public class GroupService {
             throw new GroupNotEmptyException(usage);
         }
         groups.delete(group);
-        log.info("Deleted {}", group);
+        // Only the audit log, not the history page: the history belongs to a
+        // group, so a GROUP_DELETED row would be filed under a group that no
+        // longer exists and only a super admin could ever read it.
+        audit.allowed("group_deleted", actor.getEmail(), group.getName(), null);
     }
 
     /** Turns {@code [groupId, count]} rows into a map, as the repositories return them. */

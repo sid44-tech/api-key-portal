@@ -1,0 +1,78 @@
+# syntax=docker/dockerfile:1
+#
+# The portal and its database as one image: start it, open a browser, sign in.
+#
+# The plain Dockerfile next to this one is still the way to run the portal as an
+# ordinary Spring Boot app against a database you manage. This one is for the
+# case where there is no database to point at and nobody who wants to set one
+# up - a single container with PostgreSQL inside it, one volume to back up, and
+# nothing to configure before the first sign-in.
+#
+#   docker build -f Dockerfile.allinone -t api-key-portal:allinone .
+#   docker run -p 8080:8080 -v keyportal-data:/var/lib/keyportal api-key-portal:allinone
+
+FROM eclipse-temurin:25-jdk AS build
+WORKDIR /workspace
+
+# Resolve dependencies in their own layer so source changes don't re-download them
+COPY mvnw .
+COPY .mvn .mvn
+COPY pom.xml .
+RUN ./mvnw -B dependency:go-offline
+
+COPY src src
+RUN ./mvnw -B package -DskipTests
+
+
+# PostgreSQL is the base rather than an addition: its image carries the initdb,
+# ownership and first-run machinery that is the awkward half of running a
+# database in a container, and borrowing that is a great deal less work than
+# re-creating it on top of a JRE. The JRE is the easy half - it is a directory.
+#
+# Both tags are pinned to a distribution on purpose. Lifting a JRE out of one
+# image into another only works while the glibc it was built against is no newer
+# than the one it lands on: Debian trixie (2.41) is comfortably ahead of Ubuntu
+# noble (2.39), so this pairing holds. Floating either tag could quietly reverse
+# that and the only symptom would be a JVM that refuses to start.
+FROM postgres:18-trixie
+
+COPY --from=eclipse-temurin:25-jre-noble /opt/java/openjdk /opt/java/openjdk
+ENV JAVA_HOME=/opt/java/openjdk
+ENV PATH="$JAVA_HOME/bin:$PATH"
+
+# The portal runs as its own unprivileged user, separate from the one running
+# the database: the two share a container, not an account.
+RUN groupadd --system portal && useradd --system --gid portal --no-create-home portal
+
+COPY --from=build /workspace/target/api-key-portal-*.jar /app/app.jar
+COPY docker/allinone/entrypoint.sh /usr/local/bin/keyportal-entrypoint.sh
+RUN chmod 755 /usr/local/bin/keyportal-entrypoint.sh
+
+# The database, the generated database password and the generated encryption key
+# all live here. Mount a volume on it to keep them; see the entrypoint.
+ENV PORTAL_DATA_DIR=/var/lib/keyportal
+RUN mkdir -p /var/lib/keyportal
+
+EXPOSE 8080
+
+# The PostgreSQL image sets STOPSIGNAL SIGINT for its own benefit; here the
+# entrypoint is what gets signalled, and it stops the two processes in order.
+# It handles either signal, but saying which keeps the inherited one from
+# looking like a decision somebody made about this image.
+#
+# Shutting down in order takes longer than Docker's ten second default allows,
+# so give it room: `docker run --stop-timeout 60`, or stop_grace_period in
+# Compose. Cut short, the database is killed rather than asked to flush.
+STOPSIGNAL SIGTERM
+
+# Up means "the portal answers", not "the container is running". A database that
+# never came up leaves the portal unable to serve a page, and that should show.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
+    CMD bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080' || exit 1
+
+# Starts as root to prepare the data directory, then drops to postgres and
+# portal. Neither process runs as root.
+ENTRYPOINT ["/usr/local/bin/keyportal-entrypoint.sh"]
+# Clears the "postgres" the base image leaves behind, which would otherwise
+# arrive as a stray argument to the entrypoint above
+CMD []

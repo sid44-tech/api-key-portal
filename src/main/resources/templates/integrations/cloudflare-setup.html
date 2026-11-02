@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Connect Cloudflare</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a th:href="@{/integrations}">Integrations</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Connect Cloudflare</li>
+                </ol>
+            </nav>
+
+            <h1 class="mb-2"><i class="bi bi-cloud-fill me-2" aria-hidden="true"></i>Connect Cloudflare</h1>
+            <p class="text-muted mb-4">
+                A one-time setup, done in about five minutes. Cloudflare token permissions are too rich to
+                rebuild as a form here, so the portal doesn't try: you craft <strong>one template token</strong>
+                in Cloudflare's own editor, and every token the portal mints is a copy of that template's
+                permissions with its own name and expiry.
+            </p>
+
+            <form th:action="@{/integrations/cloudflare}" th:object="${form}" method="post" novalidate>
+
+                <div class="alert alert-danger d-flex align-items-start" th:if="${#fields.hasGlobalErrors()}">
+                    <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>
+                    <div>
+                        <strong>Cloudflare did not accept the connection.</strong>
+                        <div th:each="err : ${#fields.globalErrors()}" th:text="${err}">Error</div>
+                    </div>
+                </div>
+
+                <!-- Step 1 -->
+                <div class="card mb-3 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">1</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Create the portal's own API token</h2>
+                            <p>This is the token the portal acts with. It can mint and read tokens, and do
+                                nothing else — not touch zones, DNS or anything behind them.</p>
+                            <ol class="mb-3">
+                                <li>Open <strong>My Profile → API Tokens → Create Token</strong>.</li>
+                                <li>Scroll to <em>Create Custom Token</em>, name it <code>api-key-portal</code>.</li>
+                                <li>Give it exactly one permission:
+                                    <strong>User → API Tokens → Edit</strong>.</li>
+                                <li>Create it, copy the value — Cloudflare shows it only once — and paste it below.</li>
+                            </ol>
+                            <div class="mb-2 col-md-6">
+                                <label class="form-label" for="apiToken">API token</label>
+                                <input type="password" class="form-control font-monospace" th:field="*{apiToken}"
+                                       th:errorclass="is-invalid" autocomplete="off" spellcheck="false" maxlength="256">
+                                <div class="invalid-feedback" th:errors="*{apiToken}"></div>
+                            </div>
+                            <a href="https://dash.cloudflare.com/profile/api-tokens"
+                               target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>
+                                Open "API Tokens" in the Cloudflare dashboard
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="card mb-3 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">2</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Create the template token</h2>
+                            <p>Still under <strong>API Tokens → Create Token</strong>, create a second token
+                                carrying exactly the permissions you want every portal-minted token to have —
+                                say, <em>Zone → DNS → Edit</em> on one zone. Name it something recognisable like
+                                <code>portal-template</code>.</p>
+                            <p>Back on the API Tokens list, use the token's <strong>⋯ menu → Copy ID</strong>
+                                (or open it) and paste the ID below.</p>
+                            <div class="mb-2 col-md-6">
+                                <label class="form-label" for="templateTokenId">Template token ID</label>
+                                <input type="text" class="form-control font-monospace" th:field="*{templateTokenId}"
+                                       th:errorclass="is-invalid" autocomplete="off" spellcheck="false" maxlength="100">
+                                <div class="invalid-feedback" th:errors="*{templateTokenId}"></div>
+                            </div>
+                            <p class="text-muted small mb-0">
+                                <i class="bi bi-shield-check me-1" aria-hidden="true"></i>
+                                The template's value is never entered here and the token itself is never used —
+                                only its permission list is copied, read fresh each time. Edit the template in
+                                Cloudflare and every key minted afterwards picks up the change.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="card mb-4 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">3</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Name it and connect</h2>
+                            <p>This name shows up in the provider dropdown on the Add key screen, and as the
+                                service name on keys created through it.</p>
+                            <div class="mb-3 col-md-6">
+                                <label class="form-label" for="name">Integration name</label>
+                                <input type="text" class="form-control" th:field="*{name}"
+                                       th:errorclass="is-invalid" maxlength="100">
+                                <div class="invalid-feedback" th:errors="*{name}"></div>
+                            </div>
+                            <p class="text-muted small">
+                                <i class="bi bi-magic me-1" aria-hidden="true"></i>
+                                The portal verifies the token and reads the template against Cloudflare before
+                                anything is saved, so typos surface right here.
+                            </p>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-plug me-1" aria-hidden="true"></i> Verify &amp; connect
+                            </button>
+                            <a th:href="@{/integrations}" class="btn btn-link">Cancel</a>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+</html>

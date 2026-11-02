@@ -2,14 +2,18 @@ package com.sidbhat.apikeyportal.guided;
 
 /**
  * Providers whose keys can only be created by hand in their own console - there is
- * no API to mint them (GitHub personal access tokens, Anthropic API keys). For these
+ * no API to mint them (GitHub personal access tokens, Anthropic API keys, Atlassian
+ * API tokens). For these
  * the portal offers a guided walk-through instead: step-by-step instructions, then
  * it verifies the pasted key live against the provider before storing it.
  */
 public enum GuidedProvider {
 
     GITHUB("GitHub", "bi-github", "GitHub", "Personal access token"),
-    ANTHROPIC("Anthropic", "bi-robot", "Anthropic", "API key");
+    ANTHROPIC("Anthropic", "bi-robot", "Anthropic", "API key"),
+    ATLASSIAN("Atlassian", "bi-kanban-fill", "Atlassian", "API token"),
+    OPENAI("OpenAI", "bi-openai", "OpenAI", "API key"),
+    STRIPE("Stripe", "bi-stripe", "Stripe", "API key");
 
     private final String label;
 

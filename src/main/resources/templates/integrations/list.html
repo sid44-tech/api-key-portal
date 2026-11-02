@@ -53,6 +53,39 @@
             </div>
         </div>
         <div class="col">
+            <div class="card h-100 kp-provider is-connected">
+                <div class="card-body d-flex flex-column">
+                    <span class="kp-provider-icon" aria-hidden="true"><i class="bi bi-amazon"></i></span>
+                    <h3 class="h6 mb-1">Amazon Web Services</h3>
+                    <p class="mb-2"><span class="badge text-bg-primary">Creates keys for you</span></p>
+                    <p class="text-muted small">Creates IAM users and access keys in your account.</p>
+                    <a th:href="@{/integrations/new(provider='AWS_IAM')}" class="btn btn-primary btn-sm mt-auto align-self-start">Connect</a>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100 kp-provider is-connected">
+                <div class="card-body d-flex flex-column">
+                    <span class="kp-provider-icon" aria-hidden="true"><i class="bi bi-gitlab"></i></span>
+                    <h3 class="h6 mb-1">GitLab</h3>
+                    <p class="mb-2"><span class="badge text-bg-primary">Creates keys for you</span></p>
+                    <p class="text-muted small">Mints project access tokens in a project, including self-hosted.</p>
+                    <a th:href="@{/integrations/new(provider='GITLAB')}" class="btn btn-primary btn-sm mt-auto align-self-start">Connect</a>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100 kp-provider is-connected">
+                <div class="card-body d-flex flex-column">
+                    <span class="kp-provider-icon" aria-hidden="true"><i class="bi bi-cloud-fill"></i></span>
+                    <h3 class="h6 mb-1">Cloudflare</h3>
+                    <p class="mb-2"><span class="badge text-bg-primary">Creates keys for you</span></p>
+                    <p class="text-muted small">Mints API tokens copying the permissions of a template token.</p>
+                    <a th:href="@{/integrations/new(provider='CLOUDFLARE')}" class="btn btn-primary btn-sm mt-auto align-self-start">Connect</a>
+                </div>
+            </div>
+        </div>
+        <div class="col">
             <div class="card h-100 kp-provider">
                 <div class="card-body d-flex flex-column">
                     <span class="kp-provider-icon" aria-hidden="true"><i class="bi bi-github"></i></span>
@@ -70,9 +103,45 @@
                     <span class="kp-provider-icon" aria-hidden="true"><i class="bi bi-robot"></i></span>
                     <h3 class="h6 mb-1">Anthropic</h3>
                     <p class="mb-2"><span class="badge text-bg-secondary">Guided manual steps</span></p>
-                    <p class="text-muted small">Keys are created in the Anthropic console; the portal walks you
-                        through it and verifies the key.</p>
+                    <p class="text-muted small">Claude API keys are created in the Anthropic console; the
+                        portal walks you through it and verifies the key.</p>
                     <a th:href="@{/keys/guided/anthropic}" class="btn btn-secondary btn-sm mt-auto align-self-start">Start walk-through</a>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100 kp-provider">
+                <div class="card-body d-flex flex-column">
+                    <span class="kp-provider-icon" aria-hidden="true"><i class="bi bi-kanban-fill"></i></span>
+                    <h3 class="h6 mb-1">Atlassian</h3>
+                    <p class="mb-2"><span class="badge text-bg-secondary">Guided manual steps</span></p>
+                    <p class="text-muted small">Tokens are created in your Atlassian account; the portal walks
+                        you through it and verifies the token.</p>
+                    <a th:href="@{/keys/guided/atlassian}" class="btn btn-secondary btn-sm mt-auto align-self-start">Start walk-through</a>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100 kp-provider">
+                <div class="card-body d-flex flex-column">
+                    <span class="kp-provider-icon" aria-hidden="true"><i class="bi bi-openai"></i></span>
+                    <h3 class="h6 mb-1">OpenAI</h3>
+                    <p class="mb-2"><span class="badge text-bg-secondary">Guided manual steps</span></p>
+                    <p class="text-muted small">Keys are created in the OpenAI platform; the portal walks you
+                        through it and verifies the key.</p>
+                    <a th:href="@{/keys/guided/openai}" class="btn btn-secondary btn-sm mt-auto align-self-start">Start walk-through</a>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100 kp-provider">
+                <div class="card-body d-flex flex-column">
+                    <span class="kp-provider-icon" aria-hidden="true"><i class="bi bi-stripe"></i></span>
+                    <h3 class="h6 mb-1">Stripe</h3>
+                    <p class="mb-2"><span class="badge text-bg-secondary">Guided manual steps</span></p>
+                    <p class="text-muted small">Restricted keys are created in the Stripe dashboard; the portal
+                        walks you through it and verifies the key.</p>
+                    <a th:href="@{/keys/guided/stripe}" class="btn btn-secondary btn-sm mt-auto align-self-start">Start walk-through</a>
                 </div>
             </div>
         </div>
@@ -93,9 +162,13 @@
                     </tr>
                     </thead>
                     <tbody>
-                    <tr th:each="integration : ${integrations}">
+                    <tr th:each="integration : ${integrations}"
+                        th:classappend="${!integration.enabled} ? 'text-muted'">
                         <td>
                             <span class="kp-cell-primary" th:text="${integration.name}">Azure AD</span>
+                            <!-- everyone sees the state; it explains why the add-key
+                                 page has stopped offering this one -->
+                            <span class="pill pill-warning ms-1" th:unless="${integration.enabled}">Switched off</span>
                             <div class="kp-cell-secondary">
                                 <i th:class="'bi me-1 ' + ${integration.provider.icon}" aria-hidden="true"></i>
                                 <span th:text="${integration.provider.label}">Microsoft Azure AD</span>
@@ -107,6 +180,21 @@
                                 ? #temporals.format(integration.lastVerifiedAt.atZone(T(java.time.ZoneId).systemDefault()), 'MMM d, yyyy HH:mm')
                                 : 'Never'}">Never</td>
                         <td class="text-end" th:if="${canManage}">
+                            <!-- the switch submits straight away, like the mute toggle
+                                 on a key; the hidden field carries the state to move to -->
+                            <form th:action="@{/integrations/{id}/enabled(id=${integration.id})}" method="post"
+                                  class="d-inline-block align-middle me-2">
+                                <input type="hidden" name="enabled" th:value="${!integration.enabled}">
+                                <div class="form-check form-switch d-inline-block mb-0">
+                                    <input type="checkbox" class="form-check-input js-submit-on-change" role="switch"
+                                           th:id="'integration-enabled-' + ${integration.id}"
+                                           th:checked="${integration.enabled}"
+                                           th:title="${integration.enabled ? 'Switch off for the whole group' : 'Switch back on'}">
+                                    <label class="form-check-label visually-hidden"
+                                           th:for="'integration-enabled-' + ${integration.id}">
+                                        In use by the group</label>
+                                </div>
+                            </form>
                             <form th:action="@{/integrations/{id}/test(id=${integration.id})}" method="post" class="d-inline">
                                 <button type="submit" class="btn btn-sm btn-secondary" title="Test connection">
                                     <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i> Test

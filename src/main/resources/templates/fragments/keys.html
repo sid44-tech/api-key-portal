@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--
+  The bits of a key that appear in more than one place: the key list's table,
+  the same list as cards on a narrow screen, and the key's own page.
+
+  They live here because they carry behaviour. The reveal and copy buttons are
+  wired to keys.js by their classes and hand it the URL to fetch the value
+  from; three hand-written copies of that is three places for one of them to
+  quietly stop matching the others.
+
+  None of these check who is asking. Reveal and copy are the owner's alone, and
+  every caller wraps them in that test - the server checks it again on the
+  request itself, so what is rendered here decides what is offered, never what
+  is allowed.
+-->
+
+<!-- Reveal and copy, for the owner of the key. -->
+<th:block th:fragment="valueControls(key)">
+    <button type="button" class="btn btn-sm btn-link js-reveal" title="Show value"
+            th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">
+        <i class="bi bi-eye" aria-hidden="true"></i><span class="visually-hidden">Show value</span>
+    </button>
+    <button type="button" class="btn btn-sm btn-link js-copy" title="Copy to clipboard"
+            th:attr="data-value-url=@{/keys/{id}/value(id=${key.id})}">
+        <i class="bi bi-clipboard" aria-hidden="true"></i><span class="visually-hidden">Copy to clipboard</span>
+    </button>
+</th:block>
+
+<!--
+  Edit and delete from the key list, for the owner. Delete opens the one
+  confirmation modal on the page and tells it which key it is about.
+
+  labelled: whether the words are shown next to the icons, or left for screen
+  readers only. The table has a column of these and no room for words; the
+  cards are aimed at with a thumb, where two unlabelled icons side by side -
+  one of which deletes the key - is asking for the wrong one to be hit.
+-->
+<th:block th:fragment="listActions(key, labelled)">
+    <a th:href="@{/keys/{id}/edit(id=${key.id})}" class="btn btn-sm btn-link" title="Edit">
+        <i class="bi bi-pencil" aria-hidden="true"></i><span
+            th:class="${labelled} ? 'ms-1' : 'visually-hidden'">Edit</span>
+    </a>
+    <button type="button" class="btn btn-sm btn-outline-danger" title="Delete"
+            data-bs-toggle="modal" data-bs-target="#deleteModal"
+            th:attr="data-key-name=${key.serviceName + ' / ' + key.name},data-delete-url=@{/keys/{id}/delete(id=${key.id})}">
+        <i class="bi bi-trash" aria-hidden="true"></i><span
+            th:class="${labelled} ? 'ms-1' : 'visually-hidden'">Delete</span>
+    </button>
+</th:block>
+</body>
+</html>
