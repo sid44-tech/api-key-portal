@@ -28,7 +28,9 @@ public class PasswordChangeRequiredFilter extends OncePerRequestFilter {
 
     /** The change-password page itself, and the ways out of a session. */
     static final String CHANGE_PASSWORD_PATH = "/profile/password";
-    private static final Set<String> ALLOWED = Set.of(CHANGE_PASSWORD_PATH, "/login", "/logout", "/favicon.ico");
+    private static final Set<String> ALLOWED = Set.of(CHANGE_PASSWORD_PATH, "/login", "/logout", "/favicon.ico",
+            // the second factor comes before the password change: it is part of signing in
+            "/mfa/verify");
     private static final Set<String> ALLOWED_PREFIXES = Set.of("/webjars/", "/css/", "/js/");
 
     @Override

@@ -163,6 +163,75 @@ public class AzureGraphClient {
      * provisioning run; allowed under {@code Application.ReadWrite.OwnedBy} because
      * the portal owns what it created. Azure soft-deletes it (recoverable for 30 days).
      */
+    /**
+     * Removes one secret from an app registration, leaving the registration and
+     * its other secrets alone. This is the tidy-up after a rotation: Azure has
+     * already stopped the secret working on its end date, and this takes the
+     * dead entry off the list.
+     *
+     * @return true if it was removed, false if Azure no longer had it - either
+     *         way it is gone, which is the point
+     */
+    public boolean removePassword(String token, String applicationObjectId, String keyId) {
+        try {
+            graphClient.post()
+                    .uri("/v1.0/applications/{id}/removePassword", applicationObjectId)
+                    .headers(h -> h.setBearerAuth(token))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("keyId", keyId))
+                    .retrieve()
+                    .toBodilessEntity();
+            return true;
+        } catch (RestClientResponseException e) {
+            // 404 for a registration that is gone; Graph answers 400 for a keyId it has no secret for
+            String body = e.getResponseBodyAsString();
+            if (e.getStatusCode().value() == 404 || (e.getStatusCode().value() == 400 && body != null
+                    && body.toLowerCase(java.util.Locale.ROOT).contains("no password credential"))) {
+                return false;
+            }
+            throw translate("Could not remove the client secret", e);
+        } catch (RestClientException e) {
+            throw unreachable(e);
+        }
+    }
+
+    /**
+     * The key ids of secrets on an app registration that carry {@code displayName}
+     * and have already expired. For keys minted before the portal recorded each
+     * secret's id: an expired secret is inert whichever one it is, so matching by
+     * name among the expired ones is safe where matching among live ones would not be.
+     */
+    public java.util.List<String> expiredPasswordCredentials(String token, String applicationObjectId,
+            String displayName, Instant now) {
+        try {
+            ApplicationPasswords application = graphClient.get()
+                    .uri("/v1.0/applications/{id}?$select=passwordCredentials", applicationObjectId)
+                    .headers(h -> h.setBearerAuth(token))
+                    .retrieve()
+                    .body(ApplicationPasswords.class);
+            if (application == null || application.passwordCredentials() == null) {
+                return java.util.List.of();
+            }
+            return application.passwordCredentials().stream()
+                    .filter(credential -> credential.keyId() != null && displayName.equals(credential.displayName()))
+                    .filter(credential -> credential.endDateTime() != null
+                            && !java.time.OffsetDateTime.parse(credential.endDateTime()).toInstant().isAfter(now))
+                    .map(PasswordCredential::keyId)
+                    .toList();
+        } catch (RestClientResponseException e) {
+            throw translate("Could not read the app registration's secrets", e);
+        } catch (RestClientException e) {
+            throw unreachable(e);
+        }
+    }
+
+    record ApplicationPasswords(@JsonProperty("passwordCredentials") java.util.List<PasswordCredential> passwordCredentials) {
+    }
+
+    record PasswordCredential(@JsonProperty("keyId") String keyId, @JsonProperty("displayName") String displayName,
+            @JsonProperty("endDateTime") String endDateTime) {
+    }
+
     public void deleteApplication(String token, String applicationObjectId) {
         try {
             graphClient.delete()
@@ -222,6 +291,11 @@ public class AzureGraphClient {
      * @param endDateTime ISO-8601 expiry as returned by Graph
      */
     public record CreatedSecret(@JsonProperty("secretText") String secret,
-            @JsonProperty("endDateTime") String endDateTime) {
+            @JsonProperty("endDateTime") String endDateTime, @JsonProperty("keyId") String keyId) {
+
+        /** Without the key id, for callers and tests that have no use for it. */
+        public CreatedSecret(String secret, String endDateTime) {
+            this(secret, endDateTime, null);
+        }
     }
 }

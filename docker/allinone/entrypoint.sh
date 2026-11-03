@@ -5,10 +5,11 @@
 # with that process's status rather than sitting there half-dead.
 #
 # Everything that has to survive a restart lives under one directory - the
-# database itself, the generated database password, and the generated encryption
-# key. Mount a volume there (PORTAL_DATA_DIR) and the portal picks up exactly
-# where it left off; mount nothing and the container is a scratch instance that
-# forgets itself when it goes.
+# database itself and the generated database password. Mount a volume there
+# (PORTAL_DATA_DIR) and the portal picks up exactly where it left off; mount
+# nothing and the container is a scratch instance that forgets itself when it
+# goes. The one thing that must NOT live there is the encryption key, which is
+# why this image insists on being given one - see below.
 
 set -Eeuo pipefail
 
@@ -25,6 +26,59 @@ if [ "$(id -u)" != "0" ]; then
     log "FATAL: this image has to start as root so it can prepare $DATA_DIR and"
     log "       then drop to unprivileged users. Neither process runs as root."
     exit 1
+fi
+
+# ---------------------------------------------------------- the portal's key
+#
+# Key values are encrypted with PORTAL_ENCRYPTION_KEY, and this image will not
+# start without one. Earlier versions generated a key here when none was given
+# and kept it in the data directory, which made the image start with nothing
+# configured - and quietly undid the encryption at rest, because the key then
+# sat in the same directory as the ciphertext it protects. A backup, a snapshot
+# or a stolen disk held both halves. Refusing is the only honest answer: a
+# warning in a log nobody reads until something breaks is not a fix.
+#
+# The key is checked here - first, before the data directory is so much as
+# created - rather than left to the portal, so that a refused start neither
+# starts the database nor writes anything into the volume, and so the message
+# can say what to do about a key an earlier version left in the volume.
+
+encryption_key_file="$DATA_DIR/encryption-key"
+
+if [ -z "${PORTAL_ENCRYPTION_KEY:-}" ]; then
+    log "FATAL: PORTAL_ENCRYPTION_KEY is not set. This image no longer generates one:"
+    log "       a key kept in the data directory is kept next to the data it encrypts,"
+    log "       so a copy of the volume would be enough to read every stored value."
+    if [ -s "$encryption_key_file" ]; then
+        log "       An earlier start of this image generated a key and left it in"
+        log "       $encryption_key_file - your data is encrypted with it. Set"
+        log "       PORTAL_ENCRYPTION_KEY to that file's contents, keep a copy of it"
+        log "       somewhere other than this volume, and delete the file."
+    else
+        log "       Generate one and pass it in:"
+        log "         openssl rand -base64 32"
+        log "         docker run -e PORTAL_ENCRYPTION_KEY=<that value> ..."
+        log "       and keep a copy somewhere other than the data volume: without it"
+        log "       every stored value is unreadable."
+    fi
+    exit 1
+fi
+
+# A key the previous version generated is still sitting in the volume. Say so
+# every start until it is gone - it is the whole problem, and it is not ours to
+# delete: if it is not the key now configured, values may still be encrypted
+# with it, and it belongs in the rotation configuration rather than the bin.
+if [ -s "$encryption_key_file" ]; then
+    if [ "$(cat "$encryption_key_file")" = "$PORTAL_ENCRYPTION_KEY" ]; then
+        log "WARNING: the configured encryption key is also still stored in"
+        log "WARNING: $encryption_key_file, next to the data it encrypts. Delete that"
+        log "WARNING: file once PORTAL_ENCRYPTION_KEY is backed up somewhere else."
+    else
+        log "WARNING: $encryption_key_file holds a key from an earlier start that is"
+        log "WARNING: NOT the one in PORTAL_ENCRYPTION_KEY. If any values were written"
+        log "WARNING: under it, add it as a named key (PORTAL_ENCRYPTION_KEYS_<ID>) and"
+        log "WARNING: run the re-encrypt command - see the README - before deleting it."
+    fi
 fi
 
 mkdir -p "$PGDATA"
@@ -61,35 +115,6 @@ fi
 printf '%s' "$db_password" > "$db_password_file"
 chown postgres:postgres "$db_password_file"
 chmod 600 "$db_password_file"
-
-# ---------------------------------------------------------- the portal's key
-#
-# Key values are encrypted with this, and without it the portal refuses to
-# start. An image that cannot run until you have generated a key by hand is not
-# "ready to run", so one is generated here if none was given.
-#
-# That is a real trade and worth being plain about: a generated key lives in the
-# same directory as the ciphertext it protects, so anyone holding a copy of that
-# directory - a backup, a snapshot, a stolen disk - holds both halves. Set
-# PORTAL_ENCRYPTION_KEY for anything you would mind losing.
-
-encryption_key_file="$DATA_DIR/encryption-key"
-
-if [ -z "${PORTAL_ENCRYPTION_KEY:-}" ]; then
-    if [ -s "$encryption_key_file" ]; then
-        PORTAL_ENCRYPTION_KEY=$(cat "$encryption_key_file")
-    else
-        PORTAL_ENCRYPTION_KEY=$(head -c 32 /dev/urandom | base64 | tr -d '\n')
-        printf '%s' "$PORTAL_ENCRYPTION_KEY" > "$encryption_key_file"
-        log "Generated an encryption key; keeping it in $encryption_key_file."
-    fi
-    chown portal:portal "$encryption_key_file"
-    chmod 600 "$encryption_key_file"
-    log "WARNING: the encryption key is stored next to the data it encrypts."
-    log "WARNING: back it up separately and set PORTAL_ENCRYPTION_KEY instead -"
-    log "WARNING: lose this file and every stored key value is unreadable."
-    export PORTAL_ENCRYPTION_KEY
-fi
 
 # ------------------------------------------------------------------- postgres
 

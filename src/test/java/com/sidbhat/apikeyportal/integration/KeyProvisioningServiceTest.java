@@ -110,8 +110,10 @@ class KeyProvisioningServiceTest {
         assertThat(details.getValue().getKeyValue())
                 .contains("AWS_ACCESS_KEY_ID=AKIANEWKEY")
                 .contains("AWS_SECRET_ACCESS_KEY=new/secret+half");
-        // IAM access keys never expire on their own
-        assertThat(details.getValue().getExpiresOn()).isNull();
+        // IAM access keys never expire on their own, so the chosen validity is the
+        // portal's date - the one it will enforce by deleting the key at AWS
+        assertThat(details.getValue().getExpiresOn()).isEqualTo(LocalDate.now().plusDays(180));
+        assertThat(details.getValue().getNotes()).contains("deletes this key at AWS");
         // the secret half stays out of the notes; the key id may be in them
         assertThat(details.getValue().getNotes()).contains("AKIANEWKEY").doesNotContain("new/secret+half");
         assertThat(provenance.getValue().integrationId()).isEqualTo(aws.getId());
@@ -254,7 +256,7 @@ class KeyProvisioningServiceTest {
         ApiKey expiring = expiringKey();
         when(graphClient.acquireToken("tenant-1", "portal-client", "portal-secret")).thenReturn("tok");
         when(graphClient.addPassword(eq("tok"), eq("obj-1"), eq("Reporting service"), any(Instant.class)))
-                .thenReturn(new CreatedSecret("fresh-secret", null));
+                .thenReturn(new CreatedSecret("fresh-secret", null, "new-key-id"));
         when(apiKeyService.create(any(), eq(owner), any(), any()))
                 .thenAnswer(inv -> new ApiKey("Reporting service", "Azure AD", "fresh-secret",
                         LocalDate.now(), LocalDate.now().plusDays(180)));
@@ -281,6 +283,8 @@ class KeyProvisioningServiceTest {
         assertThat(provenance.getValue().providerResourceId()).isEqualTo("obj-1");
         assertThat(provenance.getValue().rotatedFromKeyId()).isEqualTo(42L);
         assertThat(provenance.getValue().group()).isEqualTo(expiring.getGroup());
+        // the new secret's own id travels with it, so it can be removed in its turn
+        assertThat(provenance.getValue().providerCredentialId()).isEqualTo("new-key-id");
     }
 
     @Test
@@ -298,13 +302,208 @@ class KeyProvisioningServiceTest {
 
     @Test
     void rotationRefusesProvidersItCannotMintIn() {
-        ServiceIntegration google = new ServiceIntegration(ServiceProvider.GOOGLE_CLOUD, "GCP",
-                "project-1", "client", "secret");
+        ServiceIntegration cloudflare = new ServiceIntegration(ServiceProvider.CLOUDFLARE, "Cloudflare DNS",
+                "tmpl-1", "tmpl-1", "cf-admin");
 
-        assertThatThrownBy(() -> service.rotate(expiringKey(), google))
+        assertThatThrownBy(() -> service.rotate(expiringKey(), cloudflare))
                 .isInstanceOf(ProvisioningException.class)
                 .hasMessageContaining("cannot be replaced automatically");
-        verifyNoInteractions(graphClient);
+        verifyNoInteractions(graphClient, cloudflareClient);
+    }
+
+    // ---------- Google and AWS: rotation with the portal deleting the old key ----------
+
+    /** A Google key of Alex's expiring in five days, on service account reporting@. */
+    private ApiKey expiringGoogleKey() {
+        ApiKey key = new ApiKey("Reporting service", "Google Cloud",
+                "{\"type\":\"service_account\",\"private_key_id\":\"old-key-id\",\"private_key\":\"x\"}",
+                LocalDate.now().minusDays(175), LocalDate.now().plusDays(5));
+        key.assignTo(owner, owner.getGroup());
+        key.setNotes("Service account: reporting@my-project.iam.gserviceaccount.com");
+        key.recordProvenance(9L, "reporting@my-project.iam.gserviceaccount.com", null, null);
+        ReflectionTestUtils.setField(key, "id", 61L);
+        return key;
+    }
+
+    @Test
+    void googleRotationAddsASecondKeyToTheSameServiceAccount() {
+        ApiKey expiring = expiringGoogleKey();
+        when(googleIamClient.acquireToken("portal@my-project.iam.gserviceaccount.com", "-----BEGIN PRIVATE KEY-----"))
+                .thenReturn("gtok");
+        when(googleIamClient.createServiceAccountKey("gtok", "my-project",
+                "reporting@my-project.iam.gserviceaccount.com"))
+                .thenReturn("{\"type\":\"service_account\",\"private_key_id\":\"new-key-id\"}");
+        when(apiKeyService.create(any(), eq(owner), any(), any()))
+                .thenAnswer(inv -> new ApiKey("Reporting service", "Google Cloud", "new", LocalDate.now(), null));
+
+        service.rotate(expiring, googleIntegration);
+
+        // the identity the consumer is granted roles as is untouched
+        verify(googleIamClient, never()).createServiceAccount(any(), any(), any(), any());
+        verify(googleIamClient, never()).deleteServiceAccount(any(), any(), any());
+
+        ArgumentCaptor<ApiKeyDetails> details = ArgumentCaptor.forClass(ApiKeyDetails.class);
+        ArgumentCaptor<KeyProvenance> provenance = ArgumentCaptor.forClass(KeyProvenance.class);
+        verify(apiKeyService).create(details.capture(), eq(owner), any(), provenance.capture());
+        assertThat(details.getValue().getKeyValue()).contains("new-key-id");
+        // the replacement lives as long as the old key did, from today
+        assertThat(details.getValue().getExpiresOn()).isEqualTo(LocalDate.now().plusDays(180));
+        assertThat(details.getValue().getNotes()).startsWith("Replaces \"Reporting service\"")
+                .contains("reporting@my-project.iam.gserviceaccount.com");
+        assertThat(provenance.getValue().providerResourceId()).isEqualTo("reporting@my-project.iam.gserviceaccount.com");
+        assertThat(provenance.getValue().rotatedFromKeyId()).isEqualTo(61L);
+    }
+
+    @Test
+    void revokingAGoogleKeyDeletesExactlyThatKeyAndRecordsIt() {
+        ApiKey expired = expiringGoogleKey();
+        when(googleIamClient.acquireToken(anyString(), anyString())).thenReturn("gtok");
+        when(googleIamClient.deleteServiceAccountKey("gtok", "my-project",
+                "reporting@my-project.iam.gserviceaccount.com", "old-key-id")).thenReturn(true);
+
+        service.revoke(expired, googleIntegration);
+
+        // the key id comes out of the stored value, so keys minted before the
+        // portal could delete them are deletable too
+        verify(googleIamClient).deleteServiceAccountKey("gtok", "my-project",
+                "reporting@my-project.iam.gserviceaccount.com", "old-key-id");
+        verify(apiKeyService).markRevokedAtProvider(eq(61L), org.mockito.ArgumentMatchers.contains("deleted at Google Cloud"));
+        verify(integrations).markVerified(googleIntegration);
+    }
+
+    @Test
+    void aGoogleKeyAlreadyGoneIsRecordedAsSuch() {
+        ApiKey expired = expiringGoogleKey();
+        when(googleIamClient.acquireToken(anyString(), anyString())).thenReturn("gtok");
+        when(googleIamClient.deleteServiceAccountKey(any(), any(), any(), any())).thenReturn(false);
+
+        service.revoke(expired, googleIntegration);
+
+        verify(apiKeyService).markRevokedAtProvider(eq(61L), org.mockito.ArgumentMatchers.contains("no longer had this key"));
+    }
+
+    @Test
+    void aGoogleValueWithoutAKeyIdCannotBeRevokedAndSaysWhy() {
+        ApiKey expired = expiringGoogleKey();
+        expired.setKeyValue("hand-edited, not a key file");
+
+        assertThatThrownBy(() -> service.revoke(expired, googleIntegration))
+                .isInstanceOf(ProvisioningException.class)
+                .hasMessageContaining("which Google key to delete");
+
+        verifyNoInteractions(googleIamClient);
+        verify(apiKeyService, never()).markRevokedAtProvider(any(), any());
+    }
+
+    /** An AWS key of Alex's expiring in five days, on IAM user reporting-1a2b. */
+    private ApiKey expiringAwsKey() {
+        ApiKey key = new ApiKey("Reporting service", "AWS production",
+                "AWS_ACCESS_KEY_ID=AKIAOLDKEY\nAWS_SECRET_ACCESS_KEY=old/secret",
+                LocalDate.now().minusDays(85), LocalDate.now().plusDays(5));
+        key.assignTo(owner, owner.getGroup());
+        key.setNotes("IAM user: arn:aws:iam::123456789012:user/keyportal/reporting-1a2b\nAccess key ID: AKIAOLDKEY");
+        key.recordProvenance(9L, "reporting-1a2b", null, null);
+        ReflectionTestUtils.setField(key, "id", 62L);
+        return key;
+    }
+
+    @Test
+    void awsRotationAddsASecondAccessKeyToTheSameUser() {
+        ApiKey expiring = expiringAwsKey();
+        when(awsIamClient.createAccessKey("AKIDEXAMPLE", "aws-secret", "reporting-1a2b"))
+                .thenReturn(new AwsIamClient.CreatedAccessKey("AKIANEWKEY", "new/secret"));
+        when(apiKeyService.create(any(), eq(owner), any(), any()))
+                .thenAnswer(inv -> new ApiKey("Reporting service", "AWS production", "new", LocalDate.now(), null));
+
+        service.rotate(expiring, aws);
+
+        verify(awsIamClient, never()).createUser(any(), any(), any());
+
+        ArgumentCaptor<ApiKeyDetails> details = ArgumentCaptor.forClass(ApiKeyDetails.class);
+        ArgumentCaptor<KeyProvenance> provenance = ArgumentCaptor.forClass(KeyProvenance.class);
+        verify(apiKeyService).create(details.capture(), eq(owner), any(), provenance.capture());
+        assertThat(details.getValue().getKeyValue())
+                .contains("AWS_ACCESS_KEY_ID=AKIANEWKEY")
+                .contains("AWS_SECRET_ACCESS_KEY=new/secret");
+        assertThat(details.getValue().getExpiresOn()).isEqualTo(LocalDate.now().plusDays(90));
+        // the new key's own id leads the notes, ahead of the old notes that name the old one
+        assertThat(details.getValue().getNotes())
+                .contains("Access key ID: AKIANEWKEY")
+                .doesNotContain("new/secret");
+        assertThat(details.getValue().getNotes().indexOf("AKIANEWKEY"))
+                .isLessThan(details.getValue().getNotes().indexOf("AKIAOLDKEY"));
+        assertThat(provenance.getValue().providerResourceId()).isEqualTo("reporting-1a2b");
+        assertThat(provenance.getValue().rotatedFromKeyId()).isEqualTo(62L);
+    }
+
+    @Test
+    void revokingAnAwsKeyDeletesExactlyThatAccessKey() {
+        ApiKey expired = expiringAwsKey();
+        when(awsIamClient.deleteAccessKey("AKIDEXAMPLE", "aws-secret", "reporting-1a2b", "AKIAOLDKEY"))
+                .thenReturn(true);
+
+        service.revoke(expired, aws);
+
+        // the user stays: its replacement key hangs off it
+        verify(awsIamClient, never()).deleteUser(any(), any(), any());
+        verify(apiKeyService).markRevokedAtProvider(eq(62L), org.mockito.ArgumentMatchers.contains("deleted at Amazon Web Services"));
+    }
+
+    @Test
+    void theAccessKeyIdIsReadFromTheValueNotTheNotes() {
+        ApiKey key = expiringAwsKey();
+        assertThat(KeyProvisioningService.awsAccessKeyIdOf(key)).isEqualTo("AKIAOLDKEY");
+
+        key.setKeyValue("  AWS_SECRET_ACCESS_KEY=x\r\n AWS_ACCESS_KEY_ID=AKIAOTHER \n");
+        assertThat(KeyProvisioningService.awsAccessKeyIdOf(key)).isEqualTo("AKIAOTHER");
+
+        key.setKeyValue("just a secret somebody pasted");
+        assertThatThrownBy(() -> KeyProvisioningService.awsAccessKeyIdOf(key))
+                .isInstanceOf(ProvisioningException.class)
+                .hasMessageContaining("no AWS_ACCESS_KEY_ID line");
+    }
+
+    @Test
+    void revokeRefusesProvidersThatLeaveNothingBehind() {
+        ServiceIntegration gitlab = new ServiceIntegration(ServiceProvider.GITLAB, "GitLab CI",
+                "https://gitlab.example.com", "group/app", "glpat-admin");
+
+        assertThatThrownBy(() -> service.revoke(expiringKey(), gitlab))
+                .isInstanceOf(ProvisioningException.class)
+                .hasMessageContaining("leaves nothing behind to delete");
+        verifyNoInteractions(gitLabClient);
+        verify(apiKeyService, never()).markRevokedAtProvider(any(), any());
+    }
+
+    @Test
+    void revokingAnAzureKeyRemovesItsOwnSecretFromTheAppRegistration() {
+        ApiKey expired = expiringKey();
+        expired.setProviderCredentialId("key-id-1");
+        when(graphClient.acquireToken("tenant-1", "portal-client", "portal-secret")).thenReturn("tok");
+        when(graphClient.removePassword("tok", "obj-1", "key-id-1")).thenReturn(true);
+
+        service.revoke(expired, integration);
+
+        // the registration and its other secrets are untouched
+        verify(graphClient, never()).deleteApplication(any(), any());
+        verify(graphClient, never()).expiredPasswordCredentials(any(), any(), any(), any());
+        verify(apiKeyService).markRevokedAtProvider(eq(42L), org.mockito.ArgumentMatchers.contains("deleted at Microsoft Azure AD"));
+    }
+
+    @Test
+    void anAzureKeyMintedBeforeSecretIdsWereKeptIsMatchedAmongTheExpiredSecrets() {
+        ApiKey expired = expiringKey(); // no credential id
+        when(graphClient.acquireToken(anyString(), anyString(), anyString())).thenReturn("tok");
+        when(graphClient.expiredPasswordCredentials(eq("tok"), eq("obj-1"), eq("Reporting service"), any()))
+                .thenReturn(List.of("old-a", "old-b"));
+        when(graphClient.removePassword("tok", "obj-1", "old-a")).thenReturn(true);
+        when(graphClient.removePassword("tok", "obj-1", "old-b")).thenReturn(false);
+
+        service.revoke(expired, integration);
+
+        verify(graphClient).removePassword("tok", "obj-1", "old-a");
+        verify(graphClient).removePassword("tok", "obj-1", "old-b");
+        verify(apiKeyService).markRevokedAtProvider(eq(42L), org.mockito.ArgumentMatchers.contains("deleted at"));
     }
 
     /** The bogus 403 Graph returns when a replica hasn't seen the new app registration yet. */
@@ -465,7 +664,9 @@ class KeyProvisioningServiceTest {
         assertThat(details.getValue().getServiceName()).isEqualTo("Google Cloud");
         assertThat(origin.getValue()).isEqualTo(KeyOrigin.provisionedBy("Google Cloud"));
         assertThat(details.getValue().getKeyValue()).isEqualTo("{\"type\":\"service_account\"}");
-        assertThat(details.getValue().getExpiresOn()).isNull();
+        // Google keys never expire on their own, so the chosen validity is the
+        // portal's date - the one it will enforce by deleting the key at Google
+        assertThat(details.getValue().getExpiresOn()).isEqualTo(LocalDate.now().plusDays(180));
         assertThat(details.getValue().getNotes())
                 .contains("for the dashboards")
                 .contains("reporting@my-project.iam.gserviceaccount.com")

@@ -27,6 +27,7 @@ import com.sidbhat.apikeyportal.integration.azure.AzureGraphClient.CreatedApplic
 import com.sidbhat.apikeyportal.integration.azure.AzureGraphClient.CreatedSecret;
 import com.sidbhat.apikeyportal.integration.google.GoogleIamClient;
 import com.sidbhat.apikeyportal.integration.google.GoogleIamClient.CreatedServiceAccount;
+import com.sidbhat.apikeyportal.integration.google.ServiceAccountKey;
 import com.sidbhat.apikeyportal.key.ApiKey;
 import com.sidbhat.apikeyportal.key.ApiKeyDetails;
 import com.sidbhat.apikeyportal.key.KeyProvenance;
@@ -105,8 +106,8 @@ public class KeyProvisioningService {
         }
         return switch (integration.getProvider()) {
             case AZURE_AD -> provisionAzure(integration, name.trim(), validity, notes, owner);
-            case GOOGLE_CLOUD -> provisionGoogle(integration, name.trim(), notes, owner);
-            case AWS_IAM -> provisionAws(integration, name.trim(), notes, owner);
+            case GOOGLE_CLOUD -> provisionGoogle(integration, name.trim(), validity, notes, owner);
+            case AWS_IAM -> provisionAws(integration, name.trim(), validity, notes, owner);
             case GITLAB -> provisionGitLab(integration, name.trim(), validity, notes, owner);
             case CLOUDFLARE -> provisionCloudflare(integration, name.trim(), validity, notes, owner);
         };
@@ -130,9 +131,17 @@ public class KeyProvisioningService {
             throw new ProvisioningException(integration.getProvider().getLabel()
                     + " keys cannot be replaced automatically");
         }
-        if (integration.getProvider() == ServiceProvider.GITLAB) {
-            return rotateGitLab(expiring, integration);
-        }
+        return switch (integration.getProvider()) {
+            case AZURE_AD -> rotateAzure(expiring, integration);
+            case GOOGLE_CLOUD -> rotateGoogle(expiring, integration);
+            case AWS_IAM -> rotateAws(expiring, integration);
+            case GITLAB -> rotateGitLab(expiring, integration);
+            case CLOUDFLARE -> throw new ProvisioningException("Cloudflare keys cannot be replaced automatically");
+        };
+    }
+
+    /** Azure: a second secret on the same app registration. Azure retires the old one itself. */
+    private ApiKey rotateAzure(ApiKey expiring, ServiceIntegration integration) {
         String token = graphClient.acquireToken(integration.getTenantId(), integration.getClientId(),
                 integration.getClientSecret());
         Instant requestedEnd = Instant.now().plus(replacementLifetimeDays(expiring), ChronoUnit.DAYS)
@@ -143,11 +152,151 @@ public class KeyProvisioningService {
 
         ApiKey replacement = apiKeyService.create(new ApiKeyDetails(expiring.getName(),
                 expiring.getServiceName(), secret.secret(), LocalDate.now(), expiryDate(secret, requestedEnd),
-                rotationNotes(expiring)), expiring.getOwner(), KeyOrigin.rotatedBy(integration.getName()),
-                KeyProvenance.rotatedFrom(expiring));
+                rotationNotes(expiring, null)), expiring.getOwner(), KeyOrigin.rotatedBy(integration.getName()),
+                // the new secret's own id, so it can be removed in its turn
+                KeyProvenance.rotatedFrom(expiring, secret.keyId()));
         integrations.markVerified(integration);
         log.info("Rotated {}: minted {} on the same client", expiring, replacement);
         return replacement;
+    }
+
+    /**
+     * Google: a second JSON key on the same service account. Google would keep the
+     * old key working for ever, so the replacement's expiry is the portal's own
+     * date again, and the old key is deleted at Google by {@link #revoke} when its
+     * date arrives. The service account itself - the identity the consumer is
+     * granted roles as - is untouched.
+     */
+    private ApiKey rotateGoogle(ApiKey expiring, ServiceIntegration integration) {
+        String projectId = integration.getTenantId();
+        String serviceAccountEmail = expiring.getProviderResourceId();
+        String token = googleIamClient.acquireToken(integration.getClientId(), integration.getClientSecret());
+        String keyJson = googleIamClient.createServiceAccountKey(token, projectId, serviceAccountEmail);
+
+        ApiKey replacement = apiKeyService.create(new ApiKeyDetails(expiring.getName(),
+                expiring.getServiceName(), keyJson, LocalDate.now(),
+                LocalDate.now().plusDays(replacementLifetimeDays(expiring)), rotationNotes(expiring, null)),
+                expiring.getOwner(), KeyOrigin.rotatedBy(integration.getName()),
+                KeyProvenance.rotatedFrom(expiring));
+        integrations.markVerified(integration);
+        log.info("Rotated {}: minted {} on service account {}", expiring, replacement, serviceAccountEmail);
+        return replacement;
+    }
+
+    /**
+     * AWS: a second access key on the same IAM user. IAM allows a user two keys,
+     * which is exactly enough for a hand-over: the new pair is minted alongside
+     * the old, and the old is deleted at AWS by {@link #revoke} when its date
+     * arrives - freeing the slot for the rotation after this one.
+     */
+    private ApiKey rotateAws(ApiKey expiring, ServiceIntegration integration) {
+        String userName = expiring.getProviderResourceId();
+        CreatedAccessKey accessKey = awsIamClient.createAccessKey(integration.getClientId(),
+                integration.getClientSecret(), userName);
+
+        String value = "AWS_ACCESS_KEY_ID=" + accessKey.accessKeyId()
+                + "\nAWS_SECRET_ACCESS_KEY=" + accessKey.secretAccessKey();
+        ApiKey replacement = apiKeyService.create(new ApiKeyDetails(expiring.getName(),
+                expiring.getServiceName(), value, LocalDate.now(),
+                LocalDate.now().plusDays(replacementLifetimeDays(expiring)),
+                rotationNotes(expiring, "Access key ID: " + accessKey.accessKeyId())),
+                expiring.getOwner(), KeyOrigin.rotatedBy(integration.getName()),
+                KeyProvenance.rotatedFrom(expiring));
+        integrations.markVerified(integration);
+        log.info("Rotated {}: minted {} on IAM user {}", expiring, replacement, userName);
+        return replacement;
+    }
+
+    /**
+     * Deletes an expired, already-replaced credential at its provider. For Google
+     * and AWS, which would otherwise leave it working for ever, this is the step
+     * that makes "expired" true: until it runs, the date on the key is a note.
+     * For Azure, which has already stopped the secret on its end date, it takes
+     * the dead entry off the app registration.
+     * <p>
+     * A credential the provider no longer has counts as done - somebody deleted
+     * it in the console first, and the goal was that it be gone. Anything else
+     * that goes wrong is thrown for the sweep to record and try again tomorrow.
+     *
+     * @throws ProvisioningException if the provider refuses, or the stored value
+     *                               cannot tell the provider which credential to delete
+     */
+    public void revoke(ApiKey expired, ServiceIntegration integration) {
+        if (!integration.getProvider().canDeleteReplaced()) {
+            throw new ProvisioningException(integration.getProvider().getLabel()
+                    + " leaves nothing behind to delete");
+        }
+        boolean deleted = switch (integration.getProvider()) {
+            case AZURE_AD -> revokeAzure(expired, integration);
+            case GOOGLE_CLOUD -> {
+                String keyId = googleKeyIdOf(expired);
+                String token = googleIamClient.acquireToken(integration.getClientId(),
+                        integration.getClientSecret());
+                yield googleIamClient.deleteServiceAccountKey(token, integration.getTenantId(),
+                        expired.getProviderResourceId(), keyId);
+            }
+            case AWS_IAM -> awsIamClient.deleteAccessKey(integration.getClientId(), integration.getClientSecret(),
+                    expired.getProviderResourceId(), awsAccessKeyIdOf(expired));
+            default -> throw new IllegalStateException(integration.getProvider() + " cannot delete replaced keys");
+        };
+        apiKeyService.markRevokedAtProvider(expired.getId(), deleted
+                ? "Expired; deleted at " + integration.getProvider().getLabel() + " by the portal, as its "
+                        + "replacement had been minted"
+                : "Expired; " + integration.getProvider().getLabel() + " no longer had this key, so there was "
+                        + "nothing left to delete");
+        integrations.markVerified(integration);
+        log.info("Made the expiry of {} true at {}: {}", expired, integration, deleted ? "deleted" : "already gone");
+    }
+
+    /**
+     * Azure: remove the expired secret from the app registration. By its keyId
+     * where the portal recorded one; for secrets minted before it did, by name
+     * among the registration's <em>expired</em> secrets - an expired secret is
+     * inert whichever one it is, so that match is safe where a match among
+     * live secrets would not be.
+     */
+    private boolean revokeAzure(ApiKey expired, ServiceIntegration integration) {
+        String token = graphClient.acquireToken(integration.getTenantId(), integration.getClientId(),
+                integration.getClientSecret());
+        String application = expired.getProviderResourceId();
+        if (expired.getProviderCredentialId() != null) {
+            return graphClient.removePassword(token, application, expired.getProviderCredentialId());
+        }
+        boolean removed = false;
+        for (String keyId : graphClient.expiredPasswordCredentials(token, application, expired.getName(),
+                Instant.now())) {
+            removed |= graphClient.removePassword(token, application, keyId);
+        }
+        return removed;
+    }
+
+    /** The Google key id, read out of the stored JSON key file. */
+    private static String googleKeyIdOf(ApiKey key) {
+        try {
+            return ServiceAccountKey.privateKeyId(key.getKeyValue());
+        } catch (IllegalArgumentException e) {
+            throw new ProvisioningException("Could not work out which Google key to delete: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * The access key id, read out of the stored two-line value. The id is the
+     * public half of the pair and is in the notes too, but the value is the one
+     * place it is guaranteed to be - the notes are the owner's to edit.
+     */
+    static String awsAccessKeyIdOf(ApiKey key) {
+        String value = key.getKeyValue() == null ? "" : key.getKeyValue();
+        for (String line : value.split("\\R")) {
+            String trimmed = line.trim();
+            if (trimmed.startsWith("AWS_ACCESS_KEY_ID=")) {
+                String id = trimmed.substring("AWS_ACCESS_KEY_ID=".length()).trim();
+                if (!id.isEmpty()) {
+                    return id;
+                }
+            }
+        }
+        throw new ProvisioningException("Could not work out which AWS access key to delete: the stored value "
+                + "has no AWS_ACCESS_KEY_ID line");
     }
 
     /**
@@ -185,10 +334,19 @@ public class KeyProvisioningService {
         return Math.min(730, Math.max(30, days));
     }
 
-    /** The old key's notes carry the client details; keep them, and say why this key exists. */
-    private static String rotationNotes(ApiKey expiring) {
+    /**
+     * The old key's notes carry the client details; keep them, and say why this
+     * key exists.
+     *
+     * @param extra a line about the new credential itself, where the old notes
+     *              would otherwise describe the wrong one (AWS's access key id)
+     */
+    private static String rotationNotes(ApiKey expiring, String extra) {
         String notes = "Replaces \"" + expiring.getName() + "\", which expires on " + expiring.getExpiresOn()
                 + ". Minted automatically.";
+        if (extra != null) {
+            notes = notes + "\n" + extra;
+        }
         if (StringUtils.hasText(expiring.getNotes())) {
             notes = notes + "\n\n" + expiring.getNotes();
         }
@@ -220,8 +378,9 @@ public class KeyProvisioningService {
         ApiKey key = apiKeyService.create(new ApiKeyDetails(displayName, integration.getName(), secret.secret(),
                 LocalDate.now(), expiryDate(secret, requestedEnd), buildNotes(notes, integration, application)),
                 owner, KeyOrigin.provisionedBy(integration.getName()),
-                // remembered so a replacement can be minted on this same client later
-                KeyProvenance.provisioned(integration.getId(), application.objectId()));
+                // remembered so a replacement can be minted on this same client later,
+                // and this secret removed from it once that replacement has taken over
+                KeyProvenance.provisioned(integration.getId(), application.objectId(), secret.keyId()));
         integrations.markVerified(integration);
         log.info("Provisioned {} in {} (client id {})", key, integration, application.clientId());
         return key;
@@ -230,11 +389,13 @@ public class KeyProvisioningService {
     /**
      * Google Cloud: service account + JSON key. The key is the full credentials file
      * clients authenticate with, stored encrypted as the key value. Google service
-     * account keys don't expire, so the local key has no expiry. The secret-validity
-     * choice doesn't apply here; expiry can't be set through the keys API.
+     * account keys don't expire and the keys API can't be told to make them, so the
+     * chosen validity is the portal's own date: it drives the reminders, and with
+     * automatic replacement on it is when the portal deletes the key at Google
+     * once a successor exists.
      */
-    private ApiKey provisionGoogle(ServiceIntegration integration, String displayName, String notes,
-            UserAccount owner) {
+    private ApiKey provisionGoogle(ServiceIntegration integration, String displayName, SecretValidity validity,
+            String notes, UserAccount owner) {
         String projectId = integration.getTenantId();
         String token = googleIamClient.acquireToken(integration.getClientId(), integration.getClientSecret());
         CreatedServiceAccount account = googleIamClient.createServiceAccount(token, projectId,
@@ -250,9 +411,10 @@ public class KeyProvisioningService {
         }
 
         ApiKey key = apiKeyService.create(new ApiKeyDetails(displayName, integration.getName(), keyJson,
-                LocalDate.now(), null, buildGoogleNotes(notes, integration, account)),
+                LocalDate.now(), LocalDate.now().plusDays(validity.getDays()),
+                buildGoogleNotes(notes, integration, account)),
                 owner, KeyOrigin.provisionedBy(integration.getName()),
-                // remembered for completeness; Google keys are not rotated (yet)
+                // remembered so a replacement key can be minted on this same account later
                 KeyProvenance.provisioned(integration.getId(), account.email()));
         integrations.markVerified(integration);
         log.info("Provisioned {} in {} (service account {})", key, integration, account.email());
@@ -337,11 +499,12 @@ public class KeyProvisioningService {
      * as two env-style lines ({@code AWS_ACCESS_KEY_ID=...} and
      * {@code AWS_SECRET_ACCESS_KEY=...}); the access key ID alone is not secret
      * and goes in the notes too, so the key is findable in the AWS console.
-     * Access keys don't expire on their own, so the local key has no expiry and
-     * the secret-validity choice doesn't apply.
+     * Access keys don't expire on their own, so the chosen validity is the portal's
+     * own date: it drives the reminders, and with automatic replacement on it is
+     * when the portal deletes the key at AWS once a successor exists.
      */
-    private ApiKey provisionAws(ServiceIntegration integration, String displayName, String notes,
-            UserAccount owner) {
+    private ApiKey provisionAws(ServiceIntegration integration, String displayName, SecretValidity validity,
+            String notes, UserAccount owner) {
         String keyId = integration.getClientId();
         String secret = integration.getClientSecret();
         CreatedUser user = awsIamClient.createUser(keyId, secret, awsUserName(displayName));
@@ -358,7 +521,8 @@ public class KeyProvisioningService {
         String value = "AWS_ACCESS_KEY_ID=" + accessKey.accessKeyId()
                 + "\nAWS_SECRET_ACCESS_KEY=" + accessKey.secretAccessKey();
         ApiKey key = apiKeyService.create(new ApiKeyDetails(displayName, integration.getName(), value,
-                LocalDate.now(), null, buildAwsNotes(notes, integration, user, accessKey.accessKeyId())),
+                LocalDate.now(), LocalDate.now().plusDays(validity.getDays()),
+                buildAwsNotes(notes, integration, user, accessKey.accessKeyId())),
                 owner, KeyOrigin.provisionedBy(integration.getName()),
                 KeyProvenance.provisioned(integration.getId(), user.userName()));
         integrations.markVerified(integration);
@@ -410,7 +574,9 @@ public class KeyProvisioningService {
         notes.append("Created via the ").append(integration.getName()).append(" integration.\n")
                 .append("IAM user: ").append(user.arn()).append('\n')
                 .append("Access key ID: ").append(accessKeyId).append('\n')
-                .append("The key value holds both halves of the pair. AWS access keys don't expire on their own.");
+                .append("The key value holds both halves of the pair. AWS access keys don't expire on their own: ")
+                .append("the expiry here is the portal's, and with automatic replacement on the portal deletes ")
+                .append("this key at AWS when the date arrives, once its replacement exists.");
         return notes.toString();
     }
 
@@ -460,7 +626,9 @@ public class KeyProvisioningService {
         notes.append("Created via the ").append(integration.getName()).append(" integration.\n")
                 .append("Service account: ").append(account.email()).append('\n')
                 .append("Project: ").append(integration.getTenantId()).append('\n')
-                .append("The key value is the full JSON credentials file. Google service account keys don't expire.");
+                .append("The key value is the full JSON credentials file. Google service account keys don't expire ")
+                .append("on their own: the expiry here is the portal's, and with automatic replacement on the portal ")
+                .append("deletes this key at Google when the date arrives, once its replacement exists.");
         return notes.toString();
     }
 

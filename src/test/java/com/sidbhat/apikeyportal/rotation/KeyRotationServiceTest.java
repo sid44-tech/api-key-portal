@@ -60,6 +60,9 @@ class KeyRotationServiceTest {
     @Mock
     private AuditLog audit;
 
+    @Mock
+    private com.sidbhat.apikeyportal.alerts.AlertNotifier alerts;
+
     private KeyRotationService service;
 
     private final UserAccount alex = TestUsers.alex();
@@ -69,7 +72,7 @@ class KeyRotationServiceTest {
     @BeforeEach
     void setUp() {
         service = new KeyRotationService(keys, integrations, preferences, provisioning, mailer,
-                new RotationProperties(true, "0 0 7 * * *", 7), audit);
+                new RotationProperties(true, "0 0 7 * * *", 7), audit, alerts);
     }
 
     /** An expiring provisioned key of Alex's, id 42, minted through integration 7. */
@@ -106,9 +109,12 @@ class KeyRotationServiceTest {
 
         assertThat(service.rotateDueKeys(TODAY)).isEqualTo(1);
 
-        verify(mailer).send(key, minted, true);
+        // Azure retires the secret itself, and the integration tidies it away afterwards by default
+        verify(mailer).send(key, minted, ServiceProvider.AZURE_AD, true);
         verify(audit).allowed(eq("key_rotated"), eq("alex@example.com"),
                 eq("Azure AD / Reporting service"), any());
+        // a success wipes any failure the dashboard was showing for this key
+        verify(keys).clearRotationFailure(42L);
     }
 
     @Test
@@ -171,7 +177,7 @@ class KeyRotationServiceTest {
     void providersWithoutRotationSupportAreSkipped() {
         candidates(expiring());
         when(integrations.findById(7L)).thenReturn(Optional.of(new ServiceIntegration(
-                ServiceProvider.GOOGLE_CLOUD, "GCP", "project", "client", "secret")));
+                ServiceProvider.CLOUDFLARE, "Cloudflare DNS", "tmpl-1", "tmpl-1", "cf-admin")));
 
         assertThat(service.rotateDueKeys(TODAY)).isZero();
         verifyNoInteractions(provisioning);
@@ -193,7 +199,37 @@ class KeyRotationServiceTest {
         // the failure is on the record and tried again next sweep; no email went
         // out claiming a replacement that doesn't exist
         verify(audit).refused(eq("key_rotated"), eq("alex@example.com"), any(), eq("Azure said no"));
-        verify(mailer, never()).send(eq(failing), any(), anyBoolean());
+        verify(mailer, never()).send(eq(failing), any(), any(), anyBoolean());
+        // and the failure lands on the key, where the dashboard can list it, and
+        // goes to the group's Teams channel if it has one
+        verify(keys).markRotationFailed(eq(42L), any(), eq("Azure said no"));
+        verify(alerts).rotationFailed(eq(failing), eq("Azure said no"));
+        verify(alerts, never()).rotationFailed(eq(fine), any());
+        verify(keys, never()).markRotationFailed(eq(43L), any(), any());
+    }
+
+    @Test
+    void anUnexpectedErrorIsThisKeysProblemNotTheMornings() {
+        ApiKey failing = expiring();
+        ApiKey fine = expiring();
+        ReflectionTestUtils.setField(fine, "id", 43L);
+        candidates(failing, fine);
+        when(integrations.findById(7L)).thenReturn(Optional.of(azure));
+        prefersRotation(true);
+        // not a provider refusal: the mint worked and the save blew up, or any
+        // other surprise - the kind of error that used to abandon the whole sweep
+        when(provisioning.rotate(failing, azure))
+                .thenThrow(new org.springframework.dao.DataAccessResourceFailureException("database is away"));
+        when(provisioning.rotate(fine, azure)).thenReturn(replacement());
+
+        assertThat(service.rotateDueKeys(TODAY)).isEqualTo(1);
+
+        // the second key still got its replacement, and the failure is on the
+        // record to be retried tomorrow
+        verify(mailer).send(eq(fine), any(), eq(ServiceProvider.AZURE_AD), anyBoolean());
+        verify(audit).refused(eq("key_rotated"), eq("alex@example.com"), any(),
+                contains("database is away"));
+        verify(mailer, never()).send(eq(failing), any(), any(), anyBoolean());
     }
 
     @Test
@@ -243,7 +279,7 @@ class KeyRotationServiceTest {
         assertThat(service.rotateDueKeys(TODAY)).isEqualTo(1);
 
         // the email must say "already changed", not "a replacement is ready"
-        verify(mailer).send(key, key, false);
+        verify(mailer).send(key, key, ServiceProvider.GITLAB, false);
         verify(audit).allowed(eq("key_rotated"), any(), any(),
                 contains("previous value was revoked"));
     }
@@ -255,5 +291,144 @@ class KeyRotationServiceTest {
 
         assertThat(service.supportsRotation(key)).isTrue();
         assertThat(service.rotationOverlaps(key)).isFalse();
+        // in-place rotation leaves nothing behind, so there is nothing to delete
+        assertThat(service.deletesReplaced(key)).isFalse();
+    }
+
+    // ---------- providers whose keys the portal has to delete itself ----------
+
+    private final ServiceIntegration google = new ServiceIntegration(ServiceProvider.GOOGLE_CLOUD, "Google Cloud",
+            "my-project", "portal@my-project.iam.gserviceaccount.com", "-----BEGIN PRIVATE KEY-----");
+
+    /** A Google key of Alex's that expired yesterday. */
+    private ApiKey expiredGoogleKey() {
+        ApiKey key = new ApiKey("Reporting service", "Google Cloud", "{\"private_key_id\":\"old\"}",
+                TODAY.minusDays(181), TODAY.minusDays(1));
+        key.assignTo(alex, alex.getGroup());
+        key.recordProvenance(7L, "reporting@my-project.iam.gserviceaccount.com", null, null);
+        ReflectionTestUtils.setField(key, "id", 71L);
+        return key;
+    }
+
+    @Test
+    void aGoogleKeyRotatesWithAnOverlapAndTheAuditSaysTheDeletionIsComing() {
+        ApiKey key = expiring();
+        candidates(key);
+        when(integrations.findById(7L)).thenReturn(Optional.of(google));
+        when(preferences.findByUserIdAndProvider(alex.getId(), ServiceProvider.GOOGLE_CLOUD))
+                .thenReturn(Optional.of(new AutoRotationPreference(alex.getId(), ServiceProvider.GOOGLE_CLOUD, true)));
+        ApiKey minted = replacement();
+        when(provisioning.rotate(key, google)).thenReturn(minted);
+
+        // five days out and overlapping, so it goes now - like Azure, unlike GitLab
+        assertThat(service.rotateDueKeys(TODAY)).isEqualTo(1);
+
+        verify(mailer).send(key, minted, ServiceProvider.GOOGLE_CLOUD, true);
+        verify(audit).allowed(eq("key_rotated"), eq("alex@example.com"), any(),
+                contains("will be deleted at Google Cloud after it expires on " + key.getExpiresOn()));
+        assertThat(service.deletesReplaced(key)).isTrue();
+        assertThat(service.providerNeverExpires(key)).isTrue();
+    }
+
+    @Test
+    void withDeletionSwitchedOffTheEmailAndAuditSayTheOldKeyKeepsWorking() {
+        ApiKey key = expiring();
+        candidates(key);
+        google.setDeleteReplacedKeys(false);
+        when(integrations.findById(7L)).thenReturn(Optional.of(google));
+        when(preferences.findByUserIdAndProvider(alex.getId(), ServiceProvider.GOOGLE_CLOUD))
+                .thenReturn(Optional.of(new AutoRotationPreference(alex.getId(), ServiceProvider.GOOGLE_CLOUD, true)));
+        when(provisioning.rotate(key, google)).thenReturn(replacement());
+
+        assertThat(service.rotateDueKeys(TODAY)).isEqualTo(1);
+
+        // the replacement is still minted; what changes is what the owner is told
+        verify(mailer).send(eq(key), any(), eq(ServiceProvider.GOOGLE_CLOUD), eq(false));
+        verify(audit).allowed(eq("key_rotated"), any(), any(), contains("deletion at Google Cloud is switched off"));
+        assertThat(service.deletesReplaced(key)).isFalse();
+        assertThat(service.providerNeverExpires(key)).isTrue();
+    }
+
+    @Test
+    void anExpiredReplacedGoogleKeyIsDeletedAtTheProvider() {
+        ApiKey key = expiredGoogleKey();
+        when(keys.findRevocationCandidates(TODAY)).thenReturn(List.of(key));
+        when(integrations.findById(7L)).thenReturn(Optional.of(google));
+
+        assertThat(service.revokeExpiredKeys(TODAY)).isEqualTo(1);
+
+        verify(provisioning).revoke(key, google);
+        // the owner's settings are not consulted again: the rotation they asked
+        // for is simply being finished
+        verifyNoInteractions(preferences, mailer);
+    }
+
+    @Test
+    void theDeletionSweepTidiesTheExpiredAzureSecretAwayToo() {
+        ApiKey key = expiring();
+        ReflectionTestUtils.setField(key, "expiresOn", TODAY.minusDays(1));
+        when(keys.findRevocationCandidates(TODAY)).thenReturn(List.of(key));
+        when(integrations.findById(7L)).thenReturn(Optional.of(azure));
+
+        // Azure has already stopped the secret; this takes the dead entry off the registration
+        assertThat(service.revokeExpiredKeys(TODAY)).isEqualTo(1);
+        verify(provisioning).revoke(key, azure);
+    }
+
+    @Test
+    void anIntegrationWithDeletionSwitchedOffLeavesTheExpiredKeyAtTheProvider() {
+        ApiKey key = expiredGoogleKey();
+        google.setDeleteReplacedKeys(false);
+        when(keys.findRevocationCandidates(TODAY)).thenReturn(List.of(key));
+        when(integrations.findById(7L)).thenReturn(Optional.of(google));
+
+        assertThat(service.revokeExpiredKeys(TODAY)).isZero();
+        verifyNoInteractions(provisioning);
+    }
+
+    @Test
+    void aSwitchedOffIntegrationDeletesNothingEither() {
+        when(keys.findRevocationCandidates(TODAY)).thenReturn(List.of(expiredGoogleKey()));
+        google.setEnabled(false);
+        when(integrations.findById(7L)).thenReturn(Optional.of(google));
+
+        assertThat(service.revokeExpiredKeys(TODAY)).isZero();
+        verifyNoInteractions(provisioning);
+    }
+
+    @Test
+    void anUnexpectedErrorDeletingOneKeyDoesNotLeaveTheRestAliveAtTheirProviders() {
+        ApiKey failing = expiredGoogleKey();
+        ApiKey fine = expiredGoogleKey();
+        ReflectionTestUtils.setField(fine, "id", 72L);
+        when(keys.findRevocationCandidates(TODAY)).thenReturn(List.of(failing, fine));
+        when(integrations.findById(7L)).thenReturn(Optional.of(google));
+        org.mockito.Mockito.doThrow(new org.springframework.dao.DataAccessResourceFailureException("database is away"))
+                .when(provisioning).revoke(failing, google);
+
+        assertThat(service.revokeExpiredKeys(TODAY)).isEqualTo(1);
+
+        verify(provisioning).revoke(fine, google);
+        verify(audit).refused(eq("key_revoked"), eq("alex@example.com"), any(),
+                contains("database is away"));
+    }
+
+    @Test
+    void aRefusedDeletionIsRecordedAndTriedAgainNextSweep() {
+        ApiKey failing = expiredGoogleKey();
+        ApiKey fine = expiredGoogleKey();
+        ReflectionTestUtils.setField(fine, "id", 72L);
+        when(keys.findRevocationCandidates(TODAY)).thenReturn(List.of(failing, fine));
+        when(integrations.findById(7L)).thenReturn(Optional.of(google));
+        org.mockito.Mockito.doThrow(new ProvisioningException("Permission iam.serviceAccountKeys.delete denied"))
+                .when(provisioning).revoke(failing, google);
+
+        assertThat(service.revokeExpiredKeys(TODAY)).isEqualTo(1);
+
+        verify(audit).refused(eq("key_revoked"), eq("alex@example.com"), any(),
+                eq("Permission iam.serviceAccountKeys.delete denied"));
+        verify(provisioning).revoke(fine, google);
+        verify(keys).markRotationFailed(eq(71L), any(), contains("Could not delete at the provider"));
+        verify(keys).clearRotationFailure(72L);
     }
 }

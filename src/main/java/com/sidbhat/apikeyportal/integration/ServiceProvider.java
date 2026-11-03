@@ -9,28 +9,33 @@ package com.sidbhat.apikeyportal.integration;
  */
 public enum ServiceProvider {
 
-    AZURE_AD("Microsoft Azure AD (Entra ID)", "bi-microsoft", true, true, true),
-    /**
-     * No rotation yet: Google service account keys never expire on their own, so
-     * replacing one means deleting the old key at the provider too - a bigger
-     * step than adding a secret, and one to take deliberately later.
-     */
-    GOOGLE_CLOUD("Google Cloud", "bi-google", false, false, false),
+    AZURE_AD("Microsoft Azure AD (Entra ID)", "bi-microsoft", true, true, true, false, true),
 
     /**
-     * No rotation for the same reason as Google: IAM access keys never expire on
-     * their own, so honest rotation means deleting the old key at AWS too.
+     * Google service account keys never expire on their own, so the expiry is the
+     * portal's: chosen at creation, and made true by the portal deleting the old
+     * key at Google once its replacement has been minted and the date arrives.
+     * The replacement is a second key on the same service account, so both work
+     * through the hand-over.
      */
-    AWS_IAM("Amazon Web Services (IAM)", "bi-amazon", false, false, false),
+    GOOGLE_CLOUD("Google Cloud", "bi-google", true, true, true, true, true),
+
+    /**
+     * As Google: IAM access keys never expire on their own, so the portal enforces
+     * the date by deleting the old key at AWS after the hand-over. The replacement
+     * is a second access key on the same IAM user - AWS allows exactly two, which
+     * is what makes an overlap possible at all.
+     */
+    AWS_IAM("Amazon Web Services (IAM)", "bi-amazon", true, true, true, true, true),
 
     /**
      * Rotates through GitLab's own rotate endpoint, which issues a new value and
      * revokes the old one in the same call. No overlap: the key is replaced in
      * place, as late as the portal safely can.
      */
-    GITLAB("GitLab", "bi-gitlab", true, true, false),
+    GITLAB("GitLab", "bi-gitlab", true, true, false, false, false),
 
-    CLOUDFLARE("Cloudflare", "bi-cloud-fill", false, true, false);
+    CLOUDFLARE("Cloudflare", "bi-cloud-fill", false, true, false, false, false);
 
     private final String label;
 
@@ -41,8 +46,9 @@ public enum ServiceProvider {
     private final boolean supportsRotation;
 
     /**
-     * Whether a provisioned credential's lifetime is the user's to choose. False
-     * where the provider's keys simply never expire (Google, AWS).
+     * Whether a provisioned credential's lifetime is the user's to choose. True
+     * everywhere now: where the provider's keys never expire by themselves
+     * (Google, AWS), the choice is the date the portal will enforce instead.
      */
     private final boolean supportsValidityChoice;
 
@@ -55,17 +61,45 @@ public enum ServiceProvider {
      */
     private final boolean rotationOverlaps;
 
+    /**
+     * Whether the provider never retires a credential itself, so the expiry date
+     * is the portal's own - chosen at creation - and only the portal deleting the
+     * credential makes it true. Without that an "expired" Google or AWS key is
+     * bookkeeping: shown as expired here, working as ever there.
+     */
+    private final boolean revokedByPortal;
+
+    /**
+     * Whether the portal can delete a replaced, expired credential at the
+     * provider at all. True wherever a second credential sits beside the old
+     * one: Azure's password credentials, Google's keys, AWS's access keys.
+     * False for GitLab, which replaces in place and leaves nothing behind, and
+     * Cloudflare, which does not rotate. Whether it <em>does</em> is the
+     * integration's switch.
+     */
+    private final boolean canDeleteReplaced;
+
     ServiceProvider(String label, String icon, boolean supportsRotation, boolean supportsValidityChoice,
-            boolean rotationOverlaps) {
+            boolean rotationOverlaps, boolean revokedByPortal, boolean canDeleteReplaced) {
         this.label = label;
         this.icon = icon;
         this.supportsRotation = supportsRotation;
         this.supportsValidityChoice = supportsValidityChoice;
         this.rotationOverlaps = rotationOverlaps;
+        this.revokedByPortal = revokedByPortal;
+        this.canDeleteReplaced = canDeleteReplaced;
+    }
+
+    public boolean canDeleteReplaced() {
+        return canDeleteReplaced;
     }
 
     public boolean rotationOverlaps() {
         return rotationOverlaps;
+    }
+
+    public boolean revokedByPortal() {
+        return revokedByPortal;
     }
 
     public boolean supportsRotation() {

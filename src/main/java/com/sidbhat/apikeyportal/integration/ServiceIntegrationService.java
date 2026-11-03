@@ -143,6 +143,28 @@ public class ServiceIntegrationService {
     }
 
     /**
+     * The per-integration switch for deleting replaced, expired keys at the
+     * provider. The same people as {@link #setEnabled}: it decides what happens
+     * inside the provider with the integration's credential.
+     */
+    public ServiceIntegration setDeleteReplacedKeys(Long id, boolean delete, UserAccount admin) {
+        ServiceIntegration integration = requireAdministrable(id, admin);
+        if (!integration.getProvider().canDeleteReplaced()) {
+            throw new IllegalArgumentException(integration.getProvider().getLabel()
+                    + " leaves nothing behind to delete");
+        }
+        if (integration.isDeleteReplacedKeys() == delete) {
+            return integration;
+        }
+        integration.setDeleteReplacedKeys(delete);
+        ServiceIntegration saved = repository.save(integration);
+        audit.allowed("integration_setting_changed", admin.getEmail(), saved.getName(),
+                "Delete replaced keys at the provider: " + (delete ? "on" : "off"));
+        log.info("{} switched deletion of replaced keys {} for {}", admin.getEmail(), delete ? "on" : "off", saved);
+        return saved;
+    }
+
+    /**
      * The integrations {@code viewer} can actually mint keys through right now:
      * their group's, minus the switched-off ones. The add-key page offers these;
      * the integrations page itself uses {@link #findAll} so an admin can still

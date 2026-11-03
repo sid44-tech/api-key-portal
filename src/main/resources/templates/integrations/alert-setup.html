@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title th:text="${provider.label}">Microsoft Teams</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <div class="kp-page-header">
+                <div>
+                    <h1 th:text="${provider.label}">Microsoft Teams</h1>
+                    <p class="kp-subtitle">
+                        Post <strong th:text="${groupName}">Platform team</strong>'s alerts to a
+                        <span th:text="${provider.label}">Teams</span> channel, alongside the emails: keys about to
+                        expire, automatic replacements that failed, and sign-in lockouts. Never a key value.
+                    </p>
+                </div>
+            </div>
+
+            <th:block th:object="${form}">
+                <div class="alert alert-danger" th:if="${#fields.hasGlobalErrors()}">
+                    <p class="mb-0" th:each="err : ${#fields.globalErrors()}" th:text="${err}">Error</p>
+                </div>
+            </th:block>
+
+            <div class="card mb-4 setup-step" th:unless="${connected}">
+                <div class="card-body d-flex">
+                    <div class="step-number me-3">1</div>
+                    <div class="flex-grow-1" th:switch="${provider.name()}">
+                        <th:block th:case="'TEAMS'">
+                            <h2 class="h5">Create an incoming webhook in Teams</h2>
+                            <ol class="mb-3">
+                                <li>In Teams, open the channel the alerts should go to and choose
+                                    <strong>&hellip; &rarr; Workflows</strong>.</li>
+                                <li>Pick <strong>Post to a channel when a webhook request is received</strong>,
+                                    name it (any name works), confirm the team and channel, and press
+                                    <strong>Add workflow</strong>.</li>
+                                <li>Copy the URL it shows you. It is shown once; make a new workflow if it is lost.</li>
+                            </ol>
+                            <p class="text-muted small mb-0">
+                                <i class="bi bi-shield-check me-1" aria-hidden="true"></i>
+                                The URL is the credential: anyone holding it can post into the channel. It is stored
+                                encrypted here and never shown again. Older <em>Incoming Webhook</em> connectors work
+                                too, if your tenant still has them.
+                            </p>
+                        </th:block>
+                        <th:block th:case="'SLACK'">
+                            <h2 class="h5">Create an incoming webhook in Slack</h2>
+                            <ol class="mb-3">
+                                <li>Open <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer">api.slack.com/apps</a>
+                                    and press <strong>Create New App &rarr; From scratch</strong>; name it (any name works)
+                                    and pick your workspace.</li>
+                                <li>Under <strong>Incoming Webhooks</strong>, switch <em>Activate Incoming Webhooks</em>
+                                    on, then <strong>Add New Webhook to Workspace</strong> and choose the channel.</li>
+                                <li>Copy the webhook URL it shows (it starts with
+                                    <code>https://hooks.slack.com/services/</code>).</li>
+                            </ol>
+                            <p class="text-muted small mb-0">
+                                <i class="bi bi-shield-check me-1" aria-hidden="true"></i>
+                                The URL is the credential: anyone holding it can post into the channel. It is stored
+                                encrypted here and never shown again. The app needs no other scopes.
+                            </p>
+                        </th:block>
+                    </div>
+                </div>
+            </div>
+
+            <form th:action="@{/integrations/alerts/{p}(p=${provider.path})}" th:object="${form}" method="post" novalidate>
+                <input type="hidden" th:field="*{webhookStored}">
+                <div class="card mb-4">
+                    <div class="card-header" th:text="${connected} ? 'Channel' : 'Connect the channel'">Channel</div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label" for="name">Channel name</label>
+                            <input type="text" class="form-control" th:field="*{name}" th:errorclass="is-invalid"
+                                   maxlength="60" placeholder="e.g. #platform-alerts" required>
+                            <small class="form-text">Only a label for the integrations page;
+                                <span th:text="${provider.label}">Teams</span> decides where the webhook posts.</small>
+                            <div class="invalid-feedback" th:errors="*{name}"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="webhookUrl">Webhook URL</label>
+                            <input type="password" class="form-control font-monospace" th:field="*{webhookUrl}"
+                                   th:errorclass="is-invalid" autocomplete="off" maxlength="4000"
+                                   placeholder="https://&hellip;">
+                            <small class="form-text" th:if="*{webhookStored}">
+                                <i class="bi bi-shield-lock me-1" aria-hidden="true"></i>
+                                A URL is stored and encrypted. Leave blank to keep it.
+                            </small>
+                            <small class="form-text" th:unless="*{webhookStored}">Must start with https://. Stored
+                                encrypted and never shown again.</small>
+                            <div class="invalid-feedback" th:errors="*{webhookUrl}"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">What to post</div>
+                    <div class="card-body">
+                        <div class="form-check form-switch mb-2">
+                            <input type="checkbox" class="form-check-input" role="switch" th:field="*{notifyExpiries}">
+                            <label class="form-check-label" for="notifyExpiries">
+                                <strong>Keys about to expire</strong> &mdash; at the same points as the reminder
+                                emails: a month, two weeks, a week and a day before.
+                            </label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input type="checkbox" class="form-check-input" role="switch" th:field="*{notifyRotationFailures}">
+                            <label class="form-check-label" for="notifyRotationFailures">
+                                <strong>Failed automatic replacements</strong> &mdash; when the daily sweep could not
+                                mint a replacement or delete an expired key at the provider.
+                            </label>
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <input type="checkbox" class="form-check-input" role="switch" th:field="*{notifyLockouts}">
+                            <label class="form-check-label" for="notifyLockouts">
+                                <strong>Sign-in lockouts</strong> &mdash; an account or address refused after too many
+                                wrong passwords. These name the account or address and cover the whole portal, not just
+                                this group, so leave it off for a channel everyone can read.
+                            </label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input type="checkbox" class="form-check-input" role="switch" th:field="*{enabled}">
+                            <label class="form-check-label" for="enabled">
+                                <strong>Switched on</strong> &mdash; off pauses every post without forgetting the webhook.
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <button type="submit" class="btn btn-primary">
+                        <i th:class="'bi me-1 ' + ${provider.icon}" aria-hidden="true"></i>
+                        <th:block th:text="${connected} ? 'Save' : 'Connect'">Connect</th:block>
+                    </button>
+                    <a th:href="@{/integrations}" class="btn btn-link">Cancel</a>
+                    <span class="text-muted small">A test card is posted to the channel first; nothing is saved if
+                        <span th:text="${provider.label}">Teams</span> refuses it.</span>
+                </div>
+            </form>
+
+            <div class="d-flex flex-wrap gap-2 mt-4" th:if="${connected}">
+                <form th:action="@{/integrations/alerts/{p}/test(p=${provider.path})}" method="post">
+                    <button type="submit" class="btn btn-secondary btn-sm">
+                        <i class="bi bi-send me-1" aria-hidden="true"></i> Post a test card
+                    </button>
+                </form>
+                <form th:action="@{/integrations/alerts/{p}/delete(p=${provider.path})}" method="post" class="js-confirm"
+                      th:attr="data-confirm=${'Disconnect the ' + provider.label + ' channel? Alerts stop; nothing changes in ' + provider.label + '.'}">
+                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                        <i class="bi bi-trash me-1" aria-hidden="true"></i> Disconnect
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<th:block layout:fragment="scripts">
+    <script th:src="@{/js/keys.js}"></script>
+</th:block>
+</body>
+</html>

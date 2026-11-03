@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.sidbhat.apikeyportal.user.UserAccount;
 import com.sidbhat.apikeyportal.user.UserGroup;
@@ -36,6 +37,22 @@ public interface ApiKeyRepository extends JpaRepository<ApiKey, Long>, JpaSpecif
     @Modifying(flushAutomatically = true)
     @Query("update ApiKey k set k.lastRevealedAt = :revealedAt where k.id = :id")
     int markRevealed(@Param("id") Long id, @Param("revealedAt") Instant revealedAt);
+
+    /**
+     * Remembers that the sweep could not replace or delete this key, for the
+     * dashboard. A bulk update, so the key does not look edited; transactional
+     * here because the sweep that calls it deliberately is not.
+     */
+    @Transactional
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update ApiKey k set k.rotationFailedAt = :at, k.rotationFailure = :message where k.id = :id")
+    int markRotationFailed(@Param("id") Long id, @Param("at") Instant at, @Param("message") String message);
+
+    /** The next success wipes the slate. */
+    @Transactional
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update ApiKey k set k.rotationFailedAt = null, k.rotationFailure = null where k.id = :id")
+    int clearRotationFailure(@Param("id") Long id);
 
     /** How many keys each of the given people holds, as {@code [ownerId, count]} rows. */
     @Query("select k.owner.id, count(k) from ApiKey k where k.owner.id in :ownerIds group by k.owner.id")
@@ -68,6 +85,22 @@ public interface ApiKeyRepository extends JpaRepository<ApiKey, Long>, JpaSpecif
             + "and not exists (select r.id from ApiKey r where r.rotatedFromKeyId = k.id) "
             + "order by k.expiresOn, k.id")
     List<ApiKey> findRotationCandidates(@Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    /**
+     * Keys whose expiry the portal has to make true: expired, minted through an
+     * integration, already replaced, and not yet deleted at the provider. Which
+     * providers that applies to is decided by the caller - the query hands back
+     * every replaced key past its date, which is a short list either way.
+     * <p>
+     * A replacement is required on purpose: deleting somebody's only working
+     * credential because a date passed is not rotation, it is an outage. A key
+     * nobody asked to replace keeps its date as the reminder it always was.
+     */
+    @Query("select k from ApiKey k where k.expiresOn <= :today and k.revokedAt is null "
+            + "and k.integrationId is not null and k.providerResourceId is not null "
+            + "and exists (select r.id from ApiKey r where r.rotatedFromKeyId = k.id) "
+            + "order by k.expiresOn, k.id")
+    List<ApiKey> findRevocationCandidates(@Param("today") LocalDate today);
 
     /**
      * Hands keys that predate accounts to the bootstrap admin. Only ever matches

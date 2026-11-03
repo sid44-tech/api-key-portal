@@ -28,6 +28,7 @@ public class PortalUser implements UserDetails, Serializable {
     private final boolean enabled;
     private final boolean mustChangePassword;
     private final boolean ssoLinked;
+    private final boolean mfaEnabled;
 
     public PortalUser(UserAccount account) {
         this.id = account.getId();
@@ -38,6 +39,12 @@ public class PortalUser implements UserDetails, Serializable {
         this.enabled = account.isEnabled();
         this.mustChangePassword = account.isMustChangePassword();
         this.ssoLinked = account.isSsoLinked();
+        this.mfaEnabled = account.isMfaEnabled();
+    }
+
+    /** Whether a code is owed after the password; decides where sign-in lands. */
+    public boolean isMfaEnabled() {
+        return mfaEnabled;
     }
 
     public Long getId() {

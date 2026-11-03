@@ -109,6 +109,30 @@ public class AwsIamClient {
                 required(response, "SecretAccessKey", "CreateAccessKey"));
     }
 
+    /**
+     * Deletes one access key of a user, leaving the user and its other key alone.
+     * This is what makes a portal-side expiry true for AWS: the replacement pair
+     * is already live, and from this call on the old one is not.
+     *
+     * @return true if the key was deleted, false if AWS no longer had it (already
+     *         deleted in the console, say) - either way it is gone, which is the point
+     */
+    public boolean deleteAccessKey(String accessKeyId, String secretAccessKey, String userName,
+            String accessKeyIdToDelete) {
+        String body = form("Action", "DeleteAccessKey", "Version", IAM_VERSION,
+                "UserName", userName, "AccessKeyId", accessKeyIdToDelete);
+        try {
+            call(iamClient, iamHost, "iam", accessKeyId, secretAccessKey, body, "Could not delete the access key");
+            return true;
+        } catch (ProvisioningException e) {
+            if (e.getCause() instanceof RestClientResponseException cause
+                    && "NoSuchEntity".equals(extract(cause.getResponseBodyAsString(), ERROR_CODE))) {
+                return false;
+            }
+            throw e;
+        }
+    }
+
     /** Removes a user created earlier in a run that then failed. */
     public void deleteUser(String accessKeyId, String secretAccessKey, String userName) {
         String body = form("Action", "DeleteUser", "Version", IAM_VERSION, "UserName", userName);
@@ -153,7 +177,8 @@ public class AwsIamClient {
             case "AccessDenied", "AccessDeniedException" ->
                     "The portal's IAM user is missing a permission - re-check the policy from the setup steps.";
             case "EntityAlreadyExists" -> "A user with that name already exists in the account.";
-            case "LimitExceeded" -> "The AWS account's IAM limit was reached.";
+            case "LimitExceeded" -> "An IAM limit was reached. An IAM user can hold two access keys at most, "
+                    + "so a key may need deleting in the console before another can be made.";
             default -> null;
         };
         String detail = friendly != null ? friendly

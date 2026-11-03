@@ -122,14 +122,23 @@ jobs:
           set -euo pipefail
 
           if [ "${{ matrix.name }}" = "all-in-one" ]; then
-            # Deliberately no configuration at all: "ready to run" is the claim
-            # this image makes, and this is the test of it.
-            docker run -d --name portal-smoke -p 8080:8080 api-key-portal:ci
-          else
-            docker run -d --name portal-smoke -p 8080:8080 \
-              -e PORTAL_ENCRYPTION_KEY="$(head -c 32 /dev/urandom | base64)" \
-              api-key-portal:ci
+            # The one thing this image insists on is an encryption key: it used
+            # to generate one into the data volume, next to the ciphertext, and
+            # now refuses instead. Prove the refusal - quickly, before any
+            # database is started - and that it says what to do about it.
+            if output=$(docker run --rm api-key-portal:ci 2>&1); then
+              echo "The all-in-one image started without PORTAL_ENCRYPTION_KEY; it must refuse."
+              exit 1
+            fi
+            grep -q "PORTAL_ENCRYPTION_KEY is not set" <<<"$output"
+            echo "The image refused to start without a key, as it should."
           fi
+
+          # Beyond the key, the all-in-one image needs no configuration at all:
+          # "ready to run" is the claim it makes, and this is the test of it.
+          docker run -d --name portal-smoke -p 8080:8080 \
+            -e PORTAL_ENCRYPTION_KEY="$(head -c 32 /dev/urandom | base64)" \
+            api-key-portal:ci
 
           wait_for_portal() {
             local waited=0
@@ -150,6 +159,12 @@ jobs:
           }
 
           wait_for_portal
+
+          # The probes a monitor would use: the heartbeat and the deep check.
+          # Anonymous, so only the status - the details need a super admin.
+          curl -fsS http://localhost:8080/actuator/health/liveness | grep -q '"status":"UP"'
+          curl -fsS http://localhost:8080/actuator/health | grep -q '"status":"UP"'
+          echo "Health probes answer UP."
 
           # The second start is the branch that reuses an existing database
           # rather than creating one, and it is the one every restart after

@@ -50,10 +50,10 @@ public class StartupSummaryLogger implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         log.info("Portal started: database={}, singleSignOn={}, expiryReminders={}, "
-                        + "signInLockout=after {} failures for {}",
+                        + "signInLockout=after {} failures for {} (account locks need {} addresses)",
                 describeDatabase(), sso.isEnabled() ? "on" : "off",
                 notifications.isEnabled() ? "on" : "off",
-                lockout.getMaxAttempts(), lockout.getLockoutFor());
+                lockout.getMaxAttempts(), lockout.getLockoutFor(), lockout.getMinAddresses());
         audit.system("portal_started", "database=" + describeDatabase());
     }
 

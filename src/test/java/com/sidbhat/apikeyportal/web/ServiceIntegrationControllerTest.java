@@ -44,6 +44,10 @@ class ServiceIntegrationControllerTest {
     @Autowired
     private MockMvc mvc;
 
+    /** The group's chat channels, shown on the same page; none in these tests. */
+    @MockitoBean
+    private com.sidbhat.apikeyportal.alerts.AlertChannelService alertChannels;
+
     @MockitoBean
     private ServiceIntegrationService integrationService;
 
@@ -311,5 +315,21 @@ class ServiceIntegrationControllerTest {
         mvc.perform(post("/integrations/1/delete").with(csrf()))
                 .andExpect(redirectedUrl("/integrations"))
                 .andExpect(flash().attribute("success", Matchers.containsString("Removed Azure AD")));
+    }
+
+    @Test
+    @WithPortalUser("alex")
+    void aGroupAdminCanSwitchDeletionOfReplacedKeysOff() throws Exception {
+        ServiceIntegration aws = new ServiceIntegration(ServiceProvider.AWS_IAM, "AWS production",
+                "123456789012", "AKIDEXAMPLE", "aws-secret");
+        when(integrationService.setDeleteReplacedKeys(eq(5L), eq(false), any())).thenReturn(aws);
+
+        mvc.perform(post("/integrations/5/delete-replaced").with(csrf()).param("delete", "false"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/integrations"))
+                // the message says what that means for a provider that never expires keys
+                .andExpect(flash().attribute("success", org.hamcrest.Matchers.containsString("keep working there")));
+
+        verify(integrationService).setDeleteReplacedKeys(eq(5L), eq(false), any());
     }
 }

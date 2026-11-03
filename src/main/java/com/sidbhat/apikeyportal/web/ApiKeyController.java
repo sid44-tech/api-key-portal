@@ -84,6 +84,11 @@ public class ApiKeyController {
         // the two kinds of rotation promise different things; the page must not
         // promise an overlap the provider will not give
         model.addAttribute("rotationOverlaps", rotationService.rotationOverlaps(key));
+        // ...and where the portal will delete this one at the provider afterwards,
+        // the page has to say so - and whether that is tidying or the only thing
+        // that makes the expiry real
+        model.addAttribute("rotationRevokes", rotationService.deletesReplaced(key));
+        model.addAttribute("providerNeverExpires", rotationService.providerNeverExpires(key));
         model.addAttribute("providerRotationOn", rotationService.isEnabledForProviderOf(key, me));
         model.addAttribute("currentUser", me);
         return "keys/detail";

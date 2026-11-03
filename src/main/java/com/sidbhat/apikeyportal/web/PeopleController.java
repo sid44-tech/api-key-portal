@@ -34,8 +34,11 @@ public class PeopleController {
 
     private final UserAccountService userService;
     private final ApiKeyService apiKeyService;
+    private final com.sidbhat.apikeyportal.mfa.MfaService mfa;
 
-    public PeopleController(UserAccountService userService, ApiKeyService apiKeyService) {
+    public PeopleController(UserAccountService userService, ApiKeyService apiKeyService,
+            com.sidbhat.apikeyportal.mfa.MfaService mfa) {
+        this.mfa = mfa;
         this.userService = userService;
         this.apiKeyService = apiKeyService;
     }
@@ -92,5 +95,20 @@ public class PeopleController {
         model.addAttribute("roles", me.isSuperAdmin() ? UserRole.values()
                 : new UserRole[] {UserRole.GROUP_ADMIN, UserRole.MEMBER});
         model.addAttribute("groups", me.isSuperAdmin() ? userService.findAllGroups() : List.of());
+    }
+
+    /**
+     * The way back in after a lost phone with no recovery codes: a super admin
+     * clears the person's second factor, and they sign in with their password
+     * alone until they enrol again. Written down against both names.
+     */
+    @PostMapping("/{id}/mfa/reset")
+    public String resetMfa(@PathVariable Long id, @AuthenticationPrincipal PortalUser principal,
+            org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes) {
+        UserAccount me = userService.getCurrent(principal);
+        mfa.resetByAdmin(id, me);
+        redirectAttributes.addFlashAttribute("success",
+                "Two-factor authentication was reset. They sign in with their password alone until they set it up again.");
+        return "redirect:/people/" + id;
     }
 }

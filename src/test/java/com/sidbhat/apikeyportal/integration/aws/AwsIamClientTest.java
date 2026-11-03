@@ -108,6 +108,59 @@ class AwsIamClientTest {
     }
 
     @Test
+    void deletesOneAccessKeyOfAUserAndLeavesTheUserAlone() {
+        server.expect(requestTo(IAM + "/"))
+                .andExpect(content().string(
+                        "Action=DeleteAccessKey&Version=2010-05-08&UserName=reporting-1a2b&AccessKeyId=AKIAOLDKEY"))
+                .andRespond(withSuccess("""
+                        <DeleteAccessKeyResponse>
+                          <ResponseMetadata><RequestId>abc</RequestId></ResponseMetadata>
+                        </DeleteAccessKeyResponse>
+                        """, MediaType.TEXT_XML));
+
+        assertThat(client.deleteAccessKey(KEY_ID, SECRET, "reporting-1a2b", "AKIAOLDKEY")).isTrue();
+    }
+
+    @Test
+    void anAccessKeyAwsNoLongerHasCountsAsDeleted() {
+        server.expect(requestTo(IAM + "/")).andRespond(withStatus(HttpStatus.NOT_FOUND)
+                .contentType(MediaType.TEXT_XML)
+                .body("<ErrorResponse><Error><Code>NoSuchEntity</Code>"
+                        + "<Message>The Access Key with id AKIAOLDKEY cannot be found.</Message>"
+                        + "</Error></ErrorResponse>"));
+
+        // somebody deleted it in the console first; the goal was that it be gone
+        assertThat(client.deleteAccessKey(KEY_ID, SECRET, "reporting-1a2b", "AKIAOLDKEY")).isFalse();
+    }
+
+    @Test
+    void aRefusedAccessKeyDeletionPointsBackAtThePolicy() {
+        server.expect(requestTo(IAM + "/")).andRespond(withStatus(HttpStatus.FORBIDDEN)
+                .contentType(MediaType.TEXT_XML)
+                .body("<ErrorResponse><Error><Code>AccessDenied</Code>"
+                        + "<Message>User is not authorized to perform iam:DeleteAccessKey</Message>"
+                        + "</Error></ErrorResponse>"));
+
+        assertThatThrownBy(() -> client.deleteAccessKey(KEY_ID, SECRET, "reporting-1a2b", "AKIAOLDKEY"))
+                .isInstanceOf(ProvisioningException.class)
+                .hasMessageContaining("Could not delete the access key")
+                .hasMessageContaining("missing a permission");
+    }
+
+    @Test
+    void aSecondKeyMadeByHandIsExplainedWhenRotationHitsTheLimit() {
+        server.expect(requestTo(IAM + "/")).andRespond(withStatus(HttpStatus.CONFLICT)
+                .contentType(MediaType.TEXT_XML)
+                .body("<ErrorResponse><Error><Code>LimitExceeded</Code>"
+                        + "<Message>Cannot exceed quota for AccessKeysPerUser: 2</Message>"
+                        + "</Error></ErrorResponse>"));
+
+        assertThatThrownBy(() -> client.createAccessKey(KEY_ID, SECRET, "reporting-1a2b"))
+                .isInstanceOf(ProvisioningException.class)
+                .hasMessageContaining("two access keys at most");
+    }
+
+    @Test
     void aWrongAccessKeyIdIsSaidInPlainWords() {
         server.expect(requestTo(STS + "/")).andRespond(withStatus(HttpStatus.FORBIDDEN)
                 .contentType(MediaType.TEXT_XML)

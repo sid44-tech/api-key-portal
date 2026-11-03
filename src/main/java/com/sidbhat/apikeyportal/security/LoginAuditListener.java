@@ -13,6 +13,7 @@ import org.springframework.security.web.authentication.logout.LogoutHandler;
 import org.springframework.stereotype.Component;
 
 import com.sidbhat.apikeyportal.logging.AuditLog;
+import com.sidbhat.apikeyportal.user.PortalUser;
 import com.sidbhat.apikeyportal.user.UserAccountService;
 
 /**
@@ -40,9 +41,23 @@ public class LoginAuditListener implements LogoutHandler {
     @EventListener
     public void onSuccess(AuthenticationSuccessEvent event) {
         String email = event.getAuthentication().getName();
+        if (event.getAuthentication().getPrincipal() instanceof PortalUser user && user.isMfaEnabled()
+                && !user.isSsoLinked()) {
+            // the password is half of it: "signed in" and the lockout reset wait
+            // for the code, which MfaController records when it comes
+            audit.allowed("sign_in", email, email, "Password accepted; second factor pending");
+            return;
+        }
         users.recordLogin(email);
         attempts.recordSuccess(email, addressOf(event.getAuthentication()));
         audit.allowed("sign_in", email, email, methodOf(event.getAuthentication()));
+    }
+
+    /** The second half: a code was accepted, the sign-in is complete. */
+    public void onMfaCompleted(String email, String address, String how) {
+        users.recordLogin(email);
+        attempts.recordSuccess(email, address);
+        audit.allowed("sign_in", email, email, "Second factor verified (" + how + ")");
     }
 
     @EventListener

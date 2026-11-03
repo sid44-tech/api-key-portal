@@ -5,12 +5,15 @@
 # Then open http://localhost:8080 and sign in as admin@localhost / changeme,
 # which the portal makes you replace before it lets you do anything else.
 #
-# Nothing has to be configured first: the database is inside the image, and the
-# database password and encryption key are generated on the first start and kept
-# in the data volume. For anything you would mind losing, set
-# PORTAL_ENCRYPTION_KEY below and keep a copy of it somewhere else - see the
-# README. This file builds the image locally; to run a published one instead,
-# replace `build` with `image: ghcr.io/OWNER/api-key-portal:latest-allinone`.
+# One thing has to be configured first: PORTAL_ENCRYPTION_KEY, which encrypts
+# every stored key value. Generate it with `openssl rand -base64 32`, put it in
+# a .env file next to this one (or the environment), and keep a copy somewhere
+# other than the data volume - without it nothing stored is readable, and with
+# it in the volume a copy of the volume would be enough to read everything.
+# Compose refuses to start without it. Everything else - the database, its
+# password - is inside the image and the volume. This file builds the image
+# locally; to run a published one instead, replace `build` with
+# `image: ghcr.io/OWNER/api-key-portal:latest-allinone`.
 services:
   portal:
     build:
@@ -22,9 +25,9 @@ services:
       # Where the database, and anything else that has to survive a restart,
       # is kept inside the container. The volume below is mounted on it.
       PORTAL_DATA_DIR: /var/lib/keyportal
-      # Generated and kept in the volume if left unset. Set it - and back it
-      # up - and the data in the volume is no longer readable on its own.
-      PORTAL_ENCRYPTION_KEY: ${PORTAL_ENCRYPTION_KEY:-}
+      # Required. Compose stops here with the message below if it is unset,
+      # which is the same refusal the container itself would make.
+      PORTAL_ENCRYPTION_KEY: ${PORTAL_ENCRYPTION_KEY:?Set PORTAL_ENCRYPTION_KEY (openssl rand -base64 32) and keep a copy of it outside the data volume}
       # Seeds the first account, which has to change its password at first
       # sign-in. Only read while the portal has no accounts at all.
       PORTAL_ADMIN_EMAIL: ${PORTAL_ADMIN_EMAIL:-admin@localhost}

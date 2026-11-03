@@ -33,6 +33,7 @@ import com.sidbhat.apikeyportal.integration.ServiceIntegration;
 import com.sidbhat.apikeyportal.integration.ServiceIntegrationRepository;
 import com.sidbhat.apikeyportal.integration.ServiceProvider;
 import com.sidbhat.apikeyportal.integration.azure.AzureGraphClient;
+import com.sidbhat.apikeyportal.integration.google.GoogleIamClient;
 import com.sidbhat.apikeyportal.key.ApiKey;
 import com.sidbhat.apikeyportal.key.ApiKeyRepository;
 import com.sidbhat.apikeyportal.notification.ExpiryReminderService;
@@ -86,6 +87,9 @@ class KeyRotationIntegrationTest {
 
     @MockitoBean
     private AzureGraphClient graphClient;
+
+    @MockitoBean
+    private GoogleIamClient googleIamClient;
 
     @MockitoBean
     private JavaMailSender mailSender;
@@ -240,6 +244,130 @@ class KeyRotationIntegrationTest {
 
         assertThat(sweep()).isZero();
         assertThat(keys.findByRotatedFromKeyId(expiring.getId())).isEmpty();
+    }
+
+    // ---------- Google: the portal makes the expiry true itself ----------
+
+    private static final String OLD_GOOGLE_KEY =
+            "{\"type\":\"service_account\",\"private_key_id\":\"old-key-id\",\"private_key\":\"old\"}";
+    private static final String NEW_GOOGLE_KEY =
+            "{\"type\":\"service_account\",\"private_key_id\":\"new-key-id\",\"private_key\":\"new\"}";
+
+    /** A Google key of Sam's five days from its (portal-side) expiry, rotation switched on. */
+    private ApiKey expiringGoogleKey() {
+        ServiceIntegration integration = new ServiceIntegration(ServiceProvider.GOOGLE_CLOUD, "Google Cloud",
+                "my-project", "portal@my-project.iam.gserviceaccount.com", "-----BEGIN PRIVATE KEY-----");
+        integration.assignTo(sam.getGroup());
+        ServiceIntegration google = integrations.save(integration);
+
+        ApiKey key = new ApiKey("Pipeline runner", "Google Cloud", OLD_GOOGLE_KEY,
+                TODAY.minusDays(175), TODAY.plusDays(5));
+        key.assignTo(sam, sam.getGroup());
+        key.recordProvenance(google.getId(), "runner@my-project.iam.gserviceaccount.com", true, null);
+        ApiKey saved = keys.save(key);
+
+        when(googleIamClient.acquireToken("portal@my-project.iam.gserviceaccount.com", "-----BEGIN PRIVATE KEY-----"))
+                .thenReturn("gtok");
+        when(googleIamClient.createServiceAccountKey("gtok", "my-project", "runner@my-project.iam.gserviceaccount.com"))
+                .thenReturn(NEW_GOOGLE_KEY);
+        when(googleIamClient.deleteServiceAccountKey("gtok", "my-project",
+                "runner@my-project.iam.gserviceaccount.com", "old-key-id")).thenReturn(true);
+        return saved;
+    }
+
+    @Test
+    void aGoogleKeyIsReplacedAWeekAheadAndDeletedAtGoogleOnceItsDateHasPassed() throws Exception {
+        ApiKey old = expiringGoogleKey();
+
+        // the first half of the sweep: a second key on the same service account
+        assertThat(sweep()).isEqualTo(1);
+        ApiKey replacement = keys.findByRotatedFromKeyId(old.getId()).orElseThrow();
+        assertThat(replacement.getKeyValue()).isEqualTo(NEW_GOOGLE_KEY);
+        assertThat(replacement.getProviderResourceId()).isEqualTo("runner@my-project.iam.gserviceaccount.com");
+
+        // the email warns that this hand-over ends in a deletion, and names the day
+        ArgumentCaptor<SimpleMailMessage> mail = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender).send(mail.capture());
+        assertThat(mail.getValue().getText())
+                .contains("the portal will DELETE the old key there")
+                .doesNotContain("old-key-id")
+                .doesNotContain("new-key-id");
+
+        // not expired yet: nothing is deleted, and the page says what is coming
+        assertThat(rotationService.revokeExpiredKeys(TODAY)).isZero();
+        verify(googleIamClient, org.mockito.Mockito.never()).deleteServiceAccountKey(any(), any(), any(), any());
+        String before = mvc.perform(get("/keys/{id}", old.getId()).with(user(new PortalUser(sam))))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(before).contains("when the portal deletes it at the provider");
+
+        // the morning after its date: the old key is deleted at Google, and only it
+        assertThat(rotationService.revokeExpiredKeys(old.getExpiresOn().plusDays(1))).isEqualTo(1);
+        verify(googleIamClient).deleteServiceAccountKey("gtok", "my-project",
+                "runner@my-project.iam.gserviceaccount.com", "old-key-id");
+        verify(googleIamClient, org.mockito.Mockito.never()).deleteServiceAccount(any(), any(), any());
+
+        ApiKey revoked = keys.findById(old.getId()).orElseThrow();
+        assertThat(revoked.isRevoked()).isTrue();
+        // the row stays, for the record; the replacement is untouched
+        assertThat(keys.findById(replacement.getId())).isPresent();
+        assertThat(keys.findById(replacement.getId()).orElseThrow().isRevoked()).isFalse();
+
+        String after = mvc.perform(get("/keys/{id}", old.getId()).with(user(new PortalUser(sam))))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(after).contains("Deleted at the provider by the portal");
+
+        // done is done: the next sweep has nothing to delete
+        assertThat(rotationService.revokeExpiredKeys(old.getExpiresOn().plusDays(2))).isZero();
+
+        assertThat(events.findAllByOrderByOccurredAtDesc(org.springframework.data.domain.PageRequest.of(0, 10))
+                .getContent())
+                .anySatisfy(event -> {
+                    assertThat(event.getAction()).isEqualTo(com.sidbhat.apikeyportal.activity.ActivityAction.KEY_REVOKED);
+                    assertThat(event.getActorEmail()).isEqualTo("sam@example.com");
+                });
+    }
+
+    @Test
+    void switchingDeletionOffLeavesTheReplacedGoogleKeyAtGoogleAndSaysSo() throws Exception {
+        ApiKey old = expiringGoogleKey();
+        ServiceIntegration google = integrations.findById(old.getIntegrationId()).orElseThrow();
+        UserAccount admin = accounts.findByEmailIgnoreCase("admin@example.com").orElseThrow();
+
+        // the switch on the integrations page, as a super admin
+        mvc.perform(post("/integrations/{id}/delete-replaced", google.getId()).param("delete", "false")
+                        .with(user(new PortalUser(admin))).with(csrf()))
+                .andExpect(status().is3xxRedirection());
+        assertThat(integrations.findById(google.getId()).orElseThrow().isDeleteReplacedKeys()).isFalse();
+
+        // replacement still minted; the email no longer promises a deletion and warns instead
+        assertThat(sweep()).isEqualTo(1);
+        ArgumentCaptor<SimpleMailMessage> mail = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender).send(mail.capture());
+        assertThat(mail.getValue().getText())
+                .contains("automatic deletion is switched off")
+                .doesNotContain("the portal will DELETE");
+
+        // and once the date passes, nothing is deleted at Google
+        assertThat(rotationService.revokeExpiredKeys(old.getExpiresOn().plusDays(1))).isZero();
+        verify(googleIamClient, org.mockito.Mockito.never()).deleteServiceAccountKey(any(), any(), any(), any());
+        String page = mvc.perform(get("/keys/{id}", old.getId()).with(user(new PortalUser(sam))))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(page).contains("Deletion at the provider is switched off");
+    }
+
+    @Test
+    void aGoogleKeyNobodyAskedToReplaceIsNeverDeletedWhenItsDatePasses() {
+        ApiKey old = expiringGoogleKey();
+        old.setAutoRotate(false);
+        keys.save(old);
+
+        assertThat(sweep()).isZero();
+        assertThat(rotationService.revokeExpiredKeys(old.getExpiresOn().plusDays(1))).isZero();
+
+        // expired in the portal, still working at Google: bookkeeping, as before,
+        // because deleting somebody's only credential on a date is an outage
+        verify(googleIamClient, org.mockito.Mockito.never()).deleteServiceAccountKey(any(), any(), any(), any());
+        assertThat(keys.findById(old.getId()).orElseThrow().isRevoked()).isFalse();
     }
 
     @Test

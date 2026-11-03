@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Enter your code</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="kp-auth">
+        <div class="kp-auth-brand">
+            <span class="kp-brand-mark" aria-hidden="true"><i class="bi bi-phone"></i></span>
+            <h1 th:text="${recovery} ? 'Use a recovery code' : 'Enter your code'">Enter your code</h1>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div class="alert alert-danger" th:if="${error != null}">
+                    <span th:text="${error}">That code did not match.</span>
+                    <span th:if="${attemptsLeft != null and attemptsLeft <= 2}"
+                          th:text="${attemptsLeft == 1 ? ' One more wrong code ends this sign-in.' : ' ' + attemptsLeft + ' attempts left.'}"></span>
+                </div>
+
+                <form th:action="@{/mfa/verify}" method="post" th:unless="${recovery}">
+                    <p class="text-muted small">Open your authenticator app and type the six-digit code it shows.</p>
+                    <div class="mb-4">
+                        <label class="form-label" for="code">Authentication code</label>
+                        <input type="text" class="form-control form-control-lg font-monospace text-center" id="code"
+                               name="code" inputmode="numeric" pattern="[0-9 ]*" autocomplete="one-time-code"
+                               maxlength="7" autofocus required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Continue</button>
+                </form>
+
+                <form th:action="@{/mfa/verify}" method="post" th:if="${recovery}">
+                    <p class="text-muted small">Type one of the recovery codes you saved when you set this up. Each
+                        works once.</p>
+                    <div class="mb-4">
+                        <label class="form-label" for="recoveryCode">Recovery code</label>
+                        <input type="text" class="form-control form-control-lg font-monospace text-center"
+                               id="recoveryCode" name="recoveryCode" autocomplete="off" spellcheck="false"
+                               placeholder="abcde-fghij" autofocus required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Continue</button>
+                </form>
+
+                <div class="d-flex justify-content-between mt-3 small">
+                    <a th:unless="${recovery}" th:href="@{/mfa/verify(recovery=true)}">Lost your authenticator? Use a recovery code</a>
+                    <a th:if="${recovery}" th:href="@{/mfa/verify}">Use the authenticator app instead</a>
+                    <form th:action="@{/logout}" method="post" class="d-inline">
+                        <button type="submit" class="btn btn-link btn-sm p-0 align-baseline">Cancel and sign out</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

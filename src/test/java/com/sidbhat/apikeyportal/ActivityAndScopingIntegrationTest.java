@@ -315,7 +315,7 @@ class ActivityAndScopingIntegrationTest {
     void revealingAKeyIsRecordedAgainstWhoeverRevealedIt() throws Exception {
         Long keyId = addAKeyAs(sam);
 
-        mvc.perform(get("/keys/{id}/value", keyId).with(as(sam))).andExpect(status().isOk());
+        mvc.perform(post("/keys/{id}/value", keyId).with(csrf()).with(as(sam))).andExpect(status().isOk());
 
         ActivityEvent event = eventsOf(ActivityAction.KEY_REVEALED).get(0);
         assertThat(event.getActorEmail()).isEqualTo("sam@example.com");
@@ -328,7 +328,7 @@ class ActivityAndScopingIntegrationTest {
     void copyingAKeyIsRecordedAsSuch() throws Exception {
         Long keyId = addAKeyAs(sam);
 
-        mvc.perform(get("/keys/{id}/value", keyId).param("intent", "copied").with(as(sam)))
+        mvc.perform(post("/keys/{id}/value", keyId).with(csrf()).param("intent", "copied").with(as(sam)))
                 .andExpect(status().isOk());
 
         assertThat(eventsOf(ActivityAction.KEY_REVEALED).get(0).getDetail())
@@ -340,7 +340,7 @@ class ActivityAndScopingIntegrationTest {
         Long keyId = addAKeyAs(sam);
 
         for (int i = 0; i < 3; i++) {
-            mvc.perform(get("/keys/{id}/value", keyId).with(as(sam))).andExpect(status().isOk());
+            mvc.perform(post("/keys/{id}/value", keyId).with(csrf()).with(as(sam))).andExpect(status().isOk());
         }
 
         // "last revealed" on the key cannot answer who took the value out and when
@@ -352,8 +352,24 @@ class ActivityAndScopingIntegrationTest {
         Long keyId = addAKeyAs(sam);
 
         // Alex can see Sam's key listed, but never its value
-        mvc.perform(get("/keys/{id}/value", keyId).with(as(alex))).andExpect(status().isForbidden());
+        mvc.perform(post("/keys/{id}/value", keyId).with(csrf()).with(as(alex))).andExpect(status().isForbidden());
 
+        assertThat(eventsOf(ActivityAction.KEY_REVEALED)).isEmpty();
+    }
+
+    @Test
+    void aRevealForgedByAnotherSiteIsRefusedAndRecordsNothing() throws Exception {
+        Long keyId = addAKeyAs(sam);
+
+        // what a cross-site request looks like: the owner's session, no CSRF
+        // token - which another origin cannot read. As a GET it is not a
+        // reveal at all any more, and as a token-less POST it is refused.
+        mvc.perform(get("/keys/{id}/value", keyId).with(as(sam)))
+                .andExpect(status().isMethodNotAllowed());
+        mvc.perform(post("/keys/{id}/value", keyId).with(as(sam)))
+                .andExpect(status().isForbidden());
+
+        // the history is what an audit relies on; neither attempt touched it
         assertThat(eventsOf(ActivityAction.KEY_REVEALED)).isEmpty();
     }
 
@@ -361,7 +377,7 @@ class ActivityAndScopingIntegrationTest {
     void theRevealedValueNeverReachesTheHistory() throws Exception {
         Long keyId = addAKeyAs(sam);
 
-        mvc.perform(get("/keys/{id}/value", keyId).with(as(sam))).andExpect(status().isOk());
+        mvc.perform(post("/keys/{id}/value", keyId).with(csrf()).with(as(sam))).andExpect(status().isOk());
 
         assertThat(allEvents()).allSatisfy(event -> {
             assertThat(event.getTargetName()).doesNotContain("sk_live_fake0123456789");

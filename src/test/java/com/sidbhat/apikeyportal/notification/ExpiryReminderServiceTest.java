@@ -41,11 +41,14 @@ class ExpiryReminderServiceTest {
     @Mock
     private ExpiryReminderMailer mailer;
 
+    @Mock
+    private com.sidbhat.apikeyportal.alerts.AlertNotifier alerts;
+
     private ExpiryReminderService service;
 
     @BeforeEach
     void setUp() {
-        service = new ExpiryReminderService(keys, reminders, mailer);
+        service = new ExpiryReminderService(keys, reminders, mailer, alerts);
         when(mailer.isAvailable()).thenReturn(true);
         when(mailer.send(any(), any(), anyLong())).thenReturn(true);
         when(reminders.existsByApiKeyIdAndExpiresOnAndThresholdDays(anyLong(), any(), anyInt())).thenReturn(false);
@@ -140,5 +143,23 @@ class ExpiryReminderServiceTest {
         assertThat(service.sendDueReminders(TODAY)).isEqualTo(2);
         verify(mailer).send(soon, ReminderThreshold.ONE_DAY, 1);
         verify(mailer).send(later, ReminderThreshold.ONE_MONTH, 20);
+    }
+
+    @Test
+    void aChatChannelAnnouncesExpiriesEvenWithNoMailServer() {
+        when(mailer.isAvailable()).thenReturn(false);
+        when(alerts.wantsExpiries()).thenReturn(true);
+        com.sidbhat.apikeyportal.key.ApiKey key = new com.sidbhat.apikeyportal.key.ApiKey("Deploy token", "GitHub",
+                "ghp_x", TODAY.minusDays(100), TODAY.plusDays(7));
+        key.assignTo(com.sidbhat.apikeyportal.user.TestUsers.alex(), com.sidbhat.apikeyportal.user.TestUsers.platformTeam());
+        org.springframework.test.util.ReflectionTestUtils.setField(key, "id", 42L);
+        when(keys.findExpiringBetween(any(), any())).thenReturn(java.util.List.of(key));
+        when(alerts.expiring(eq(key), eq(ReminderThreshold.ONE_WEEK), eq(7L))).thenReturn(true);
+
+        assertThat(service.sendDueReminders(TODAY)).isEqualTo(1);
+
+        // posted to the channel, never attempted by email, and recorded as announced
+        verify(mailer, never()).send(any(), any(), anyLong());
+        verify(reminders).save(any());
     }
 }

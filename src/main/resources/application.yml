@@ -20,6 +20,44 @@ spring:
     # db/migration/sqlite or db/migration/postgresql, picked by the driver in use
     locations: classpath:db/migration/{vendor}
 
+spring.servlet.multipart:
+  # The one upload is the logo under Appearance, capped at 512 KB by the
+  # portal itself; these are the outer bounds the container enforces first.
+  max-file-size: 1MB
+  max-request-size: 2MB
+
+# Health checks, and nothing else from Actuator: the health endpoint is the one
+# thing exposed, anonymously, because that is what a load balancer, container
+# runtime or uptime monitor needs. Everything else Actuator could offer stays
+# switched off - on a portal full of secrets, "just the metrics" is still a map.
+#
+#   /actuator/health/liveness   a heartbeat: 200 while the process is up
+#   /actuator/health/readiness  database and encryption key - what makes this
+#                               instance able to serve; wire orchestrators here
+#   /actuator/health            the deep probe: all of the above plus disk, the
+#                               SMTP server if one is configured and the SSO
+#                               issuer if SSO is on. External trouble makes it
+#                               503, which is the point of a deep probe and the
+#                               reason not to use it as a readiness check.
+#
+# Anonymous callers get the status and the HTTP code; a signed-in super admin
+# also sees each component and its details.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+      show-components: when-authorized
+      roles: SUPER_ADMIN
+      group:
+        readiness:
+          include: readinessState, db, encryption
+
 server:
   port: 8080
   # Whether X-Forwarded-For and friends are believed. Off by default, because
@@ -32,6 +70,18 @@ server:
   servlet:
     session:
       timeout: 30m
+      cookie:
+        # The session cookie is the signed-in session; marking it Secure means
+        # the browser never sends it over plain HTTP, so a downgraded or
+        # mistyped http:// request cannot leak it. Off by default only because
+        # a fresh install is reached over plain http://localhost and a Secure
+        # cookie would make signing in silently impossible there. Set it to
+        # true the moment the portal is behind HTTPS - see the README's
+        # "Behind a reverse proxy and HTTPS".
+        secure: ${PORTAL_SECURE_COOKIE:false}
+        # Script never needs the session cookie; this is Tomcat's default,
+        # pinned here so it is a decision rather than an accident.
+        http-only: true
   error:
     whitelabel:
       enabled: false
@@ -86,14 +136,25 @@ portal:
     admin-password: ${PORTAL_ADMIN_PASSWORD:changeme}
     admin-password-hash: ${PORTAL_ADMIN_PASSWORD_HASH:${PORTAL_PASSWORD_HASH:}}
     admin-group-name: ${PORTAL_ADMIN_GROUP:Administrators}
+    mfa:
+      # Two-factor authentication (an authenticator app) for password accounts.
+      # Off: each person chooses from their profile. On: an account without one
+      # is pinned to the enrolment page at sign-in until it has one. Accounts
+      # that sign in through the identity provider are never affected - their
+      # second factor is the provider's.
+      required: ${PORTAL_MFA_REQUIRED:false}
     lockout:
       # Failed password sign-ins are counted per account and per calling address,
       # and either count reaching the limit refuses further attempts for a while.
       # The same span is the window failures are counted over, so an occasional
       # typo never adds up to a lockout. Counters are in memory, so a restart
-      # clears them.
+      # clears them. The account lock only engages once the failures have come
+      # from min-addresses different addresses, so one caller typing wrong
+      # passwords at a colleague's email - or the super admin's - locks only
+      # their own address, never the account. Set to 1 to lock on count alone.
       max-attempts: ${PORTAL_LOCKOUT_MAX_ATTEMPTS:5}
       lockout-for: ${PORTAL_LOCKOUT_FOR:15m}
+      min-addresses: ${PORTAL_LOCKOUT_MIN_ADDRESSES:3}
   invitations:
     # How long an invitation link works for, and who it comes from.
     valid-for: ${PORTAL_INVITE_VALID_FOR:24h}
@@ -113,7 +174,9 @@ portal:
     # switched it on - per provider on their profile, or per key on its page.
     # Runs an hour before the reminder sweep so a replaced key's owner gets one
     # email ("a replacement is ready") instead of that plus a plain warning.
-    # Only providers the portal can mint fresh secrets in take part (Azure AD).
+    # Azure AD and GitLab rotate on their own terms; Google Cloud and AWS keys
+    # never expire by themselves, so the same sweep deletes a replaced key at the
+    # provider once its date has passed - that is what makes it truly expired.
     enabled: ${PORTAL_AUTO_ROTATION:true}
     cron: ${PORTAL_AUTO_ROTATION_CRON:0 0 7 * * *}
     lead-days: ${PORTAL_AUTO_ROTATION_LEAD_DAYS:7}

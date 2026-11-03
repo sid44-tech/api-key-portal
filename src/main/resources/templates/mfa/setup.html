@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Set up two-factor authentication</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="kp-page-header">
+                <div>
+                    <h1>Set up two-factor authentication</h1>
+                    <p class="kp-subtitle">
+                        <th:block th:if="${required}">This portal requires a second factor for every password
+                            account, so this comes before anything else.</th:block>
+                        <th:block th:unless="${required}">After this, signing in asks for your password and a
+                            six-digit code from your phone.</th:block>
+                        A stolen password alone will not get in.
+                    </p>
+                </div>
+            </div>
+
+            <div class="alert alert-danger" th:if="${error != null}" th:text="${error}">That code did not match.</div>
+
+            <div class="card mb-4 setup-step">
+                <div class="card-body d-flex">
+                    <div class="step-number me-3">1</div>
+                    <div class="flex-grow-1">
+                        <h2 class="h5">Scan this with an authenticator app</h2>
+                        <p class="text-muted small">Any app that does one-time codes works: Microsoft Authenticator,
+                            Google Authenticator, Authy, 1Password, Bitwarden and the rest.</p>
+                        <div class="d-flex flex-wrap align-items-start gap-4">
+                            <img th:src="${pending.qrDataUri}" alt="QR code for your authenticator app" width="220" height="220"
+                                 class="border rounded">
+                            <div>
+                                <p class="mb-1 small text-muted">Can't scan? Type this key in instead:</p>
+                                <code class="d-inline-block fs-6 mb-2" th:text="${#strings.replace(#strings.replace(pending.secret, '(?<=\\G.{4})', ' '), '  ', ' ')}">ABCD EFGH IJKL</code>
+                                <p class="small text-muted mb-0">Time-based, 6 digits, 30 seconds - the defaults.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4 setup-step">
+                <div class="card-body d-flex">
+                    <div class="step-number me-3">2</div>
+                    <div class="flex-grow-1">
+                        <h2 class="h5">Enter the code it shows</h2>
+                        <p class="text-muted small">Nothing is switched on until a code from your app has been accepted,
+                            so there is no way to lock yourself out halfway.</p>
+                        <form th:action="@{/mfa/setup}" method="post" class="d-flex flex-wrap align-items-end gap-2">
+                            <div>
+                                <label class="form-label" for="code">Code</label>
+                                <input type="text" class="form-control font-monospace" id="code" name="code"
+                                       inputmode="numeric" pattern="[0-9 ]*" autocomplete="one-time-code" maxlength="7"
+                                       required autofocus>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-shield-check me-1" aria-hidden="true"></i> Turn on
+                            </button>
+                            <a th:unless="${required}" th:href="@{/profile}" class="btn btn-link">Not now</a>
+                            <form th:if="${required}" th:action="@{/logout}" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-link">Sign out instead</button>
+                            </form>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

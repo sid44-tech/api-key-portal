@@ -167,7 +167,7 @@ class TeamAccessIntegrationTest {
                 .andExpect(content().string(containsString("Only")));
 
         // the value endpoint is the only way to a key value, and it is owner-only
-        mvc.perform(get("/keys/{id}/value", id).with(as(sam)))
+        mvc.perform(post("/keys/{id}/value", id).with(csrf()).with(as(sam)))
                 .andExpect(status().isForbidden())
                 .andExpect(content().string(not(containsString("fake-stripe-key-0123456789"))));
     }
@@ -194,7 +194,7 @@ class TeamAccessIntegrationTest {
     void theOwnerCanStillRevealTheirOwnKey() throws Exception {
         Long id = addStripeKeyAsAlex();
 
-        mvc.perform(get("/keys/{id}/value", id).with(as(alex)))
+        mvc.perform(post("/keys/{id}/value", id).with(csrf()).with(as(alex)))
                 .andExpect(jsonPath("$.value").value("fake-stripe-key-0123456789"));
     }
 

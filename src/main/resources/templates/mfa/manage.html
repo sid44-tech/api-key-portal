@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Two-factor authentication</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="kp-page-header">
+                <div>
+                    <h1>Two-factor authentication</h1>
+                    <p class="kp-subtitle">A code from your phone, after your password. A stolen password alone will not get in.</p>
+                </div>
+            </div>
+
+            <th:block th:unless="${account.mfaEnabled}">
+                <div class="card">
+                    <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
+                        <div><span class="pill pill-warning">Off</span>
+                            <span class="text-muted ms-1">Your password alone signs you in.</span></div>
+                        <a th:href="@{/mfa/setup}" class="btn btn-primary">
+                            <i class="bi bi-shield-check me-1" aria-hidden="true"></i> Set up
+                        </a>
+                    </div>
+                </div>
+            </th:block>
+
+            <th:block th:if="${account.mfaEnabled}">
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <span class="pill pill-success">On</span>
+                        <span class="text-muted ms-1">since
+                            <span th:text="${#temporals.format(account.mfaEnabledAt, 'MMMM d, yyyy')}">March 1, 2026</span>.
+                            <span th:text="${recoveryCodesLeft}">10</span> of 10 recovery codes unused.</span>
+                        <div class="alert alert-warning mt-3 mb-0 small" th:if="${recoveryCodesLeft <= 3}">
+                            Only <span th:text="${recoveryCodesLeft}">2</span> recovery codes left. Make new ones below
+                            before they run out: without a code and without your authenticator, only an administrator
+                            can get you back in.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">New recovery codes</div>
+                    <div class="card-body">
+                        <p class="text-muted small">Replaces every existing code, used or not. Your password and a current
+                            code from your app, so neither a stolen session nor a stolen password can do this alone.</p>
+                        <form th:action="@{/mfa/recovery-codes}" method="post" class="row g-2 align-items-end">
+                            <div class="col-md-5">
+                                <label class="form-label" for="rc-password">Current password</label>
+                                <input type="password" class="form-control" id="rc-password" name="currentPassword"
+                                       autocomplete="current-password" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="rc-code">Authenticator code</label>
+                                <input type="text" class="form-control font-monospace" id="rc-code" name="code"
+                                       inputmode="numeric" autocomplete="one-time-code" required>
+                            </div>
+                            <div class="col-md-3">
+                                <button type="submit" class="btn btn-secondary w-100">Make new codes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card border-danger-subtle">
+                    <div class="card-header">Switch off</div>
+                    <div class="card-body">
+                        <p class="text-muted small">
+                            <th:block th:if="${required}">This portal requires two-factor authentication, so switching it
+                                off here sends you straight back to setting it up.</th:block>
+                            <th:block th:unless="${required}">Your password alone will sign you in again.</th:block>
+                            Your password and a current code (or a recovery code), both.
+                        </p>
+                        <form th:action="@{/mfa/disable}" method="post" class="row g-2 align-items-end js-confirm"
+                              data-confirm="Switch two-factor authentication off?">
+                            <div class="col-md-5">
+                                <label class="form-label" for="off-password">Current password</label>
+                                <input type="password" class="form-control" id="off-password" name="currentPassword"
+                                       autocomplete="current-password" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" for="off-code">Code</label>
+                                <input type="text" class="form-control font-monospace" id="off-code" name="code"
+                                       autocomplete="one-time-code" required>
+                            </div>
+                            <div class="col-md-3">
+                                <button type="submit" class="btn btn-outline-danger w-100">Switch off</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </th:block>
+
+            <p class="mt-4"><a th:href="@{/profile}">Back to your profile</a></p>
+        </div>
+    </div>
+</div>
+
+<th:block layout:fragment="scripts">
+    <script th:src="@{/js/keys.js}"></script>
+</th:block>
+</body>
+</html>

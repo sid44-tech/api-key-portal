@@ -8,22 +8,33 @@
     <meta name="color-scheme" content="light dark">
     <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
-    <title layout:title-pattern="$CONTENT_TITLE · API Key Portal">API Key Portal</title>
+    <title layout:title-pattern="$CONTENT_TITLE · $LAYOUT_TITLE" th:text="${portalName ?: 'API Key Portal'}">API Key Portal</title>
+    <!-- an uploaded logo doubles as the tab icon -->
+    <link rel="icon" th:if="${hasLogo}" th:href="@{/theme/logo(v=${themeVersion ?: '0'})}">
+    <!-- For the reveal and copy buttons, whose request is a POST made from script -->
+    <meta name="_csrf" th:if="${_csrf != null}" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:if="${_csrf != null}" th:content="${_csrf.headerName}">
     <!-- Before the stylesheet, so the theme is settled before the first paint -->
     <script th:src="@{/js/theme.js}"></script>
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}">
     <link rel="stylesheet" th:href="@{/webjars/bootstrap-icons/font/bootstrap-icons.css}">
     <link rel="stylesheet" th:href="@{/css/app.css}">
+    <!-- Colours chosen under Appearance, as a stylesheet because the CSP allows no inline styles;
+         empty while the built-in look is in use. Versioned so a save shows on the next page. -->
+    <link rel="stylesheet" th:href="@{/theme.css(v=${themeVersion ?: '0'})}">
 </head>
 <body>
 <header class="kp-header">
     <div class="container">
         <a class="kp-brand" th:href="@{/}">
-            <span class="kp-brand-mark" aria-hidden="true"><i class="bi bi-key-fill"></i></span>
-            <span>API Key Portal</span>
+            <img class="kp-brand-logo" th:if="${hasLogo}" th:src="@{/theme/logo(v=${themeVersion ?: '0'})}" alt="">
+            <span class="kp-brand-mark" th:unless="${hasLogo}" aria-hidden="true"><i class="bi bi-key-fill"></i></span>
+            <span th:text="${portalName ?: 'API Key Portal'}">API Key Portal</span>
         </a>
 
         <ul class="kp-nav" sec:authorize="isAuthenticated()">
+            <li><a th:href="@{/dashboard}" th:classappend="${activeNav == 'dashboard'} ? 'active'"
+                   th:attrappend="aria-current=${activeNav == 'dashboard'} ? 'page'">Dashboard</a></li>
             <li><a th:href="@{/keys}" th:classappend="${activeNav == 'keys'} ? 'active'"
                    th:attrappend="aria-current=${activeNav == 'keys'} ? 'page'">Keys</a></li>
             <li><a th:href="@{/people}" th:classappend="${activeNav == 'people'} ? 'active'"
@@ -42,6 +53,9 @@
             <li sec:authorize="hasRole('SUPER_ADMIN')">
                 <a th:href="@{/sso}" th:classappend="${activeNav == 'sso'} ? 'active'"
                    th:attrappend="aria-current=${activeNav == 'sso'} ? 'page'">Single sign-on</a></li>
+            <li sec:authorize="hasRole('SUPER_ADMIN')">
+                <a th:href="@{/appearance}" th:classappend="${activeNav == 'appearance'} ? 'active'"
+                   th:attrappend="aria-current=${activeNav == 'appearance'} ? 'page'">Appearance</a></li>
         </ul>
 
         <div class="kp-user dropdown" sec:authorize="isAuthenticated()">
@@ -99,7 +113,7 @@
 
 <footer class="kp-footer">
     <div class="container d-flex justify-content-between flex-wrap gap-2">
-        <span>API Key Portal</span>
+        <span th:text="${portalName ?: 'API Key Portal'}">API Key Portal</span>
         <span>Key values are encrypted at rest and only ever shown to their owner.</span>
     </div>
 </footer>

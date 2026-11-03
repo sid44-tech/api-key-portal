@@ -34,7 +34,9 @@ public class ReencryptService {
     static final List<EncryptedColumn> COLUMNS = List.of(
             new EncryptedColumn("api_key", "key_value"),
             new EncryptedColumn("service_integration", "client_secret"),
-            new EncryptedColumn("sso_configuration", "client_secret"));
+            new EncryptedColumn("sso_configuration", "client_secret"),
+            new EncryptedColumn("alert_channel", "webhook_url"),
+            new EncryptedColumn("user_account", "mfa_secret"));
 
     private final JdbcTemplate jdbc;
     private final EncryptionService encryption;
@@ -68,6 +70,11 @@ public class ReencryptService {
         java.util.Map<String, Integer> counts = new java.util.TreeMap<>();
         for (EncryptedColumn column : COLUMNS) {
             for (String value : readAll(column)) {
+                if (value == null) {
+                    // a nullable encrypted column (a second factor not set up) is
+                    // not a value on any key, legacy or otherwise
+                    continue;
+                }
                 counts.merge(EncryptionService.keyIdOf(value), 1, Integer::sum);
             }
         }

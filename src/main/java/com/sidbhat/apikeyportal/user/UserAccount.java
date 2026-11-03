@@ -5,6 +5,7 @@ import java.util.Locale;
 import java.util.Objects;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.EnumType;
@@ -20,6 +21,8 @@ import jakarta.persistence.Table;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import com.sidbhat.apikeyportal.crypto.EncryptedStringConverter;
 
 /**
  * Someone who can sign in to the portal.
@@ -79,6 +82,21 @@ public class UserAccount {
      */
     @Column(name = "sso_subject", length = 255)
     private String ssoSubject;
+
+    /**
+     * The TOTP secret, once two-factor is on. Encrypted at rest with the portal's
+     * key: anyone who can read it can mint valid codes. Null while off.
+     */
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(name = "mfa_secret", length = 8192)
+    private String mfaSecret;
+
+    @Column(name = "mfa_enabled_at")
+    private Instant mfaEnabledAt;
+
+    /** The time step the last accepted code was for, so no code is ever accepted twice. */
+    @Column(name = "mfa_last_used_step")
+    private Long mfaLastUsedStep;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -192,6 +210,40 @@ public class UserAccount {
 
     public void setMustChangePassword(boolean mustChangePassword) {
         this.mustChangePassword = mustChangePassword;
+    }
+
+    /** True once a second factor is enrolled. Never true for an account that signs in through SSO. */
+    public boolean isMfaEnabled() {
+        return mfaSecret != null;
+    }
+
+    public String getMfaSecret() {
+        return mfaSecret;
+    }
+
+    public Instant getMfaEnabledAt() {
+        return mfaEnabledAt;
+    }
+
+    /** -1 while no code has been accepted, which is what the verifier wants to compare against. */
+    public long getMfaLastUsedStep() {
+        return mfaLastUsedStep == null ? -1 : mfaLastUsedStep;
+    }
+
+    public void enableMfa(String secret, Instant at, long firstStep) {
+        this.mfaSecret = secret;
+        this.mfaEnabledAt = at;
+        this.mfaLastUsedStep = firstStep;
+    }
+
+    public void recordMfaStep(long step) {
+        this.mfaLastUsedStep = step;
+    }
+
+    public void disableMfa() {
+        this.mfaSecret = null;
+        this.mfaEnabledAt = null;
+        this.mfaLastUsedStep = null;
     }
 
     public Instant getCreatedAt() {

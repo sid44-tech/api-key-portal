@@ -11,13 +11,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.sidbhat.apikeyportal.key.ApiKey;
 import com.sidbhat.apikeyportal.key.ApiKeyRepository;
+import com.sidbhat.apikeyportal.alerts.AlertNotifier;
 
 /**
  * The daily sweep: find keys inside a reminder threshold that haven't been
  * reminded at that threshold yet, email their owners, and record it.
  * <p>
  * Recording happens only after a successful send, so a mail outage means a
- * retry tomorrow rather than a reminder nobody received marked as sent.
+ * retry tomorrow rather than a reminder nobody received marked as sent. A
+ * reminder counts as sent if it reached the owner by email <em>or</em> the
+ * group's chat channel: either is somewhere a person will see it, and a
+ * portal with a channel and no mail server still announces its expiries.
  */
 @Service
 public class ExpiryReminderService {
@@ -27,12 +31,14 @@ public class ExpiryReminderService {
     private final ApiKeyRepository keys;
     private final ExpiryReminderRepository reminders;
     private final ExpiryReminderMailer mailer;
+    private final AlertNotifier alerts;
 
     public ExpiryReminderService(ApiKeyRepository keys, ExpiryReminderRepository reminders,
-            ExpiryReminderMailer mailer) {
+            ExpiryReminderMailer mailer, AlertNotifier alerts) {
         this.keys = keys;
         this.reminders = reminders;
         this.mailer = mailer;
+        this.alerts = alerts;
     }
 
     /** @return how many reminders went out */
@@ -44,9 +50,10 @@ public class ExpiryReminderService {
     /** The date is a parameter so the sweep can be tested on any day it likes. */
     @Transactional
     public int sendDueReminders(LocalDate today) {
-        if (!mailer.isAvailable()) {
-            log.warn("No mail server configured; expiry reminders cannot be sent. "
-                    + "Set SPRING_MAIL_HOST (see .env.example) to turn them on.");
+        boolean mailable = mailer.isAvailable();
+        if (!mailable && !alerts.wantsExpiries()) {
+            log.warn("No mail server configured and no chat channel wants expiries; reminders cannot be sent. "
+                    + "Set SPRING_MAIL_HOST (see .env.example) or connect a Teams or Slack channel to turn them on.");
             return 0;
         }
         int sent = 0;
@@ -61,7 +68,9 @@ public class ExpiryReminderService {
             if (threshold == null || alreadySent(key, threshold)) {
                 continue;
             }
-            if (mailer.send(key, threshold, daysRemaining)) {
+            boolean emailed = mailable && mailer.send(key, threshold, daysRemaining);
+            boolean posted = alerts.expiring(key, threshold, daysRemaining);
+            if (emailed || posted) {
                 reminders.save(new ExpiryReminder(key.getId(), key.getExpiresOn(), threshold,
                         key.getOwner().getEmail(), Instant.now()));
                 sent++;

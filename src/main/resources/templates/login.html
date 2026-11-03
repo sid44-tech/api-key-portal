@@ -9,8 +9,9 @@
 <div layout:fragment="content">
     <div class="kp-auth">
         <div class="kp-auth-brand">
-            <span class="kp-brand-mark" aria-hidden="true"><i class="bi bi-key-fill"></i></span>
-            <h1>Sign in to API Key Portal</h1>
+            <img class="kp-brand-logo" th:if="${hasLogo}" th:src="@{/theme/logo(v=${themeVersion ?: '0'})}" alt="">
+            <span class="kp-brand-mark" th:unless="${hasLogo}" aria-hidden="true"><i class="bi bi-key-fill"></i></span>
+            <h1 th:text="${'Sign in to ' + (portalName ?: 'API Key Portal')}">Sign in to API Key Portal</h1>
         </div>
 
         <div class="card">
@@ -23,6 +24,9 @@
                     <span th:text="${lockoutMinutes == 1} ? '1 minute' : |${lockoutMinutes} minutes|">15 minutes</span>.
                 </div>
                 <div th:if="${param.logout}" class="alert alert-success">You have been signed out.</div>
+                <div th:if="${param.mfaFailed}" class="alert alert-warning">
+                    Too many wrong codes. Sign in again, and use a recovery code if your authenticator is lost.
+                </div>
                 <div th:if="${param.registered}" class="alert alert-success">
                     Your account is ready. Sign in to get started.
                 </div>

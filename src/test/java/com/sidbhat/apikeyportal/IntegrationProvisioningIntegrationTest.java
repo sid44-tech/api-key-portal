@@ -128,7 +128,7 @@ class IntegrationProvisioningIntegrationTest {
         String raw = jdbcTemplate.queryForObject("select key_value from api_key where id = ?", String.class,
                 key.getId());
         assertThat(raw).doesNotContain("generated-azure-secret");
-        mvc.perform(get("/keys/{id}/value", key.getId()))
+        mvc.perform(post("/keys/{id}/value", key.getId()).with(csrf()))
                 .andExpect(jsonPath("$.value").value("generated-azure-secret"));
 
         // the key detail page never renders the secret

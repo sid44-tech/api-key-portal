@@ -10,7 +10,7 @@
     <div class="kp-auth is-wide">
         <div class="kp-auth-brand">
             <span class="kp-brand-mark" aria-hidden="true"><i class="bi bi-key-fill"></i></span>
-            <h1>Welcome to API Key Portal</h1>
+            <h1 th:text="${'Welcome to ' + (portalName ?: 'API Key Portal')}">Welcome to API Key Portal</h1>
             <p class="text-muted text-center mb-0">
                 You've been invited to join
                 <strong th:text="${invitation.group != null ? invitation.group.name : 'the portal'}">Platform team</strong>

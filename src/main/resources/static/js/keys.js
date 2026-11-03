@@ -1,8 +1,25 @@
 (function () {
     'use strict';
 
-    function fetchValue(url) {
-        return fetch(url, {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+    // A reveal is recorded in the history, so it is a POST with the CSRF token:
+    // a GET could be fired at the portal by any other page the owner had open,
+    // and would fill their history with reveals they never made.
+    function fetchValue(url, intent) {
+        var headers = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded'
+        };
+        var csrfHeader = document.querySelector('meta[name="_csrf_header"]');
+        var csrfToken = document.querySelector('meta[name="_csrf"]');
+        if (csrfHeader && csrfToken) {
+            headers[csrfHeader.content] = csrfToken.content;
+        }
+        return fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: headers,
+            body: intent ? 'intent=' + encodeURIComponent(intent) : ''
+        })
             .then(function (response) {
                 if (!response.ok) {
                     throw new Error('Request failed with ' + response.status);
@@ -64,7 +81,7 @@
             return;
         }
         // tells the history this value went to the clipboard rather than the screen
-        fetchValue(button.dataset.valueUrl + '?intent=copied')
+        fetchValue(button.dataset.valueUrl, 'copied')
             .then(function (value) {
                 return navigator.clipboard.writeText(value);
             })

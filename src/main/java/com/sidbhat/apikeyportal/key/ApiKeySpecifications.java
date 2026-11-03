@@ -32,6 +32,14 @@ final class ApiKeySpecifications {
         return (root, query, cb) -> cb.equal(root.get("group").get("id"), groupId);
     }
 
+    /** One group's keys. For a super admin narrowing the dashboard; no-op for null. */
+    static Specification<ApiKey> inGroup(Long groupId) {
+        if (groupId == null) {
+            return Specification.unrestricted();
+        }
+        return (root, query, cb) -> cb.equal(root.get("group").get("id"), groupId);
+    }
+
     /** Case-insensitive match on key name, service name or owner. No-op for blank text. */
     static Specification<ApiKey> textContains(String text) {
         if (!StringUtils.hasText(text)) {

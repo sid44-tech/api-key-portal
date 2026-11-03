@@ -1536,3 +1536,106 @@ dl.row dt {
     --bs-card-border-color: rgba(59, 140, 246, 0.35);
     background: linear-gradient(180deg, rgba(59, 140, 246, 0.08), rgba(59, 140, 246, 0)) var(--kp-surface);
 }
+
+/* --------------------------------------------------------------------------
+   Appearance page: the live preview
+   Reads the same tokens as the rest of the page, which appearance.js sets on
+   the preview element alone - so a colour typed on the left shows on the right
+   without touching the real page.
+   -------------------------------------------------------------------------- */
+
+.kp-theme-preview {
+    background: var(--kp-canvas);
+    border: 1px solid var(--kp-hairline-strong);
+    border-radius: var(--kp-radius);
+    padding: 1.25rem;
+    height: 100%;
+    min-height: 180px;
+    display: flex;
+    align-items: center;
+}
+
+.kp-theme-preview.is-dark {
+    color-scheme: dark;
+    --kp-hairline: rgba(255, 255, 255, 0.10);
+    --kp-hairline-strong: rgba(255, 255, 255, 0.18);
+}
+
+.kp-theme-preview-card {
+    width: 100%;
+    background: var(--kp-surface);
+    color: var(--kp-ink);
+    border: 1px solid var(--kp-hairline);
+    border-radius: var(--kp-radius-sm);
+    padding: 1rem;
+}
+
+.kp-theme-preview-title {
+    font-weight: 600;
+    color: var(--kp-ink);
+}
+
+.kp-theme-preview-muted {
+    color: var(--kp-ink-2);
+    font-size: 0.85rem;
+    margin-bottom: 0.75rem;
+}
+
+.kp-theme-preview-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.9rem;
+}
+
+.kp-theme-preview-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+}
+
+.kp-theme-preview-actions .btn-primary {
+    pointer-events: none;
+}
+
+.kp-theme-preview-link {
+    color: var(--kp-accent);
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+}
+
+.js-color-field .form-control-color {
+    max-width: 3.25rem;
+    flex: 0 0 auto;
+}
+
+/* An uploaded logo in place of the key mark: same footprint, no gradient box */
+.kp-brand-logo {
+    height: 1.75rem;
+    width: auto;
+    max-width: 8rem;
+    object-fit: contain;
+}
+
+.kp-auth-brand .kp-brand-logo {
+    height: 3rem;
+    max-width: 12rem;
+}
+
+.kp-logo-current {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 5rem;
+    height: 5rem;
+    border: 1px solid var(--kp-hairline-strong);
+    border-radius: var(--kp-radius);
+    background: var(--kp-surface-muted);
+    flex: 0 0 auto;
+}
+
+.kp-logo-current img {
+    max-width: 4rem;
+    max-height: 4rem;
+    object-fit: contain;
+}

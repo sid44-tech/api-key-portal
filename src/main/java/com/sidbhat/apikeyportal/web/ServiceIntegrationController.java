@@ -20,6 +20,7 @@ import com.sidbhat.apikeyportal.integration.ServiceIntegration;
 import com.sidbhat.apikeyportal.integration.ServiceIntegrationService;
 import com.sidbhat.apikeyportal.integration.ServiceProvider;
 import com.sidbhat.apikeyportal.integration.google.ServiceAccountKey;
+import com.sidbhat.apikeyportal.alerts.AlertChannelService;
 import com.sidbhat.apikeyportal.user.PortalUser;
 import com.sidbhat.apikeyportal.user.UserAccount;
 import com.sidbhat.apikeyportal.user.UserAccountService;
@@ -30,17 +31,26 @@ public class ServiceIntegrationController {
 
     private final ServiceIntegrationService integrationService;
     private final UserAccountService userService;
+    private final AlertChannelService alertChannels;
 
     public ServiceIntegrationController(ServiceIntegrationService integrationService,
-            UserAccountService userService) {
+            UserAccountService userService,
+            AlertChannelService alertChannels) {
         this.integrationService = integrationService;
         this.userService = userService;
+        this.alertChannels = alertChannels;
     }
 
     @GetMapping
     public String list(@AuthenticationPrincipal PortalUser principal, Model model) {
         UserAccount me = userService.getCurrent(principal);
         model.addAttribute("integrations", integrationService.findAll(me));
+        java.util.List<com.sidbhat.apikeyportal.alerts.AlertChannel> channels = alertChannels.findForGroupOf(me);
+        model.addAttribute("alertChannels", channels);
+        // a card to connect each product the group has not connected yet
+        model.addAttribute("unconnectedProviders", java.util.Arrays.stream(
+                com.sidbhat.apikeyportal.alerts.ChannelProvider.values())
+                .filter(p -> channels.stream().noneMatch(c -> c.getProvider() == p)).toList());
         model.addAttribute("currentUser", me);
         // connecting and removing integrations is a group admin's job; members only use them
         model.addAttribute("canManage", ServiceIntegrationService.canManage(me));
@@ -218,6 +228,23 @@ public class ServiceIntegrationController {
                 ? integration.getName() + " is back on. Everyone in the group can create keys through it again."
                 : integration.getName() + " is switched off. Nobody in the group can create keys through it "
                         + "until it's switched back on; the stored credential and existing keys are untouched.");
+        return "redirect:/integrations";
+    }
+
+    @PostMapping("/{id}/delete-replaced")
+    public String setDeleteReplacedKeys(@PathVariable Long id, @AuthenticationPrincipal PortalUser principal,
+            @RequestParam(value = "delete", defaultValue = "false") boolean delete,
+            RedirectAttributes redirectAttributes) {
+        ServiceIntegration integration = integrationService.setDeleteReplacedKeys(id, delete,
+                userService.getCurrent(principal));
+        redirectAttributes.addFlashAttribute("success", delete
+                ? "Keys replaced through " + integration.getName() + " will be deleted at "
+                        + integration.getProvider().getLabel() + " once they expire."
+                : "Keys replaced through " + integration.getName() + " will be left at "
+                        + integration.getProvider().getLabel() + " when they expire."
+                        + (integration.getProvider().revokedByPortal()
+                                ? " Note that " + integration.getProvider().getLabel()
+                                        + " never expires them itself, so they keep working there." : ""));
         return "redirect:/integrations";
     }
 

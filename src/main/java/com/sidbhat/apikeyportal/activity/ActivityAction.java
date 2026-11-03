@@ -13,6 +13,11 @@ public enum ActivityAction {
     KEY_REVEALED("Key revealed", "bi-eye", "pill-warning"),
     KEY_UPDATED("Key updated", "bi-pencil", "pill-accent"),
     KEY_DELETED("Key deleted", "bi-trash", "pill-danger"),
+    /**
+     * The portal deleted the credential at its provider, completing a rotation
+     * for a provider whose keys never expire by themselves. The key row stays.
+     */
+    KEY_REVOKED("Key deleted at provider", "bi-x-octagon", "pill-danger"),
     INTEGRATION_CONNECTED("Integration connected", "bi-plug", "pill-accent"),
     INTEGRATION_REMOVED("Integration removed", "bi-plug", "pill-danger"),
     /** Paused for the whole group; the credential stays stored. */
@@ -21,7 +26,11 @@ public enum ActivityAction {
     INVITATION_SENT("Invitation sent", "bi-envelope", "pill-neutral"),
     ACCOUNT_CREATED("Account created", "bi-person-plus", "pill-success"),
     ACCOUNT_LINKED_TO_SSO("Account linked to SSO", "bi-shield-check", "pill-neutral"),
+    /** Two-factor switched on, off, or reset by an administrator. */
+    MFA_CHANGED("Two-factor changed", "bi-phone", "pill-accent"),
     SSO_CONFIGURED("Single sign-on changed", "bi-shield-lock", "pill-accent"),
+    /** The portal's colours were changed or reset under Appearance. */
+    APPEARANCE_CHANGED("Appearance changed", "bi-palette", "pill-accent"),
     GROUP_CREATED("Group created", "bi-diagram-3", "pill-neutral");
 
     private final String label;

@@ -74,7 +74,7 @@ class ApiKeyLifecycleIntegrationTest {
                 .andExpect(content().string(not(containsString("fake-stripe-key-0123456789"))));
 
         // revealed on demand, and the reveal is recorded
-        mvc.perform(get("/keys/{id}/value", id))
+        mvc.perform(post("/keys/{id}/value", id).with(csrf()))
                 .andExpect(jsonPath("$.value").value("fake-stripe-key-0123456789"));
         assertThat(repository.findById(id).orElseThrow().getLastRevealedAt()).isNotNull();
 
@@ -88,7 +88,7 @@ class ApiKeyLifecycleIntegrationTest {
                         .param("expiresOn", "2022-08-01"))
                 .andExpect(status().is3xxRedirection());
 
-        mvc.perform(get("/keys/{id}/value", id))
+        mvc.perform(post("/keys/{id}/value", id).with(csrf()))
                 .andExpect(jsonPath("$.value").value("fake-stripe-key-0123456789"));
         mvc.perform(get("/keys/{id}", id))
                 .andExpect(content().string(containsString("Prod secret (rotated)")));

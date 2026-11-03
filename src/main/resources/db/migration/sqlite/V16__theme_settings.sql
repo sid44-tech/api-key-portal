@@ -1,0 +1,26 @@
+-- The colours a super admin has chosen for the portal, under Appearance.
+--
+-- One row for the whole installation; no row means the built-in look, and
+-- "reset to defaults" deletes it rather than writing the defaults in, so
+-- app.css stays the one place the defaults live. Seven colours per mode, as
+-- #rrggbb; everything else on the page is derived from these.
+
+CREATE TABLE theme_settings (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    light_accent  VARCHAR(7) NOT NULL,
+    light_canvas  VARCHAR(7) NOT NULL,
+    light_surface VARCHAR(7) NOT NULL,
+    light_ink     VARCHAR(7) NOT NULL,
+    light_success VARCHAR(7) NOT NULL,
+    light_warning VARCHAR(7) NOT NULL,
+    light_danger  VARCHAR(7) NOT NULL,
+    dark_accent   VARCHAR(7) NOT NULL,
+    dark_canvas   VARCHAR(7) NOT NULL,
+    dark_surface  VARCHAR(7) NOT NULL,
+    dark_ink      VARCHAR(7) NOT NULL,
+    dark_success  VARCHAR(7) NOT NULL,
+    dark_warning  VARCHAR(7) NOT NULL,
+    dark_danger   VARCHAR(7) NOT NULL,
+    created_at    TIMESTAMP  NOT NULL,
+    updated_at    TIMESTAMP  NOT NULL
+);

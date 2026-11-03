@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Appearance</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="kp-page-header">
+                <div>
+                    <h1>Appearance</h1>
+                    <p class="kp-subtitle">
+                        The portal's name, logo and colours, for everyone who uses it. Pick a colour or type
+                        a hex value; the preview follows as you type. Light and dark are set separately,
+                        since a colour that reads well on white rarely does on black.
+                    </p>
+                </div>
+            </div>
+
+            <div class="alert alert-info d-flex align-items-start gap-2" th:if="${customised}">
+                <i class="bi bi-palette mt-1" aria-hidden="true"></i>
+                <div>
+                    A custom look is in use. <strong>Reset to defaults</strong> below returns the name,
+                    logo and colours to the built-in ones.
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">Logo</div>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap align-items-center gap-4">
+                        <div class="kp-logo-current">
+                            <img th:if="${hasLogo}" th:src="@{/theme/logo(v=${themeVersion})}" alt="Current logo">
+                            <span th:unless="${hasLogo}" class="kp-brand-mark" aria-hidden="true"><i class="bi bi-key-fill"></i></span>
+                        </div>
+                        <div class="flex-grow-1">
+                            <form th:action="@{/appearance/logo}" method="post" enctype="multipart/form-data"
+                                  class="d-flex flex-wrap align-items-center gap-2">
+                                <label class="visually-hidden" for="logo">Logo file</label>
+                                <input type="file" class="form-control w-auto" id="logo" name="logo" required
+                                       accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml">
+                                <button type="submit" class="btn btn-secondary">
+                                    <i class="bi bi-upload me-1" aria-hidden="true"></i> Upload
+                                </button>
+                            </form>
+                            <form th:action="@{/appearance/logo/remove}" method="post" class="mt-2" th:if="${hasLogo}">
+                                <button type="submit" class="btn btn-link btn-sm p-0">Remove the logo and use the key mark</button>
+                            </form>
+                            <small class="form-text d-block mt-2">
+                                Shown in the header, on the sign-in page and as the tab icon.
+                                <span th:text="${logoAccepted}">PNG, JPEG, GIF, WebP or SVG</span>, up to
+                                <span th:text="${logoMaxKb}">512</span> KB; a square image around 128&times;128 works best.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <form th:action="@{/appearance}" th:object="${form}" method="post" novalidate id="appearanceForm">
+                <div class="card mb-4">
+                    <div class="card-header">Name</div>
+                    <div class="card-body">
+                        <div class="col-md-6">
+                            <label class="form-label" for="portalName">Portal name</label>
+                            <input type="text" class="form-control" th:field="*{portalName}" th:errorclass="is-invalid"
+                                   maxlength="60" required>
+                            <small class="form-text">In the header, the page titles and "Sign in to &hellip;".</small>
+                            <div class="invalid-feedback" th:errors="*{portalName}"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4" th:each="mode : ${modes}"
+                     th:with="prefix=${mode.prefix}, defaults=${mode.name() == 'DARK'} ? ${defaultDark} : ${defaultLight}">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span th:text="${mode.label + ' theme'}">Light theme</span>
+                        <button type="button" class="btn btn-sm btn-link js-use-defaults"
+                                th:attr="data-mode=${prefix},
+                                         data-defaults=${defaults.accent + ',' + defaults.canvas + ',' + defaults.surface + ',' + defaults.ink + ',' + defaults.success + ',' + defaults.warning + ',' + defaults.danger}">
+                            Fill in the built-in colours
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-4">
+                            <div class="col-lg-7">
+                                <div class="row g-3">
+                                    <div class="col-sm-6 js-color-field" th:each="field : ${fields}"
+                                         th:attr="data-mode=${prefix}, data-color=${field.name}">
+                                        <label class="form-label" th:for="${prefix + '.' + field.name}"
+                                               th:text="${field.label}">Accent</label>
+                                        <div class="input-group">
+                                            <!-- the picker mirrors the text field; only the text is submitted -->
+                                            <input type="color" class="form-control form-control-color js-color-picker"
+                                                   th:attr="aria-label=${'Choose the ' + field.label + ' colour'}">
+                                            <input type="text" class="form-control font-monospace js-color-hex"
+                                                   th:field="*{__${prefix}__.__${field.name}__}"
+                                                   th:errorclass="is-invalid" maxlength="7" spellcheck="false"
+                                                   autocomplete="off" placeholder="#0a5fd6">
+                                            <div class="invalid-feedback"
+                                                 th:errors="*{__${prefix}__.__${field.name}__}"></div>
+                                        </div>
+                                        <small class="form-text" th:text="${field.help}">Links and buttons</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-5">
+                                <!-- a sample of the page, recoloured live from the fields on the left -->
+                                <div class="kp-theme-preview" th:attr="data-preview=${prefix}"
+                                     th:classappend="${mode.name() == 'DARK'} ? 'is-dark'">
+                                    <div class="kp-theme-preview-card">
+                                        <div class="kp-theme-preview-title">Reporting service</div>
+                                        <div class="kp-theme-preview-muted">Azure AD · expires in 12 days</div>
+                                        <div class="kp-theme-preview-pills">
+                                            <span class="pill pill-success">Active</span>
+                                            <span class="pill pill-warning">Expiring soon</span>
+                                            <span class="pill pill-danger">Expired</span>
+                                        </div>
+                                        <div class="kp-theme-preview-actions">
+                                            <span class="btn btn-primary btn-sm">Primary button</span>
+                                            <a class="kp-theme-preview-link">A link</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check2 me-1" aria-hidden="true"></i> Save name and colours
+                    </button>
+                    <a th:href="@{/keys}" class="btn btn-link">Cancel</a>
+                </div>
+            </form>
+
+            <form th:action="@{/appearance/reset}" method="post" class="mt-3 js-confirm"
+                  data-confirm="Return to the built-in look? The name, logo and colours above will be discarded."
+                  th:if="${customised}">
+                <button type="submit" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i> Reset to defaults
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<th:block layout:fragment="scripts">
+    <script th:src="@{/js/appearance.js}"></script>
+</th:block>
+</body>
+</html>

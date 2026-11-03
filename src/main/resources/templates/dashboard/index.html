@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Dashboard</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="kp-page-header">
+        <div>
+            <h1>Dashboard</h1>
+            <p class="kp-subtitle">
+                <th:block th:if="${selectedGroup != null}">What needs attention among
+                    <strong th:text="${selectedGroup.name}">Platform team</strong>'s keys.</th:block>
+                <th:block th:if="${selectedGroup == null and currentUser.superAdmin}">What needs attention across
+                    every group's keys.</th:block>
+                <th:block th:if="${selectedGroup == null and !currentUser.superAdmin}">What needs attention among
+                    your keys.</th:block>
+            </p>
+        </div>
+        <!-- only a super admin has more than one group to look at -->
+        <form th:if="${groups != null}" method="get" th:action="@{/dashboard}" class="kp-actions">
+            <label class="visually-hidden" for="group">Group</label>
+            <select class="form-select js-autosubmit" id="group" name="group">
+                <option value="" th:selected="${selectedGroup == null}">All groups</option>
+                <option th:each="g : ${groups}" th:value="${g.id}" th:text="${g.name}"
+                        th:selected="${selectedGroup != null and selectedGroup.id == g.id}">Platform team</option>
+            </select>
+        </form>
+    </div>
+
+    <div class="kp-metrics">
+        <a th:href="@{/keys}" class="kp-metric">
+            <span class="kp-metric-icon is-accent" aria-hidden="true"><i class="bi bi-key"></i></span>
+            <div>
+                <div class="kp-metric-value" th:text="${dashboard.total}">0</div>
+                <div class="kp-metric-label">Keys</div>
+            </div>
+        </a>
+        <a href="#expiring" class="kp-metric" th:classappend="${#lists.isEmpty(dashboard.expiringSoon)} ? 'is-quiet'">
+            <span class="kp-metric-icon" th:classappend="${!#lists.isEmpty(dashboard.expiringSoon)} ? 'is-amber'" aria-hidden="true">
+                <i class="bi bi-hourglass-split"></i></span>
+            <div>
+                <div class="kp-metric-value" th:text="${#lists.size(dashboard.expiringSoon)}">0</div>
+                <div class="kp-metric-label" th:text="${'Expiring in the next ' + expiringSoonDays + ' days'}">Expiring in the next 30 days</div>
+            </div>
+        </a>
+        <a th:href="@{/keys(sort=EXPIRES,showExpired=true)}" class="kp-metric" th:classappend="${dashboard.expired == 0} ? 'is-quiet'">
+            <span class="kp-metric-icon" th:classappend="${dashboard.expired > 0} ? 'is-red'" aria-hidden="true">
+                <i class="bi bi-exclamation-octagon"></i></span>
+            <div>
+                <div class="kp-metric-value" th:text="${dashboard.expired}">0</div>
+                <div class="kp-metric-label">Expired</div>
+            </div>
+        </a>
+        <a href="#failed" class="kp-metric" th:classappend="${#lists.isEmpty(dashboard.failedRotations)} ? 'is-quiet'">
+            <span class="kp-metric-icon" th:classappend="${!#lists.isEmpty(dashboard.failedRotations)} ? 'is-red'" aria-hidden="true">
+                <i class="bi bi-arrow-repeat"></i></span>
+            <div>
+                <div class="kp-metric-value" th:text="${#lists.size(dashboard.failedRotations)}">0</div>
+                <div class="kp-metric-label">Failed replacements</div>
+            </div>
+        </a>
+        <a href="#unused" class="kp-metric" th:classappend="${#lists.isEmpty(dashboard.neverRevealed)} ? 'is-quiet'">
+            <span class="kp-metric-icon" th:classappend="${!#lists.isEmpty(dashboard.neverRevealed)} ? 'is-amber'" aria-hidden="true">
+                <i class="bi bi-eye-slash"></i></span>
+            <div>
+                <div class="kp-metric-value" th:text="${#lists.size(dashboard.neverRevealed)}">0</div>
+                <div class="kp-metric-label">Never revealed</div>
+            </div>
+        </a>
+    </div>
+
+    <div class="kp-empty" th:if="${dashboard.allClear}">
+        <span class="kp-empty-icon" aria-hidden="true"><i class="bi bi-check2-circle"></i></span>
+        <h2>All clear</h2>
+        <p>Nothing is about to expire, every automatic replacement went through, and every key older
+            than a month has been used.</p>
+    </div>
+
+    <!-- Expiring -->
+    <div class="card kp-table-card mb-4" id="expiring" th:unless="${#lists.isEmpty(dashboard.expiringSoon)}">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span th:text="${'Expiring in the next ' + expiringSoonDays + ' days'}">Expiring in the next 30 days</span>
+            <a th:href="@{/keys(sort=EXPIRES)}" class="small">All keys by expiry</a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th scope="col">Key</th>
+                    <th scope="col">Owner</th>
+                    <th scope="col">Expires</th>
+                    <th scope="col"><span class="visually-hidden">Status</span></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="key : ${dashboard.expiringSoon}">
+                    <td>
+                        <a th:href="@{/keys/{id}(id=${key.id})}" th:text="${key.name}">Deploy token</a>
+                        <div class="kp-cell-secondary" th:text="${key.serviceName}">GitHub</div>
+                    </td>
+                    <td th:text="${key.ownerName}">Alex Carter</td>
+                    <td>
+                        <span th:text="${#temporals.format(key.expiresOn, 'MMM d, yyyy')}">Mar 1, 2026</span>
+                        <div class="kp-cell-secondary"
+                             th:text="${key.daysUntilExpiry == 0 ? 'today' : (key.daysUntilExpiry == 1 ? 'tomorrow' : 'in ' + key.daysUntilExpiry + ' days')}">in 12 days</div>
+                    </td>
+                    <td class="text-end">
+                        <a th:if="${replacements.containsKey(key.id)}" class="kp-handover"
+                           th:href="@{/keys/{id}(id=${replacements.get(key.id).id})}">
+                            <i class="bi bi-arrow-repeat" aria-hidden="true"></i> Replacement ready</a>
+                        <span th:unless="${replacements.containsKey(key.id)}"
+                              th:replace="fragments/badges :: expiration(${key})"></span>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Failed replacements -->
+    <div class="card kp-table-card mb-4" id="failed" th:unless="${#lists.isEmpty(dashboard.failedRotations)}">
+        <div class="card-header">Automatic replacement failed</div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th scope="col">Key</th>
+                    <th scope="col">Owner</th>
+                    <th scope="col">Last attempt</th>
+                    <th scope="col">What went wrong</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="key : ${dashboard.failedRotations}">
+                    <td>
+                        <a th:href="@{/keys/{id}(id=${key.id})}" th:text="${key.name}">Reporting service</a>
+                        <div class="kp-cell-secondary" th:text="${key.serviceName}">Azure AD</div>
+                    </td>
+                    <td th:text="${key.ownerName}">Sam Diaz</td>
+                    <td th:text="${#temporals.format(key.rotationFailedAt, 'MMM d, yyyy h:mm a')}">Mar 1, 2026 7:00 AM</td>
+                    <td class="kp-cell-secondary" th:text="${key.rotationFailure}">The provider said no</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer text-muted small">
+            Each is tried again on the next daily sweep. A refusal that keeps coming back usually means the
+            integration's credential or permissions need looking at under Integrations.
+        </div>
+    </div>
+
+    <!-- Never revealed -->
+    <div class="card kp-table-card mb-4" id="unused" th:unless="${#lists.isEmpty(dashboard.neverRevealed)}">
+        <div class="card-header" th:text="${'Never revealed, added more than ' + unusedAfterDays + ' days ago'}">Never revealed</div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                <tr>
+                    <th scope="col">Key</th>
+                    <th scope="col">Owner</th>
+                    <th scope="col">Added</th>
+                    <th scope="col">Expires</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="key : ${dashboard.neverRevealed}">
+                    <td>
+                        <a th:href="@{/keys/{id}(id=${key.id})}" th:text="${key.name}">Old token</a>
+                        <div class="kp-cell-secondary" th:text="${key.serviceName}">Stripe</div>
+                    </td>
+                    <td th:text="${key.ownerName}">Alex Carter</td>
+                    <td th:text="${#temporals.format(key.addedAt, 'MMM d, yyyy')}">Jan 3, 2026</td>
+                    <td th:text="${key.expiresOn != null ? #temporals.format(key.expiresOn, 'MMM d, yyyy') : 'Never'}">Never</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer text-muted small">
+            Nobody has shown or copied these since they were added, so they may not be in use. Possibly
+            a replacement nobody has switched to yet, possibly a key to retire - only the owner can
+            reveal or delete it.
+        </div>
+    </div>
+</div>
+</body>
+</html>

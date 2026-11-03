@@ -18,6 +18,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.sidbhat.apikeyportal.activity.ActivityAction;
 import com.sidbhat.apikeyportal.activity.ActivityService;
 import com.sidbhat.apikeyportal.activity.KeyOrigin;
 import com.sidbhat.apikeyportal.activity.RevealMethod;
@@ -97,6 +98,19 @@ public class ApiKeyService {
         return KeySummary.of(repository.findAll(ApiKeySpecifications.visibleTo(viewer)));
     }
 
+    /**
+     * What needs attention among the keys {@code viewer} can see - or, for a
+     * super admin, within one group when {@code groupId} is given. Anyone else's
+     * {@code groupId} is ignored: their scope is their group, full stop.
+     */
+    public KeyDashboard dashboard(UserAccount viewer, Long groupId, LocalDate today) {
+        Specification<ApiKey> scope = ApiKeySpecifications.visibleTo(viewer);
+        if (viewer.isSuperAdmin()) {
+            scope = scope.and(ApiKeySpecifications.inGroup(groupId));
+        }
+        return KeyDashboard.of(repository.findAll(scope), today, Instant.now());
+    }
+
     public List<String> findServiceNames(UserAccount viewer) {
         if (viewer.isSuperAdmin()) {
             return repository.findDistinctServiceNames();
@@ -169,6 +183,7 @@ public class ApiKeyService {
         newKey.assignTo(owner, provenance.group() != null ? provenance.group() : owner.getGroup());
         newKey.recordProvenance(provenance.integrationId(), provenance.providerResourceId(),
                 provenance.autoRotate(), provenance.rotatedFromKeyId());
+        newKey.setProviderCredentialId(provenance.providerCredentialId());
         ApiKey key = repository.save(newKey);
         activity.recordKeyCreated(owner, key.getId(), key.getServiceName(), key.getName(), origin);
         log.info("Created {} for {} ({})", key, owner.getEmail(), origin.source());
@@ -197,6 +212,27 @@ public class ApiKeyService {
         activity.recordKeyUpdated(key.getOwner(), key.getId(), key.getServiceName(), key.getName(),
                 "Token rotated automatically; the previous value was revoked by the provider");
         log.info("Rotated the value of {} in place", key);
+        return key;
+    }
+
+    /**
+     * Records that the portal deleted this credential at its provider, which is
+     * how an expiry date on a Google or AWS key becomes true rather than a note.
+     * The row stays - the history of what the key was, who revealed it and what
+     * replaced it is still worth having - but from here on its value is dead.
+     * <p>
+     * Written in the owner's name, as the rotation that led here was: it happens
+     * because they switched automatic replacement on.
+     *
+     * @param detail what happened at the provider, for the history
+     */
+    @Transactional
+    public ApiKey markRevokedAtProvider(Long id, String detail) {
+        ApiKey key = repository.findById(id).orElseThrow(() -> new ApiKeyNotFoundException(id));
+        key.markRevoked(Instant.now());
+        activity.record(ActivityAction.KEY_REVOKED, key.getOwner(), key.getId(),
+                key.getServiceName() + " / " + key.getName(), detail);
+        log.info("Deleted {} at its provider: {}", key, detail);
         return key;
     }
 

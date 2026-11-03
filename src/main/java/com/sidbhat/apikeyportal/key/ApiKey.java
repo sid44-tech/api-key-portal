@@ -116,6 +116,16 @@ public class ApiKey {
     private String providerResourceId;
 
     /**
+     * The provider's id for this specific credential, where {@link #providerResourceId}
+     * is what it hangs off: for Azure, the password credential's keyId on the app
+     * registration. What a deletion at the provider deletes by; null for keys
+     * minted before it was recorded, and for providers whose stored value
+     * already identifies the credential (Google's key id, AWS's access key id).
+     */
+    @Column(name = "provider_credential_id", length = 255)
+    private String providerCredentialId;
+
+    /**
      * The owner's per-key say on automatic replacement: null defers to their
      * setting for the provider, true or false pins this one key regardless.
      */
@@ -125,6 +135,26 @@ public class ApiKey {
     /** Set on a replacement: the key this one was minted to take over from. */
     @Column(name = "rotated_from_key_id")
     private Long rotatedFromKeyId;
+
+    /**
+     * When the last automatic replacement or deletion of this key failed, and
+     * why. Written by {@link ApiKeyRepository#markRotationFailed} only and
+     * cleared by the next success, so - like {@link #lastRevealedAt} - it never
+     * counts as the key being edited.
+     */
+    @Column(name = "rotation_failed_at", insertable = false, updatable = false)
+    private Instant rotationFailedAt;
+
+    @Column(name = "rotation_failure", insertable = false, updatable = false)
+    private String rotationFailure;
+
+    /**
+     * When the portal deleted this credential at its provider, for providers whose
+     * keys never expire on their own (Google, AWS). Null until then - and always,
+     * for providers that retire their own credentials.
+     */
+    @Column(name = "revoked_at")
+    private Instant revokedAt;
 
     protected ApiKey() {
         // for JPA
@@ -159,6 +189,14 @@ public class ApiKey {
         return providerResourceId;
     }
 
+    public String getProviderCredentialId() {
+        return providerCredentialId;
+    }
+
+    public void setProviderCredentialId(String providerCredentialId) {
+        this.providerCredentialId = providerCredentialId;
+    }
+
     public Boolean getAutoRotate() {
         return autoRotate;
     }
@@ -169,6 +207,28 @@ public class ApiKey {
 
     public Long getRotatedFromKeyId() {
         return rotatedFromKeyId;
+    }
+
+    public Instant getRevokedAt() {
+        return revokedAt;
+    }
+
+    public Instant getRotationFailedAt() {
+        return rotationFailedAt;
+    }
+
+    public String getRotationFailure() {
+        return rotationFailure;
+    }
+
+    /** True once the portal has deleted this credential at the provider; the value no longer works anywhere. */
+    public boolean isRevoked() {
+        return revokedAt != null;
+    }
+
+    /** Records that the portal deleted this credential at the provider. Set once. */
+    public void markRevoked(Instant revokedAt) {
+        this.revokedAt = revokedAt;
     }
 
     /** Where a provisioned or rotated key came from; set once, at creation. */

@@ -48,6 +48,7 @@
     "Action": [
       "iam:CreateUser",
       "iam:CreateAccessKey",
+      "iam:DeleteAccessKey",
       "iam:DeleteUser"
     ],
     "Resource": "arn:aws:iam::*:user/keyportal/*"
@@ -59,6 +60,8 @@
                                 This is the least-privileged option: every user this portal creates lives under the
                                 <code>/keyportal/</code> path, and the policy reaches that path and nothing else.
                                 The portal cannot touch any other user, role or resource in your account.
+                                <code>iam:DeleteAccessKey</code> is what lets automatic replacement finish the
+                                job: once a key has expired and its successor exists, the old pair is deleted.
                             </p>
                             <a href="https://console.aws.amazon.com/iam/home#/policies/create"
                                target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm">

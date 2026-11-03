@@ -9,7 +9,7 @@ import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -54,12 +54,20 @@ public class ApiKeyValueController {
      * <p>
      * The log level is also pinned in {@code application.yml} as a second lock,
      * but that one can be overridden by configuration and this cannot.
+     * <p>
+     * A POST, not a GET, although it changes nothing the caller can see. A
+     * reveal is recorded in the history and on the key, and a GET could be
+     * triggered by any page the owner happened to have open - an image tag on
+     * another site, say. The other site could never read the value, but it could
+     * fill the owner's history with reveals they never made, which is the one
+     * record an audit relies on. As a POST it needs the CSRF token, which only
+     * this site's own pages have.
      *
      * @param intent what the browser is about to do with the value, for the
      *               history. A hint, not a permission - showing and copying are
      *               the same call, and both are recorded as a reveal either way.
      */
-    @GetMapping("/keys/{id}/value")
+    @PostMapping("/keys/{id}/value")
     public void value(@PathVariable Long id,
             @RequestParam(name = "intent", required = false) String intent,
             @AuthenticationPrincipal PortalUser principal,

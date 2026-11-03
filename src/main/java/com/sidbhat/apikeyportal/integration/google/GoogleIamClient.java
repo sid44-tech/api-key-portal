@@ -156,6 +156,35 @@ public class GoogleIamClient {
     }
 
     /**
+     * Deletes one key of a service account, leaving the account and its other
+     * keys alone. This is what makes a portal-side expiry true for Google: the
+     * replacement key is already live, and from this call on the old one is not.
+     *
+     * @param keyId the key's id - {@code private_key_id} in the JSON file Google issued
+     * @return true if the key was deleted, false if Google no longer had it (already
+     *         deleted in the console, say) - either way it is gone, which is the point
+     */
+    public boolean deleteServiceAccountKey(String token, String projectId, String serviceAccountEmail,
+            String keyId) {
+        try {
+            iamClient.delete()
+                    .uri("/v1/projects/{projectId}/serviceAccounts/{email}/keys/{keyId}", projectId,
+                            serviceAccountEmail, keyId)
+                    .headers(h -> h.setBearerAuth(token))
+                    .retrieve()
+                    .toBodilessEntity();
+            return true;
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode().value() == 404) {
+                return false;
+            }
+            throw translate("Could not delete the service account key", e);
+        } catch (RestClientException e) {
+            throw unreachable(e);
+        }
+    }
+
+    /**
      * Deletes a service account. Used to clean up after a partially failed
      * provisioning run.
      */

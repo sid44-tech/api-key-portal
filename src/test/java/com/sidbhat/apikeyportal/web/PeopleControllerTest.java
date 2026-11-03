@@ -50,6 +50,10 @@ class PeopleControllerTest {
     @MockitoBean
     private ApiKeyService apiKeyService;
 
+    /** The super admin's two-factor reset lives on the same page; not exercised here. */
+    @MockitoBean
+    private com.sidbhat.apikeyportal.mfa.MfaService mfaService;
+
     private final UserAccount alex = TestUsers.alex();
     private final UserAccount sam = TestUsers.sam();
 

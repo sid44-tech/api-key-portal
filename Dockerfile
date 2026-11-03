@@ -28,4 +28,11 @@ USER portal
 ENV PORTAL_DB_PATH=/app/data/keyportal.db
 
 EXPOSE 8080
+# Healthy means the readiness probe says so: database reachable, encryption key
+# working. bash and /dev/tcp rather than curl, which this image does not carry.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 \
+        && printf "GET /actuator/health/readiness HTTP/1.0\r\nHost: localhost\r\n\r\n" >&3 \
+        && head -n 1 <&3 | grep -q " 200 "' || exit 1
+
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

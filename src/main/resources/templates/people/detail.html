@@ -102,6 +102,22 @@
 
                         <button type="submit" class="btn btn-primary">Save changes</button>
                     </form>
+
+                    <!-- a lost phone with no recovery codes is otherwise the end of the account -->
+                    <th:block th:if="${currentUser.superAdmin and person.mfaEnabled and !currentUser.is(person)}">
+                        <hr>
+                        <form th:action="@{/people/{id}/mfa/reset(id=${person.id})}" method="post" class="js-confirm"
+                              th:attr="data-confirm=${'Reset two-factor authentication for ' + person.displayName + '? They will sign in with their password alone until they set it up again.'}">
+                            <p class="text-muted small mb-2">
+                                Two-factor authentication is on for this account. If they have lost their
+                                authenticator and their recovery codes, reset it here - and tell them, since
+                                until they enrol again a password is all that protects the account.
+                            </p>
+                            <button type="submit" class="btn btn-outline-danger btn-sm">
+                                <i class="bi bi-phone me-1" aria-hidden="true"></i> Reset two-factor authentication
+                            </button>
+                        </form>
+                    </th:block>
                 </div>
             </div>
         </div>

@@ -48,6 +48,23 @@ class ServiceAccountKeyTest {
     }
 
     @Test
+    void readsTheKeyIdOutOfAnIssuedKeyFile() {
+        assertThat(ServiceAccountKey.privateKeyId("""
+                {"type":"service_account","project_id":"p","private_key_id":"0a1b2c","private_key":"x"}
+                """)).isEqualTo("0a1b2c");
+    }
+
+    @Test
+    void aValueWithNoKeyIdCannotBeDeletedByIt() {
+        assertThatThrownBy(() -> ServiceAccountKey.privateKeyId("{\"type\":\"service_account\"}"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no private_key_id");
+        assertThatThrownBy(() -> ServiceAccountKey.privateKeyId("not json at all"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not a Google JSON key file");
+    }
+
+    @Test
     void neverIncludesThePrivateKeyInToString() {
         ServiceAccountKey key = new ServiceAccountKey("p", "e@p.iam", "SECRET-KEY-MATERIAL");
         assertThat(key.toString()).doesNotContain("SECRET-KEY-MATERIAL");

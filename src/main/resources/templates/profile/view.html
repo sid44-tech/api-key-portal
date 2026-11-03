@@ -82,7 +82,9 @@
                         Where a provider supports it, the portal can mint a fresh secret for a key of yours a
                         week before it expires &mdash; same client, new secret, and an email telling you it's
                         ready. The old key keeps working until its own expiry, so you switch over whenever
-                        suits. You can also pin any single key on or off from that key's page.
+                        suits. Google Cloud and AWS never retire a key themselves, so for those the portal
+                        also deletes the old key at the provider once it has expired and been replaced.
+                        You can also pin any single key on or off from that key's page.
                     </p>
                     <form th:each="setting : ${rotationSettings}" th:action="@{/profile/rotation}" method="post"
                           class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
@@ -100,6 +102,26 @@
                                    th:text="${setting.value ? 'On' : 'Off'}">Off</label>
                         </div>
                     </form>
+                </div>
+            </div>
+
+            <div class="card mb-4" th:unless="${account.ssoLinked}">
+                <div class="card-header">Two-factor authentication</div>
+                <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
+                    <div>
+                        <th:block th:if="${account.mfaEnabled}">
+                            <span class="pill pill-success">On</span>
+                            <span class="text-muted ms-1">Signing in asks for a code from your authenticator app, since
+                                <span th:text="${#temporals.format(account.mfaEnabledAt, 'MMMM d, yyyy')}">March 1, 2026</span>.</span>
+                        </th:block>
+                        <th:block th:unless="${account.mfaEnabled}">
+                            <span class="pill pill-warning">Off</span>
+                            <span class="text-muted ms-1">Your password alone signs you in. An authenticator app on your
+                                phone adds a second lock that a stolen password cannot open.</span>
+                        </th:block>
+                    </div>
+                    <a th:href="@{/mfa}" class="btn btn-sm" th:classappend="${account.mfaEnabled} ? 'btn-secondary' : 'btn-primary'"
+                       th:text="${account.mfaEnabled} ? 'Manage' : 'Set up'">Set up</a>
                 </div>
             </div>
 

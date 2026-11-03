@@ -17,6 +17,7 @@ import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequest
 
 import com.sidbhat.apikeyportal.logging.AccessDeniedLogger;
 import com.sidbhat.apikeyportal.logging.AuditLog;
+import com.sidbhat.apikeyportal.mfa.MfaProperties;
 import com.sidbhat.apikeyportal.logging.PrincipalLogContextFilter;
 import com.sidbhat.apikeyportal.sso.PasswordLoginFailureHandler;
 import com.sidbhat.apikeyportal.sso.SsoAuthenticationFailureHandler;
@@ -26,7 +27,7 @@ import com.sidbhat.apikeyportal.sso.SsoUserService;
 
 @Configuration
 @EnableWebSecurity
-@EnableConfigurationProperties({SecurityProperties.class, LockoutProperties.class})
+@EnableConfigurationProperties({SecurityProperties.class, LockoutProperties.class, MfaProperties.class})
 public class SecurityConfig {
 
     /** No inline scripts or styles; everything is served from this app. */
@@ -79,10 +80,13 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, MfaProperties mfaProperties) throws Exception {
         http
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/webjars/**", "/css/**", "/js/**", "/favicon.ico").permitAll()
+                        // /theme.css is the chosen colours as a stylesheet; the sign-in
+                        // page wears them too, and there is nothing in it to protect
+                        .requestMatchers("/webjars/**", "/css/**", "/js/**", "/favicon.ico", "/theme.css",
+                                "/theme/logo").permitAll()
                         // The login page by path, so every query string reaches it.
                         // formLogin().permitAll() only permits the exact URLs it knows
                         // about ("/login", "/login?error"), so our own "?registered" and
@@ -91,6 +95,9 @@ public class SecurityConfig {
                         // and the next successful sign-in lands back on the login page
                         // instead of the portal.
                         .requestMatchers("/login").permitAll()
+                        // health checks are for monitors, which have no session. Anonymously
+                        // they get a status and an HTTP code; the details need a super admin
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         // Error dispatches are forwarded through this chain too. Left
                         // protected, a 403 or 404 for a signed-out visitor becomes their
                         // saved request and sends them to the error page after signing in.
@@ -105,15 +112,21 @@ public class SecurityConfig {
                         .requestMatchers("/activity/**").hasAnyRole("SUPER_ADMIN", "GROUP_ADMIN")
                         .requestMatchers("/integrations/new", "/integrations/azure-ad",
                                 "/integrations/google-cloud", "/integrations/aws",
-                                "/integrations/gitlab", "/integrations/cloudflare")
+                                "/integrations/gitlab", "/integrations/cloudflare",
+                                "/integrations/alerts/**")
                                 .hasAnyRole("SUPER_ADMIN", "GROUP_ADMIN")
                         // connecting the organisation's identity provider is the one
                         // thing only the super admin can do: it decides who gets in
                         .requestMatchers("/sso/**").hasRole("SUPER_ADMIN")
                         .requestMatchers("/groups/**").hasRole("SUPER_ADMIN")
+                        // the colours everybody sees are the super admin's to choose
+                        .requestMatchers("/appearance/**").hasRole("SUPER_ADMIN")
                         .anyRequest().authenticated())
                 .formLogin(form -> {
-                    form.loginPage("/login").defaultSuccessUrl("/keys").permitAll();
+                    form.loginPage("/login").permitAll();
+                    // a correct password lands on the code page for accounts with a
+                    // second factor, and where it always did for the rest
+                    form.successHandler(new MfaAuthenticationSuccessHandler());
                     // tells somebody whose account is linked to the provider to use
                     // the button, instead of a flat "invalid email or password"
                     passwordFailureHandler.ifAvailable(form::failureHandler);
@@ -133,9 +146,11 @@ public class SecurityConfig {
                 .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp.policyDirectives(CONTENT_SECURITY_POLICY))
                         .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.SAME_ORIGIN)))
-                // after authorization, so it only ever sees requests that were going
-                // to be served anyway
-                .addFilterAfter(new PasswordChangeRequiredFilter(), AuthorizationFilter.class)
+                // after authorization, so they only ever see requests that were going
+                // to be served anyway. The second factor first: it is part of signing
+                // in, and the password change comes once the person is fully in
+                .addFilterAfter(new MfaRequiredFilter(mfaProperties), AuthorizationFilter.class)
+                .addFilterAfter(new PasswordChangeRequiredFilter(), MfaRequiredFilter.class)
                 // likewise after authorization, which is the first point at which
                 // "who is this" has an answer to put in the logging context
                 .addFilterAfter(new PrincipalLogContextFilter(), AuthorizationFilter.class);

@@ -10,6 +10,8 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
 
+import com.sidbhat.apikeyportal.theme.ThemeService;
+
 /**
  * Sends the invitation link.
  * <p>
@@ -25,10 +27,13 @@ public class InvitationMailer {
 
     private final ObjectProvider<JavaMailSender> mailSender;
     private final InvitationProperties properties;
+    private final ThemeService theme;
 
-    public InvitationMailer(ObjectProvider<JavaMailSender> mailSender, InvitationProperties properties) {
+    public InvitationMailer(ObjectProvider<JavaMailSender> mailSender, InvitationProperties properties,
+            ThemeService theme) {
         this.mailSender = mailSender;
         this.properties = properties;
+        this.theme = theme;
     }
 
     /**
@@ -49,7 +54,7 @@ public class InvitationMailer {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(properties.getFromAddress());
         message.setTo(invitation.getEmail());
-        message.setSubject("You've been invited to the API Key Portal");
+        message.setSubject("You've been invited to " + theme.portalName());
         message.setText(body(invitation, link));
         try {
             sender.send(message);
@@ -68,7 +73,7 @@ public class InvitationMailer {
                 : invitation.getInvitedBy().getDisplayName();
         String group = invitation.getGroup() == null ? "the portal" : invitation.getGroup().getName();
         return """
-                %s has invited you to join %s on the API Key Portal.
+                %s has invited you to join %s on %s.
 
                 Set up your account here:
                 %s
@@ -78,7 +83,8 @@ public class InvitationMailer {
 
                 If you weren't expecting this, you can ignore this email - nothing is
                 created until the link is used.
-                """.formatted(inviter, group, link, humanize(properties.getValidFor()), inviter);
+                """.formatted(inviter, group, theme.portalName(), link, humanize(properties.getValidFor()),
+                inviter);
     }
 
     private static String humanize(Duration duration) {

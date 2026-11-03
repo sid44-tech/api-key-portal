@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import com.sidbhat.apikeyportal.key.ApiKey;
+import com.sidbhat.apikeyportal.theme.ThemeService;
 
 /**
  * Writes and sends the "your key is about to expire" email.
@@ -27,10 +28,13 @@ public class ExpiryReminderMailer {
 
     private final ObjectProvider<JavaMailSender> mailSender;
     private final NotificationProperties properties;
+    private final ThemeService theme;
 
-    public ExpiryReminderMailer(ObjectProvider<JavaMailSender> mailSender, NotificationProperties properties) {
+    public ExpiryReminderMailer(ObjectProvider<JavaMailSender> mailSender, NotificationProperties properties,
+            ThemeService theme) {
         this.mailSender = mailSender;
         this.properties = properties;
+        this.theme = theme;
     }
 
     /** True if a mail server is configured at all; the sweep is pointless without one. */
@@ -78,7 +82,9 @@ public class ExpiryReminderMailer {
     String body(ApiKey key, ReminderThreshold threshold, long daysRemaining) {
         StringBuilder text = new StringBuilder();
         text.append("Hi ").append(key.getOwner().getDisplayName()).append(",\n\n");
-        text.append("A key you hold in the API Key Portal expires ").append(describe(daysRemaining)).append(".\n\n");
+        // the portal's name as the admin set it, so the email matches the site it links to
+        text.append("A key you hold in ").append(theme.portalName()).append(" expires ")
+                .append(describe(daysRemaining)).append(".\n\n");
         text.append("Service:     ").append(key.getServiceName()).append('\n');
         text.append("Name:        ").append(key.getName()).append('\n');
         text.append("Expires on:  ").append(DATE.format(key.getExpiresOn())).append('\n');

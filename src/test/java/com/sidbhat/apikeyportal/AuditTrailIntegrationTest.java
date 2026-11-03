@@ -131,7 +131,7 @@ class AuditTrailIntegrationTest {
     void revealingAKeyIsRecordedWithWhoWhatAndHow() throws Exception {
         Long keyId = addAKey();
 
-        mvc.perform(get("/keys/{id}/value", keyId).param("intent", "copied").with(as(sam)))
+        mvc.perform(post("/keys/{id}/value", keyId).with(csrf()).param("intent", "copied").with(as(sam)))
                 .andExpect(status().isOk());
 
         assertThat(auditLines()).anySatisfy(line -> assertThat(line)
@@ -210,13 +210,13 @@ class AuditTrailIntegrationTest {
         Long keyId = addAKey();
         appender.list.clear();
 
-        mvc.perform(get("/keys/{id}/value", keyId).with(as(sam))).andExpect(status().isOk());
+        mvc.perform(post("/keys/{id}/value", keyId).with(csrf()).with(as(sam))).andExpect(status().isOk());
 
         ILoggingEvent event = firstEventWith("event=key_revealed");
         assertThat(event.getMDCPropertyMap())
                 .containsEntry(AuditLogContext.USER, "sam@example.com")
                 .containsEntry(AuditLogContext.CLIENT_IP, "127.0.0.1")
-                .containsEntry(AuditLogContext.REQUEST, "GET /keys/" + keyId + "/value");
+                .containsEntry(AuditLogContext.REQUEST, "POST /keys/" + keyId + "/value");
         assertThat(event.getMDCPropertyMap().get(AuditLogContext.REQUEST_ID)).isNotBlank();
     }
 
@@ -232,8 +232,8 @@ class AuditTrailIntegrationTest {
         Long keyId = addAKey();
         appender.list.clear();
 
-        mvc.perform(get("/keys/{id}/value", keyId).with(as(sam)));
-        mvc.perform(get("/keys/{id}/value", keyId).with(as(sam)));
+        mvc.perform(post("/keys/{id}/value", keyId).with(csrf()).with(as(sam)));
+        mvc.perform(post("/keys/{id}/value", keyId).with(csrf()).with(as(sam)));
 
         List<String> ids = appender.list.stream()
                 .filter(event -> event.getFormattedMessage().contains("event=key_revealed"))
@@ -279,8 +279,8 @@ class AuditTrailIntegrationTest {
     /** Everything that handles a key value in one go. */
     private void revealAndDeleteAKey() throws Exception {
         Long keyId = addAKey();
-        mvc.perform(get("/keys/{id}/value", keyId).with(as(sam))).andExpect(status().isOk());
-        mvc.perform(get("/keys/{id}/value", keyId).param("intent", "copied").with(as(sam)));
+        mvc.perform(post("/keys/{id}/value", keyId).with(csrf()).with(as(sam))).andExpect(status().isOk());
+        mvc.perform(post("/keys/{id}/value", keyId).with(csrf()).param("intent", "copied").with(as(sam)));
         mvc.perform(get("/keys/{id}", keyId).with(as(sam)));
         mvc.perform(post("/keys/{id}/delete", keyId).with(as(sam)).with(csrf()));
     }
@@ -290,7 +290,7 @@ class AuditTrailIntegrationTest {
         Long keyId = addAKey();
 
         // it writes its own response body, so this is worth checking outright
-        mvc.perform(get("/keys/{id}/value", keyId).with(as(sam)))
+        mvc.perform(post("/keys/{id}/value", keyId).with(csrf()).with(as(sam)))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(content().contentTypeCompatibleWith("application/json"))

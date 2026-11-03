@@ -30,18 +30,31 @@ class ExpiryReminderMailerTest {
     @Mock
     private JavaMailSender sender;
 
+    @org.mockito.Mock
+    private com.sidbhat.apikeyportal.theme.ThemeService theme;
+
     private ExpiryReminderMailer mailer;
     private ApiKey key;
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient().when(theme.portalName()).thenReturn("Keys at Contoso");
         mailer = new ExpiryReminderMailer(senderProvider,
-                new NotificationProperties(true, "0 0 8 * * *", "no-reply@example.com", "https://keys.example.com"));
+                new NotificationProperties(true, "0 0 8 * * *", "no-reply@example.com", "https://keys.example.com"),
+                theme);
         key = new ApiKey("Deploy token", "GitHub", "ghp_SECRET_VALUE_0123", LocalDate.of(2026, 1, 15),
                 LocalDate.of(2026, 10, 20));
         key.setNotes("Used by the release pipeline.\nRotate with the platform team.");
         key.assignTo(TestUsers.alex(), TestUsers.platformTeam());
         ReflectionTestUtils.setField(key, "id", 42L);
+    }
+
+    @Test
+    void theEmailNamesThePortalAsTheAdminRenamedIt() {
+        // the email has to match the site its link lands on
+        assertThat(mailer.body(key, ReminderThreshold.ONE_WEEK, 6))
+                .contains("A key you hold in Keys at Contoso expires")
+                .doesNotContain("API Key Portal");
     }
 
     @Test

@@ -90,6 +90,16 @@ public class ServiceIntegration {
     @Column(nullable = false)
     private boolean enabled = true;
 
+    /**
+     * Whether a key minted here is deleted at the provider once it has been
+     * replaced and has expired. On by default. For Google and AWS, off means an
+     * "expired" key keeps working at the provider until somebody removes it
+     * there; for Azure, off leaves the expired secret listed on the app
+     * registration. Only ever applies to keys the portal itself replaced.
+     */
+    @Column(name = "delete_replaced_keys", nullable = false)
+    private boolean deleteReplacedKeys = true;
+
     protected ServiceIntegration() {
         // for JPA
     }
@@ -157,6 +167,14 @@ public class ServiceIntegration {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public boolean isDeleteReplacedKeys() {
+        return deleteReplacedKeys;
+    }
+
+    public void setDeleteReplacedKeys(boolean deleteReplacedKeys) {
+        this.deleteReplacedKeys = deleteReplacedKeys;
     }
 
     public void markVerified(Instant verifiedAt) {

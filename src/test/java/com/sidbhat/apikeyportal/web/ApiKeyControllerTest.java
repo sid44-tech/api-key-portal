@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -333,10 +334,20 @@ class ApiKeyControllerTest {
     void valueEndpointReturnsDecryptedValueAndIsNotCached() throws Exception {
         when(apiKeyService.revealValue(eq(1L), eq(alex), eq(RevealMethod.SHOWN))).thenReturn("ghp_abc");
 
-        mvc.perform(get("/keys/1/value"))
+        mvc.perform(post("/keys/1/value").with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.value").value("ghp_abc"));
+    }
+
+    @Test
+    @WithPortalUser
+    void valueEndpointCannotBeReachedWithAGet() throws Exception {
+        // a GET is what an image tag or a link on another site can make the
+        // owner's browser send; refusing the method keeps forged reveals out of
+        // the history without the service ever being asked
+        mvc.perform(get("/keys/1/value")).andExpect(status().isMethodNotAllowed());
+        verifyNoInteractions(apiKeyService);
     }
 
     @Test
@@ -345,7 +356,7 @@ class ApiKeyControllerTest {
         when(apiKeyService.revealValue(eq(1L), any(), any()))
                 .thenThrow(new AccessDeniedException("Only the owner can reveal this key"));
 
-        mvc.perform(get("/keys/1/value"))
+        mvc.perform(post("/keys/1/value").with(csrf()))
                 .andExpect(status().isForbidden())
                 .andExpect(content().string(Matchers.not(Matchers.containsString("ghp_abc"))));
     }

@@ -65,8 +65,7 @@
                     <small class="form-text" th:if="${integration.provider.name() == 'GOOGLE_CLOUD'}">
                         Used as the service account's display name in Google Cloud and as the key name here.</small>
                     <small class="form-text" th:if="${integration.provider.name() == 'AWS_IAM'}">
-                        Used (sanitised) as the IAM user's name in AWS and as the key name here.
-                        AWS access keys don't expire on their own.</small>
+                        Used (sanitised) as the IAM user's name in AWS and as the key name here.</small>
                     <small class="form-text" th:if="${integration.provider.name() == 'GITLAB'}">
                         Used as the token's name in GitLab and as the key name here.</small>
                     <small class="form-text" th:if="${integration.provider.name() == 'CLOUDFLARE'}">
@@ -75,7 +74,9 @@
                 </div>
 
                 <div class="mb-3 col-md-6" th:if="${integration.provider.supportsValidityChoice()}">
-                    <label class="form-label" for="validity">Secret valid for</label>
+                    <label class="form-label" for="validity"
+                           th:text="${integration.provider.revokedByPortal()} ? 'Key valid for' : 'Secret valid for'">
+                        Secret valid for</label>
                     <select class="form-select" th:field="*{validity}" th:errorclass="is-invalid">
                         <option th:each="v : ${validities}" th:value="${v}" th:text="${v.label}">180 days</option>
                     </select>
@@ -85,6 +86,14 @@
                         tokens at one year; a longer choice becomes a year.</small>
                     <small class="form-text" th:if="${integration.provider.name() == 'CLOUDFLARE'}">The expiry
                         is set on the token and tracked here.</small>
+                    <small class="form-text" th:if="${integration.provider.name() == 'GOOGLE_CLOUD'}">Google
+                        service account keys never expire on their own, so this date is the portal's: you'll be
+                        reminded as it approaches, and with automatic replacement on the portal mints a new key
+                        a week ahead and deletes this one at Google when the date arrives.</small>
+                    <small class="form-text" th:if="${integration.provider.name() == 'AWS_IAM'}">AWS access keys
+                        never expire on their own, so this date is the portal's: you'll be reminded as it
+                        approaches, and with automatic replacement on the portal mints a new key a week ahead
+                        and deletes this one at AWS when the date arrives.</small>
                     <div class="invalid-feedback" th:errors="*{validity}"></div>
                 </div>
 

@@ -4,7 +4,9 @@ import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestBuilders.formLogin;
 import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.authenticated;
 import static org.springframework.security.test.web.servlet.response.SecurityMockMvcResultMatchers.unauthenticated;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 
@@ -16,6 +18,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.sidbhat.apikeyportal.user.UserAccount;
 import com.sidbhat.apikeyportal.user.UserAccountRepository;
@@ -79,6 +82,14 @@ class LoginLockoutIntegrationTest {
         }
     }
 
+    /** A sign-in attempt arriving from {@code address} rather than MockMvc's loopback. */
+    private static RequestPostProcessor fromAddress(String address) {
+        return request -> {
+            request.setRemoteAddr(address);
+            return request;
+        };
+    }
+
     @Test
     void wrongPasswordsUnderTheLimitStillJustSayInvalid() throws Exception {
         guessWrong(2);
@@ -96,7 +107,7 @@ class LoginLockoutIntegrationTest {
     }
 
     @Test
-    void enoughWrongPasswordsLockTheAccountOut() throws Exception {
+    void enoughWrongPasswordsLockThatCallerOut() throws Exception {
         guessWrong(3);
 
         mvc.perform(formLogin().user(EMAIL).password("wrong-yet-again"))
@@ -115,14 +126,67 @@ class LoginLockoutIntegrationTest {
     }
 
     @Test
-    void signingInSuccessfullyClearsTheFailuresBehindIt() throws Exception {
+    void aFloodFromOneAddressNeverLocksTheOwnerOutOfTheirOwnAccount() throws Exception {
+        // anyone can type anyone's email here, so this used to be a free denial
+        // of service on any account - the super admin's included, which is
+        // supposed to be the emergency way in when SSO is broken
+        guessWrong(3);
+
+        // the prankster's address is locked; the owner, from their own machine,
+        // sails straight in
+        mvc.perform(post("/login").param("username", EMAIL).param("password", PASSWORD)
+                        .with(csrf()).with(fromAddress("203.0.113.9")))
+                .andExpect(authenticated());
+    }
+
+    @Test
+    void guessesSpreadAcrossEnoughAddressesLockTheAccountForEveryone() throws Exception {
+        // an address per guess is how a distributed run stays under the
+        // per-address limit; that spread is exactly what the account lock is for
+        for (int i = 0; i < 3; i++) {
+            mvc.perform(post("/login").param("username", EMAIL).param("password", "guess-" + i)
+                            .with(csrf()).with(fromAddress("198.51.100." + i)))
+                    .andExpect(unauthenticated());
+        }
+
+        // now even the right password from a fresh address is refused
+        mvc.perform(post("/login").param("username", EMAIL).param("password", PASSWORD)
+                        .with(csrf()).with(fromAddress("203.0.113.9")))
+                .andExpect(unauthenticated())
+                .andExpect(redirectedUrl("/login?lockedOut"));
+    }
+
+    @Test
+    void signingInSuccessfullyClearsTheFailuresAgainstTheAccount() throws Exception {
         guessWrong(2);
         mvc.perform(formLogin().user(EMAIL).password(PASSWORD)).andExpect(authenticated());
 
-        // two more would have been the third and fourth of a run, and locked it
-        guessWrong(2);
+        // two more, from two more addresses: as the third and fourth of one run
+        // across three addresses they would have locked the account
+        for (int i = 0; i < 2; i++) {
+            mvc.perform(post("/login").param("username", EMAIL).param("password", "wrong-again-" + i)
+                            .with(csrf()).with(fromAddress("198.51.100." + i)))
+                    .andExpect(unauthenticated());
+        }
 
-        mvc.perform(formLogin().user(EMAIL).password(PASSWORD)).andExpect(authenticated());
+        mvc.perform(post("/login").param("username", EMAIL).param("password", PASSWORD)
+                        .with(csrf()).with(fromAddress("203.0.113.9")))
+                .andExpect(authenticated());
+    }
+
+    @Test
+    void signingIntoYourOwnAccountDoesNotBuyMoreGuessesAtOthers() throws Exception {
+        // an attacker with a valid account of their own - here, the suite's admin
+        guessWrong(2);
+        mvc.perform(formLogin().user("admin@example.com").password("test-password"))
+                .andExpect(authenticated());
+
+        // one address, one more guess at somebody else: the address's third
+        // failure, and the sign-in in between is no help at all
+        mvc.perform(formLogin().user(EMAIL).password("wrong-after-signing-in")).andExpect(unauthenticated());
+        mvc.perform(formLogin().user(EMAIL).password(PASSWORD))
+                .andExpect(unauthenticated())
+                .andExpect(redirectedUrl("/login?lockedOut"));
     }
 
     @Test

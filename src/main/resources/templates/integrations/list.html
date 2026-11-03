@@ -17,6 +17,35 @@
         </div>
     </div>
 
+    <!-- The group's chat channels: alerts rather than keys, so they sit apart from the providers -->
+    <div class="card mb-4" th:each="channel : ${alertChannels}">
+        <div class="card-body d-flex flex-wrap align-items-center gap-3">
+            <span class="kp-provider-icon mb-0" aria-hidden="true"><i th:class="'bi ' + ${channel.provider.icon}"></i></span>
+            <div class="flex-grow-1">
+                <div>
+                    <span class="kp-cell-primary" th:text="${channel.provider.label}">Microsoft Teams</span>
+                    <span class="text-muted">&middot;</span>
+                    <span th:text="${channel.name}">#platform-alerts</span>
+                    <span class="pill pill-warning ms-1" th:unless="${channel.enabled}">Switched off</span>
+                    <span class="pill pill-danger ms-1" th:if="${channel.lastError != null}">Last post failed</span>
+                </div>
+                <div class="kp-cell-secondary">
+                    Posts
+                    <th:block th:if="${channel.notifyExpiries}">expiring keys</th:block><th:block
+                        th:if="${channel.notifyExpiries and (channel.notifyRotationFailures or channel.notifyLockouts)}">, </th:block><th:block
+                        th:if="${channel.notifyRotationFailures}">failed replacements</th:block><th:block
+                        th:if="${channel.notifyRotationFailures and channel.notifyLockouts}">, </th:block><th:block
+                        th:if="${channel.notifyLockouts}">sign-in lockouts</th:block><th:block
+                        th:unless="${channel.notifyExpiries or channel.notifyRotationFailures or channel.notifyLockouts}">nothing yet</th:block>.
+                    <th:block th:if="${channel.lastSentAt != null}">Last posted
+                        <span th:text="${#temporals.format(channel.lastSentAt.atZone(T(java.time.ZoneId).systemDefault()), 'MMM d, yyyy HH:mm')}">today</span>.</th:block>
+                    <span th:if="${channel.lastError != null}" th:text="${channel.lastError}">The service rejected the message</span>
+                </div>
+            </div>
+            <a th:if="${canManage}" th:href="@{/integrations/alerts/{p}(p=${channel.provider.path})}" class="btn btn-sm btn-secondary">Manage</a>
+        </div>
+    </div>
+
     <div class="kp-empty" th:if="${#lists.isEmpty(integrations) and !canManage}">
         <span class="kp-empty-icon" aria-hidden="true"><i class="bi bi-plug"></i></span>
         <h2>No providers connected yet</h2>
@@ -82,6 +111,18 @@
                     <p class="mb-2"><span class="badge text-bg-primary">Creates keys for you</span></p>
                     <p class="text-muted small">Mints API tokens copying the permissions of a template token.</p>
                     <a th:href="@{/integrations/new(provider='CLOUDFLARE')}" class="btn btn-primary btn-sm mt-auto align-self-start">Connect</a>
+                </div>
+            </div>
+        </div>
+        <div class="col" th:each="p : ${unconnectedProviders}">
+            <div class="card h-100 kp-provider">
+                <div class="card-body d-flex flex-column">
+                    <span class="kp-provider-icon" aria-hidden="true"><i th:class="'bi ' + ${p.icon}"></i></span>
+                    <h3 class="h6 mb-1" th:text="${p.label}">Microsoft Teams</h3>
+                    <p class="mb-2"><span class="badge text-bg-success">Alerts</span></p>
+                    <p class="text-muted small">Posts expiring keys, failed automatic replacements and sign-in
+                        lockouts to a channel, alongside the emails.</p>
+                    <a th:href="@{/integrations/alerts/{p}(p=${p.path})}" class="btn btn-primary btn-sm mt-auto align-self-start">Connect</a>
                 </div>
             </div>
         </div>
@@ -166,6 +207,8 @@
                         th:classappend="${!integration.enabled} ? 'text-muted'">
                         <td>
                             <span class="kp-cell-primary" th:text="${integration.name}">Azure AD</span>
+                            <span class="pill pill-neutral ms-1" th:if="${integration.provider.canDeleteReplaced() and !integration.deleteReplacedKeys}"
+                                  title="Replaced keys are left at the provider when they expire">Keeps replaced keys</span>
                             <!-- everyone sees the state; it explains why the add-key
                                  page has stopped offering this one -->
                             <span class="pill pill-warning ms-1" th:unless="${integration.enabled}">Switched off</span>
@@ -193,6 +236,23 @@
                                     <label class="form-check-label visually-hidden"
                                            th:for="'integration-enabled-' + ${integration.id}">
                                         In use by the group</label>
+                                </div>
+                            </form>
+                            <!-- what happens at the provider once a replaced key has expired -->
+                            <form th:if="${integration.provider.canDeleteReplaced()}"
+                                  th:action="@{/integrations/{id}/delete-replaced(id=${integration.id})}" method="post"
+                                  class="d-inline-block align-middle me-2">
+                                <input type="hidden" name="delete" th:value="${!integration.deleteReplacedKeys}">
+                                <div class="form-check form-switch d-inline-block mb-0">
+                                    <input type="checkbox" class="form-check-input js-submit-on-change" role="switch"
+                                           th:id="'integration-delete-replaced-' + ${integration.id}"
+                                           th:checked="${integration.deleteReplacedKeys}"
+                                           th:title="${integration.deleteReplacedKeys
+                                                ? 'Replaced keys are deleted at ' + integration.provider.label + ' once they expire. Switch off to leave them there.'
+                                                : 'Replaced keys are left at ' + integration.provider.label + ' when they expire. Switch on to delete them.'}">
+                                    <label class="form-check-label visually-hidden"
+                                           th:for="'integration-delete-replaced-' + ${integration.id}">
+                                        Delete replaced keys at the provider once they expire</label>
                                 </div>
                             </form>
                             <form th:action="@{/integrations/{id}/test(id=${integration.id})}" method="post" class="d-inline">

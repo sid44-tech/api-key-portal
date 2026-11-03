@@ -12,6 +12,9 @@ import org.springframework.stereotype.Component;
  * the time reminders are considered, so its owner gets the one email that says
  * "a replacement is ready" rather than that plus a plain warning.
  * <p>
+ * The same run then deletes, at the provider, any expired key whose replacement
+ * exists and whose provider would otherwise leave it working for ever.
+ * <p>
  * Kept apart from the service so the service can be driven directly in tests
  * and on demand without a clock involved.
  */
@@ -36,6 +39,11 @@ public class KeyRotationScheduler {
             // a scheduled method that throws is silently dropped by the scheduler;
             // say so, or a broken sweep looks like a quiet one
             log.error("The key rotation sweep failed", e);
+        }
+        try {
+            service.revokeExpiredKeys();
+        } catch (RuntimeException e) {
+            log.error("The expired-key deletion sweep failed", e);
         }
     }
 }

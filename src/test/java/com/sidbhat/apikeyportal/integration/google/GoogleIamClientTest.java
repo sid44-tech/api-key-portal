@@ -141,6 +141,46 @@ class GoogleIamClientTest {
     }
 
     @Test
+    void deletesOneKeyOfAServiceAccountAndLeavesTheAccountAlone() {
+        server.expect(requestTo(IAM
+                        + "/v1/projects/my-project/serviceAccounts/reporting%40my-project.iam.gserviceaccount.com"
+                        + "/keys/abc123"))
+                .andExpect(method(HttpMethod.DELETE))
+                .andExpect(header("Authorization", "Bearer gtok-123"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        assertThat(client.deleteServiceAccountKey("gtok-123", "my-project",
+                "reporting@my-project.iam.gserviceaccount.com", "abc123")).isTrue();
+        server.verify();
+    }
+
+    @Test
+    void aKeyGoogleNoLongerHasCountsAsDeleted() {
+        server.expect(requestTo(Matchers.endsWith("/keys/abc123")))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\":{\"code\":404,\"message\":\"Unknown service account key\"}}"));
+
+        // somebody deleted it in the console first; the goal was that it be gone
+        assertThat(client.deleteServiceAccountKey("gtok-123", "my-project",
+                "reporting@my-project.iam.gserviceaccount.com", "abc123")).isFalse();
+    }
+
+    @Test
+    void aRefusedKeyDeletionIsAnErrorNotSilence() {
+        server.expect(requestTo(Matchers.endsWith("/keys/abc123")))
+                .andRespond(withStatus(HttpStatus.FORBIDDEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\":{\"code\":403,\"message\":\"Permission iam.serviceAccountKeys.delete denied\"}}"));
+
+        assertThatThrownBy(() -> client.deleteServiceAccountKey("gtok-123", "my-project",
+                "reporting@my-project.iam.gserviceaccount.com", "abc123"))
+                .isInstanceOf(ProvisioningException.class)
+                .hasMessageContaining("Could not delete the service account key")
+                .hasMessageContaining("iam.serviceAccountKeys.delete denied");
+    }
+
+    @Test
     void deletesServiceAccount() {
         server.expect(requestTo(IAM
                         + "/v1/projects/my-project/serviceAccounts/reporting%40my-project.iam.gserviceaccount.com"))

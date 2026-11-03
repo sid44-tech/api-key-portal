@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Your recovery codes</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <div class="kp-page-header">
+                <div>
+                    <h1 th:text="${justEnrolled} ? 'Two-factor authentication is on' : 'Your new recovery codes'">Two-factor authentication is on</h1>
+                    <p class="kp-subtitle">Save these recovery codes somewhere safe - a password manager, or printed and
+                        put away. Each one signs you in <strong>once</strong> if you lose your authenticator. They are
+                        shown now and never again.</p>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row row-cols-2 g-2 font-monospace fs-5 text-center">
+                        <div class="col" th:each="code : ${recoveryCodes}"><code th:text="${code}">abcde-fghij</code></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-warning d-flex align-items-start gap-2">
+                <i class="bi bi-exclamation-triangle mt-1" aria-hidden="true"></i>
+                <div>Anyone holding one of these and your password can sign in as you. Treat them like the password.
+                    Any earlier recovery codes no longer work.</div>
+            </div>
+
+            <a th:href="@{/profile}" class="btn btn-primary">I've saved them</a>
+        </div>
+    </div>
+</div>
+</body>
+</html>

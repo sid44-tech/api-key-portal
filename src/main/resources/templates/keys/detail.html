@@ -40,15 +40,46 @@
                 </div>
             </div>
 
+            <!-- the sweep tried and could not; the audit log has it, but this is where the owner looks -->
+            <div class="alert alert-warning d-flex align-items-start gap-2" th:if="${key.rotationFailedAt != null}">
+                <i class="bi bi-exclamation-triangle mt-1" aria-hidden="true"></i>
+                <div>
+                    <strong>Automatic replacement failed</strong>
+                    <span th:text="${'on ' + #temporals.format(key.rotationFailedAt, 'MMMM d, yyyy')}">on March 1, 2026</span>:
+                    <span th:text="${key.rotationFailure}">the provider said no</span>
+                    It is tried again on the next daily sweep; this notice clears when an attempt succeeds.
+                </div>
+            </div>
+
+            <!-- the one case where automatic replacement ends in a deletion: say so, past tense -->
+            <div class="alert alert-danger d-flex align-items-start gap-2" th:if="${key.revoked}">
+                <i class="bi bi-x-octagon mt-1" aria-hidden="true"></i>
+                <div>
+                    Deleted at the provider by the portal
+                    <span th:text="${'on ' + #temporals.format(key.revokedAt, 'MMMM d, yyyy')}">on March 1, 2026</span>,
+                    after it expired and its replacement had been generated. The value here no longer works
+                    anywhere; it is kept for the record.
+                </div>
+            </div>
+
             <!-- the hand-over, from either end of it -->
-            <div class="alert alert-info d-flex align-items-start gap-2" th:if="${replacement != null}">
+            <div class="alert alert-info d-flex align-items-start gap-2" th:if="${replacement != null and !key.revoked}">
                 <i class="bi bi-arrow-repeat mt-1" aria-hidden="true"></i>
                 <div>
                     A replacement for this key has been generated automatically -
                     <a th:href="@{/keys/{id}(id=${replacement.id})}" class="alert-link">open it</a>
                     to reveal or copy the new value. Both keys work until this one expires
                     <span th:text="${'on ' + #temporals.format(key.expiresOn, 'MMMM d, yyyy')}">on March 1, 2026</span>,
-                    when it moves to the expired list.
+                    <th:block th:if="${!rotationRevokes and !providerNeverExpires}">when it moves to the expired list.</th:block>
+                    <th:block th:if="${rotationRevokes and providerNeverExpires}">
+                        <strong>when the portal deletes it at the provider</strong> - the provider never retires a
+                        key by itself, so this is what makes the expiry real. Anything still using this key stops
+                        working then.</th:block>
+                    <th:block th:if="${rotationRevokes and !providerNeverExpires}">when it moves to the expired list
+                        and the portal removes the expired secret from the app registration.</th:block>
+                    <th:block th:if="${!rotationRevokes and providerNeverExpires}">when it moves to the expired
+                        list. <strong>Deletion at the provider is switched off for this integration</strong>, so
+                        the key keeps working there until somebody removes it in the console.</th:block>
                 </div>
             </div>
             <div class="alert alert-info d-flex align-items-start gap-2" th:if="${key.rotatedFromKeyId != null}">
@@ -129,9 +160,17 @@
                     <form th:action="@{/keys/{id}/rotation(id=${key.id})}" method="post"
                           class="d-flex flex-wrap justify-content-between align-items-center gap-3">
                         <p class="text-muted mb-0">
-                            <th:block th:if="${rotationOverlaps}">The portal can mint a fresh secret on this
-                                same client a week before this key expires, and both work until this one
-                                expires.</th:block>
+                            <th:block th:if="${rotationOverlaps and !rotationRevokes}">The portal can mint a fresh
+                                secret on this same client a week before this key expires, and both work until
+                                this one expires.<th:block th:if="${providerNeverExpires}"> Deletion at the
+                                provider is switched off for this integration, so the old key keeps working there
+                                after its date until somebody removes it.</th:block></th:block>
+                            <th:block th:if="${rotationOverlaps and rotationRevokes}">The portal can mint a fresh
+                                key on this same account a week before this key expires, and both work until
+                                then. Once this one has expired and been replaced, the portal
+                                <strong>deletes it at the provider</strong><th:block th:if="${providerNeverExpires}"> -
+                                the provider never retires a key by itself, so that is what makes the expiry
+                                real</th:block>.</th:block>
                             <th:block th:unless="${rotationOverlaps}">Just before this key expires, the portal
                                 can have the provider issue a new value for it. The provider revokes the old
                                 value at the same moment, so whatever uses this key must be updated straight

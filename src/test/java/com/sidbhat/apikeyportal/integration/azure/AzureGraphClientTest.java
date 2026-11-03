@@ -164,4 +164,41 @@ class AzureGraphClientTest {
                 .isInstanceOf(ProvisioningException.class)
                 .hasMessageContaining("(HTTP 400)");
     }
+
+    @Test
+    void removesOneSecretAndLeavesTheRegistrationAlone() {
+        server.expect(requestTo(GRAPH + "/v1.0/applications/obj-1/removePassword"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("Authorization", "Bearer tok-123"))
+                .andExpect(jsonPath("$.keyId").value("key-id-1"))
+                .andRespond(withStatus(HttpStatus.NO_CONTENT));
+
+        assertThat(client.removePassword("tok-123", "obj-1", "key-id-1")).isTrue();
+        server.verify();
+    }
+
+    @Test
+    void aSecretGraphNoLongerHasCountsAsRemoved() {
+        server.expect(requestTo(GRAPH + "/v1.0/applications/obj-1/removePassword"))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\":{\"code\":\"Request_BadRequest\",\"message\":\"No password credential found with keyId key-id-1\"}}"));
+
+        assertThat(client.removePassword("tok-123", "obj-1", "key-id-1")).isFalse();
+    }
+
+    @Test
+    void listsOnlyTheExpiredSecretsCarryingTheKeysName() {
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith(GRAPH + "/v1.0/applications/obj-1?")))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        {"passwordCredentials":[
+                          {"keyId":"live","displayName":"Reporting service","endDateTime":"2099-01-01T00:00:00Z"},
+                          {"keyId":"old","displayName":"Reporting service","endDateTime":"2020-01-01T00:00:00Z"},
+                          {"keyId":"other","displayName":"Something else","endDateTime":"2020-01-01T00:00:00Z"}
+                        ]}
+                        """, MediaType.APPLICATION_JSON));
+
+        assertThat(client.expiredPasswordCredentials("tok-123", "obj-1", "Reporting service",
+                java.time.Instant.parse("2026-11-02T00:00:00Z"))).containsExactly("old");
+    }
 }

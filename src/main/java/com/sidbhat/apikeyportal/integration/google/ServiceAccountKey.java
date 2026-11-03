@@ -37,6 +37,30 @@ public record ServiceAccountKey(String projectId, String clientEmail, String pri
         return new ServiceAccountKey(projectId, clientEmail, privateKey);
     }
 
+    /**
+     * The id of the key a Google-issued JSON key file belongs to, which is what
+     * the IAM API deletes by. Read from the stored value rather than kept in a
+     * column of its own, so keys minted before the portal could delete them are
+     * just as deletable as new ones.
+     *
+     * @throws IllegalArgumentException with a user-displayable message if the
+     *         value is not a Google key file or carries no key id
+     */
+    public static String privateKeyId(String json) {
+        JsonNode root;
+        try {
+            root = MAPPER.readTree(json);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("the stored value is not a Google JSON key file");
+        }
+        String keyId = text(root, "private_key_id");
+        if (keyId == null) {
+            throw new IllegalArgumentException("the stored value has no private_key_id, so Google cannot be "
+                    + "told which key to delete");
+        }
+        return keyId;
+    }
+
     private static String text(JsonNode root, String field) {
         JsonNode node = root.path(field);
         return node.isTextual() && !node.asText().isBlank() ? node.asText() : null;
