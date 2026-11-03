@@ -101,7 +101,7 @@ logging:
     # point this logger at its own appender in a logback-spring.xml, or ship
     # lines matching "event=" from wherever the logs already go.
     portal.audit: INFO
-    com.sidbhat.apikeyportal: ${PORTAL_LOG_LEVEL:INFO}
+    io.github.apikeyportal: ${PORTAL_LOG_LEVEL:INFO}
     # These print HTTP request and response bodies at DEBUG, and on this portal
     # those bodies are key values, provider credentials and pasted secrets.
     # Pinned at INFO so that turning the application's own logging up - or

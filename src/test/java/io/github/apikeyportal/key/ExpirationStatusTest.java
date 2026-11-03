@@ -1,0 +1,54 @@
+package io.github.apikeyportal.key;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.LocalDate;
+
+import org.junit.jupiter.api.Test;
+
+class ExpirationStatusTest {
+
+    private static final LocalDate TODAY = LocalDate.of(2021, 2, 27);
+
+    @Test
+    void nullExpiryNeverExpires() {
+        assertThat(ExpirationStatus.of(null, TODAY)).isEqualTo(ExpirationStatus.NEVER);
+    }
+
+    @Test
+    void pastDateIsExpired() {
+        assertThat(ExpirationStatus.of(TODAY.minusDays(1), TODAY)).isEqualTo(ExpirationStatus.EXPIRED);
+    }
+
+    @Test
+    void expiringTodayIsExpired() {
+        assertThat(ExpirationStatus.of(TODAY, TODAY)).isEqualTo(ExpirationStatus.EXPIRED);
+    }
+
+    @Test
+    void withinWarningWindowIsExpiringSoon() {
+        assertThat(ExpirationStatus.of(TODAY.plusDays(10), TODAY)).isEqualTo(ExpirationStatus.EXPIRING_SOON);
+    }
+
+    @Test
+    void expiringTomorrowIsExpiringSoon() {
+        assertThat(ExpirationStatus.of(TODAY.plusDays(1), TODAY)).isEqualTo(ExpirationStatus.EXPIRING_SOON);
+    }
+
+    @Test
+    void expiringExactlyAtEndOfWarningWindowIsExpiringSoon() {
+        assertThat(ExpirationStatus.of(TODAY.plusDays(ExpirationStatus.EXPIRING_SOON_DAYS), TODAY))
+                .isEqualTo(ExpirationStatus.EXPIRING_SOON);
+    }
+
+    @Test
+    void expiringDayAfterWarningWindowIsActive() {
+        assertThat(ExpirationStatus.of(TODAY.plusDays(ExpirationStatus.EXPIRING_SOON_DAYS + 1), TODAY))
+                .isEqualTo(ExpirationStatus.ACTIVE);
+    }
+
+    @Test
+    void farFutureIsActive() {
+        assertThat(ExpirationStatus.of(TODAY.plusDays(90), TODAY)).isEqualTo(ExpirationStatus.ACTIVE);
+    }
+}

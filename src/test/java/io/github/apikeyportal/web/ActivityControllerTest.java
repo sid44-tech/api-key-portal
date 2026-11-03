@@ -1,0 +1,160 @@
+package io.github.apikeyportal.web;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
+
+import java.time.Instant;
+import java.util.List;
+
+import org.hamcrest.Matchers;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import io.github.apikeyportal.activity.ActivityAction;
+import io.github.apikeyportal.activity.ActivityEvent;
+import io.github.apikeyportal.activity.ActivityService;
+import io.github.apikeyportal.activity.KeySource;
+import io.github.apikeyportal.security.SecurityConfig;
+import io.github.apikeyportal.user.PortalUser;
+import io.github.apikeyportal.user.TestUsers;
+import io.github.apikeyportal.user.UserAccountService;
+import io.github.apikeyportal.user.WithPortalUser;
+
+@WebMvcTest(controllers = ActivityController.class)
+@Import(SecurityConfig.class)
+class ActivityControllerTest {
+
+    @Autowired
+    private MockMvc mvc;
+
+    @MockitoBean
+    private ActivityService activityService;
+
+    @MockitoBean
+    private UserAccountService userService;
+
+    @BeforeEach
+    void stubCurrentUser() {
+        when(userService.getCurrent(any()))
+                .thenAnswer(invocation -> TestUsers.accountFor((PortalUser) invocation.getArgument(0)));
+    }
+
+    private void stubOneKeyEvent() {
+        ActivityEvent event = new ActivityEvent(ActivityAction.KEY_CREATED, TestUsers.alex(), 42L,
+                "Azure AD / Reporting service", KeySource.PROVISIONED, "Azure AD production", Instant.now());
+        when(activityService.findVisibleTo(any(), any()))
+                .thenReturn(new PageImpl<>(List.of(event), PageRequest.of(0, 40), 1));
+    }
+
+    @Test
+    void redirectsAnonymousUsersToLogin() throws Exception {
+        mvc.perform(get("/activity"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
+    @WithPortalUser("sam")
+    void aPlainMemberCannotSeeTheHistory() throws Exception {
+        mvc.perform(get("/activity")).andExpect(status().isForbidden());
+
+        verify(activityService, never()).findVisibleTo(any(), any());
+    }
+
+    @Test
+    @WithPortalUser("alex")
+    void offersTheHistoryAsATableAndAsCards() throws Exception {
+        stubOneKeyEvent();
+
+        String html = mvc.perform(get("/activity")).andReturn().getResponse().getContentAsString();
+
+        // the table where its columns fit, cards below "lg" where it would
+        // scroll sideways; every event has to be in both
+        String table = section(html, "kp-table-card d-none d-lg-flex", "kp-row-cards d-lg-none");
+        String cards = section(html, "kp-row-cards d-lg-none", "</ul>");
+        for (String field : new String[] {"Azure AD / Reporting service", "alex@example.com",
+                "Created via integration"}) {
+            assertThat(table).contains(field);
+            assertThat(cards).contains(field);
+        }
+    }
+
+    /** The page between two markers, so the navigation bar cannot muddy a count. */
+    private static String section(String html, String from, String to) {
+        int start = html.indexOf(from);
+        assertThat(start).as("marker '%s'", from).isNotNegative();
+        return html.substring(start, html.indexOf(to, start));
+    }
+
+    @Test
+    @WithPortalUser("alex")
+    void aGroupAdminSeesTheHistoryPage() throws Exception {
+        stubOneKeyEvent();
+
+        mvc.perform(get("/activity"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("activity/list"))
+                .andExpect(content().string(Matchers.containsString("Azure AD / Reporting service")))
+                .andExpect(content().string(Matchers.containsString("Alex Carter")))
+                // the point of the audit: what kind of key, and through what
+                .andExpect(content().string(Matchers.containsString("Created via integration")))
+                .andExpect(content().string(Matchers.containsString("Azure AD production")));
+    }
+
+    @Test
+    @WithPortalUser("alex")
+    void aGroupAdminIsNotOfferedTheGroupColumn() throws Exception {
+        stubOneKeyEvent();
+
+        mvc.perform(get("/activity"))
+                .andExpect(content().string(Matchers.not(Matchers.containsString("<th scope=\"col\">Group</th>"))));
+    }
+
+    @Test
+    @WithPortalUser("superadmin")
+    void aSuperAdminAlsoSeesWhichGroupEachEventBelongsTo() throws Exception {
+        stubOneKeyEvent();
+
+        mvc.perform(get("/activity"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(Matchers.containsString("Group")))
+                .andExpect(content().string(Matchers.containsString("Platform team")));
+    }
+
+    @Test
+    @WithPortalUser("alex")
+    void showsAWelcomeWhenNothingHasHappenedYet() throws Exception {
+        when(activityService.findVisibleTo(any(), any()))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 40), 0));
+
+        mvc.perform(get("/activity"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(Matchers.containsString("Nothing yet")));
+    }
+
+    @Test
+    @WithPortalUser("alex")
+    void aNegativePageNumberDoesNotReachTheRepository() throws Exception {
+        stubOneKeyEvent();
+
+        mvc.perform(get("/activity").param("page", "-5")).andExpect(status().isOk());
+
+        verify(activityService).findVisibleTo(any(), org.mockito.ArgumentMatchers.argThat(
+                pageable -> pageable.getPageNumber() == 0));
+    }
+}

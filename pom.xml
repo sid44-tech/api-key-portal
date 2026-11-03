@@ -9,7 +9,7 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
-    <groupId>com.sidbhat</groupId>
+    <groupId>io.github.apikeyportal</groupId>
     <artifactId>api-key-portal</artifactId>
     <version>1.0.0</version>
     <name>api-key-portal</name>
