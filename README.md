@@ -666,10 +666,29 @@ needed. Coverage lands in `target/site/jacoco/index.html`.
 
 ## To do
 
+**Bugs**
+
+- **GitLab rotation can lose the new token**: GitLab revokes the old token as it issues the new one,
+  so a failed save leaves the key broken
+  - Record the rotation before calling GitLab, retry the save, and alert the owner and admins if it fails
+- **First-boot admin password**: replace the `changeme` default with a random password printed once in the log
+- **404 page**: remove the red "Not Found" banner
+
+**Housekeeping**
+
+- **Publish a release**: bump the version to 2.0.0 and tag `v2.0.0`, so the published images include
+  the current work
+- **Dependabot** for Maven dependencies and GitHub Actions
+- **Remove unused code**: `PortalUser.getInitials()`
+- **Test against PostgreSQL**: run part of the suite against a real PostgreSQL, for example with Testcontainers
+
+**Features**
+
 - **More providers**
   - Connected: Twilio (API keys), SendGrid (API keys)
   - GitLab group access tokens, alongside today's project tokens
-- **Better error handling**: remove the "Not Found" banner from the 404 page
+- **API for apps to read keys**: a scoped token or CLI, so a rotated key reaches the apps that use it
+  without being copied by hand
 
 ## License
 
