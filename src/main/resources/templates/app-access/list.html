@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>App access</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="kp-page-header">
+        <div>
+            <h1>App access</h1>
+            <p class="kp-subtitle">
+                Tokens your applications use to read the current value of specific keys, so a replaced key
+                reaches them without anyone copying it by hand.
+            </p>
+        </div>
+        <a th:if="${canCreate}" th:href="@{/app-access/new}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1" aria-hidden="true"></i> New app token
+        </a>
+    </div>
+
+    <!-- The server-wide switch: the super admin's alone -->
+    <div class="card mb-4" th:if="${isSuperAdmin}">
+        <div class="card-body d-flex flex-wrap align-items-center gap-3">
+            <span class="kp-provider-icon mb-0" aria-hidden="true"><i class="bi bi-toggles"></i></span>
+            <div class="flex-grow-1">
+                <div class="kp-cell-primary">Application access for this portal</div>
+                <div class="kp-cell-secondary">
+                    <th:block th:if="${setting.enabled}">On: group admins can create app tokens, and apps can read
+                        the keys their tokens cover.</th:block>
+                    <th:block th:unless="${setting.enabled}">Off: no app token works and none can be created.
+                        Existing tokens are kept and can still be deleted.</th:block>
+                    <th:block th:if="${setting.updatedByEmail != null}">Last changed by
+                        <span th:text="${setting.updatedByEmail}">admin@example.com</span>
+                        <span th:text="${#temporals.format(setting.updatedAt.atZone(T(java.time.ZoneId).systemDefault()), 'MMM d, yyyy HH:mm')}">today</span>.</th:block>
+                </div>
+            </div>
+            <form th:action="@{/app-access/switch}" method="post" class="js-confirm"
+                  th:attr="data-confirm=${setting.enabled
+                        ? 'Switch application access off? Every app using a token will be refused until it is switched back on.'
+                        : 'Switch application access on? Group admins will be able to create tokens that let apps read keys.'}">
+                <input type="hidden" name="enabled" th:value="${!setting.enabled}">
+                <button type="submit" class="btn" th:classappend="${setting.enabled} ? 'btn-outline-danger' : 'btn-primary'"
+                        th:text="${setting.enabled} ? 'Switch off' : 'Switch on'">Switch on</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="alert alert-warning d-flex align-items-start gap-2" th:unless="${setting.enabled}">
+        <i class="bi bi-pause-circle mt-1" aria-hidden="true"></i>
+        <div>
+            Application access is switched off for this portal. Apps cannot read keys and no new tokens can be
+            created<th:block th:unless="${isSuperAdmin}">; only a super admin can switch it on</th:block>.
+        </div>
+    </div>
+
+    <div class="kp-empty" th:if="${#lists.isEmpty(tokens)}">
+        <span class="kp-empty-icon" aria-hidden="true"><i class="bi bi-box-arrow-in-down"></i></span>
+        <h2>No app tokens yet</h2>
+        <p th:if="${canCreate}">Create one for each app that needs keys, covering only the keys it uses.</p>
+        <p th:unless="${canCreate}">Group admins create app tokens for the apps that need keys.</p>
+    </div>
+
+    <div class="card kp-table-card" th:unless="${#lists.isEmpty(tokens)}">
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                <tr>
+                    <th scope="col">Token</th>
+                    <th scope="col">Keys it can read</th>
+                    <th scope="col">Expires</th>
+                    <th scope="col">Last used</th>
+                    <th scope="col" class="text-end"><span class="visually-hidden">Actions</span></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="t : ${tokens}" th:classappend="${t.expired} ? 'text-muted'">
+                    <td>
+                        <span class="kp-cell-primary" th:text="${t.name}">billing-service</span>
+                        <span class="pill pill-danger ms-1" th:if="${t.expired}">Expired</span>
+                        <div class="kp-cell-secondary">
+                            <code th:text="${t.tokenPrefix + '…'}">kpa_abcd1234…</code>
+                            <th:block th:if="${isSuperAdmin}">&middot; <span th:text="${t.groupName}">Platform team</span></th:block>
+                            &middot; by <span th:text="${t.createdByName}">Alex</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div th:each="g : ${t.grants}" class="small">
+                            <span th:text="${g.keyLabel}" th:classappend="${!g.readable} ? 'text-decoration-line-through text-muted'">Stripe / Prod</span>
+                            <span class="text-muted">&middot; ref <span th:text="${g.ref}">12</span></span>
+                        </div>
+                    </td>
+                    <td th:text="${#temporals.format(t.expiresAt.atZone(T(java.time.ZoneId).systemDefault()), 'MMM d, yyyy')}">Jan 1</td>
+                    <td th:text="${t.lastUsedAt != null
+                            ? #temporals.format(t.lastUsedAt.atZone(T(java.time.ZoneId).systemDefault()), 'MMM d, yyyy HH:mm')
+                            : 'Never'}">Never</td>
+                    <td class="text-end" th:if="${t.canManage}">
+                        <button type="button" class="btn btn-sm btn-outline-danger" title="Delete"
+                                data-bs-toggle="modal" data-bs-target="#deleteModal"
+                                th:attr="data-key-name=${t.name},data-delete-url=@{/app-access/tokens/{id}/delete(id=${t.id})}">
+                            <i class="bi bi-trash" aria-hidden="true"></i><span class="visually-hidden">Delete</span>
+                        </button>
+                    </td>
+                    <td class="text-end kp-cell-secondary" th:unless="${t.canManage}">Group admins only</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" id="deleteForm">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="deleteModalLabel">Delete this app token?</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-0">Any app using <strong id="deleteKeyName" class="text-body"></strong> will be
+                            refused from its next request. The keys themselves are not changed.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<th:block layout:fragment="scripts">
+    <script th:src="@{/js/keys.js}"></script>
+</th:block>
+</body>
+</html>

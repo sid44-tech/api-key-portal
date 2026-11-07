@@ -211,6 +211,72 @@ class ServiceIntegrationControllerTest {
 
     @Test
     @WithPortalUser
+    void setupPageShowsTheTwilioWalkthrough() throws Exception {
+        mvc.perform(get("/integrations/new").param("provider", "TWILIO"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("integrations/twilio-setup"))
+                // only a Main key can manage keys; the wizard has to say so
+                .andExpect(content().string(Matchers.containsString("Main")))
+                .andExpect(content().string(Matchers.containsString("console.twilio.com")));
+    }
+
+    @Test
+    @WithPortalUser
+    void connectTwilioVerifiesAndSaves() throws Exception {
+        String account = "AC" + "a".repeat(32);
+        String key = "SK" + "b".repeat(32);
+        when(integrationService.connect(eq(ServiceProvider.TWILIO), eq("Twilio SMS"),
+                eq(account), eq(key), eq("tw-secret"), eq(alex)))
+                .thenReturn(new ServiceIntegration(ServiceProvider.TWILIO, "Twilio SMS", account, key, "tw-secret"));
+
+        mvc.perform(post("/integrations/twilio").with(csrf())
+                        .param("name", "Twilio SMS")
+                        .param("accountSid", account)
+                        .param("apiKeySid", key)
+                        .param("apiKeySecret", "tw-secret"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/integrations"))
+                .andExpect(flash().attribute("success", Matchers.containsString("Connected Twilio SMS")));
+    }
+
+    @Test
+    @WithPortalUser
+    void connectTwilioRejectsAMalformedAccountSid() throws Exception {
+        mvc.perform(post("/integrations/twilio").with(csrf())
+                        .param("name", "Twilio SMS")
+                        .param("accountSid", "12345")
+                        .param("apiKeySid", "SK" + "b".repeat(32))
+                        .param("apiKeySecret", "tw-secret"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("integrations/twilio-setup"))
+                .andExpect(content().string(Matchers.containsString("AC followed by 32 hex characters")));
+
+        verify(integrationService, never()).connect(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @WithPortalUser
+    void sendGridWizardShowsAndConnects() throws Exception {
+        mvc.perform(get("/integrations/new").param("provider", "SENDGRID"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("integrations/sendgrid-setup"))
+                .andExpect(content().string(Matchers.containsString("Mail Send only")));
+
+        when(integrationService.connect(eq(ServiceProvider.SENDGRID), eq("SendGrid mail"),
+                eq("mail-send"), eq("mail-send"), eq("SG.admin"), eq(alex)))
+                .thenReturn(new ServiceIntegration(ServiceProvider.SENDGRID, "SendGrid mail",
+                        "mail-send", "mail-send", "SG.admin"));
+
+        mvc.perform(post("/integrations/sendgrid").with(csrf())
+                        .param("name", "SendGrid mail")
+                        .param("apiKey", "SG.admin")
+                        .param("access", "MAIL_SEND"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(flash().attribute("success", Matchers.containsString("Connected SendGrid mail")));
+    }
+
+    @Test
+    @WithPortalUser
     void connectCloudflareVerifiesAndSaves() throws Exception {
         when(integrationService.connect(eq(ServiceProvider.CLOUDFLARE), eq("Cloudflare DNS"),
                 eq("tmpl-1"), eq("tmpl-1"), eq("cf-admin"), eq(alex)))

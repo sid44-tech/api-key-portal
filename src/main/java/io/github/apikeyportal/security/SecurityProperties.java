@@ -22,9 +22,9 @@ public class SecurityProperties {
 
     /**
      * Password the seeded super admin starts with. Has to be replaced at their
-     * first sign-in, so the shipped default is a placeholder, not a secret.
+     * first sign-in. Blank by default, which means a random one printed once in
+     * the log.
      */
-    @NotBlank
     private final String adminPassword;
 
     /**

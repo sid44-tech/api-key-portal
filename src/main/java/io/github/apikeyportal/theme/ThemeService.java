@@ -31,7 +31,7 @@ public class ThemeService {
     private static final String TARGET_NAME = "Appearance";
 
     /** What the portal is called until a super admin renames it. */
-    public static final String DEFAULT_NAME = "API Key Portal";
+    public static final String DEFAULT_NAME = "Key Management Portal";
 
     private final ThemeSettingsRepository repository;
     private final ActivityService activity;

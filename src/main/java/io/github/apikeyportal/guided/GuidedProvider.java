@@ -9,16 +9,13 @@ package io.github.apikeyportal.guided;
  */
 public enum GuidedProvider {
 
-    GITHUB("GitHub", "bi-github", "GitHub", "Personal access token"),
-    ANTHROPIC("Anthropic", "bi-robot", "Anthropic", "API key"),
-    ATLASSIAN("Atlassian", "bi-kanban-fill", "Atlassian", "API token"),
-    OPENAI("OpenAI", "bi-openai", "OpenAI", "API key"),
-    STRIPE("Stripe", "bi-stripe", "Stripe", "API key");
+    GITHUB("GitHub", "GitHub", "Personal access token"),
+    ANTHROPIC("Anthropic", "Anthropic", "API key"),
+    ATLASSIAN("Atlassian", "Atlassian", "API token"),
+    OPENAI("OpenAI", "OpenAI", "API key"),
+    STRIPE("Stripe", "Stripe", "API key");
 
     private final String label;
-
-    /** Bootstrap icon class shown next to the provider name. */
-    private final String icon;
 
     /** Used as the service name on keys created through this walk-through. */
     private final String serviceName;
@@ -26,19 +23,14 @@ public enum GuidedProvider {
     /** What the provider calls the credential, e.g. in form labels. */
     private final String credentialName;
 
-    GuidedProvider(String label, String icon, String serviceName, String credentialName) {
+    GuidedProvider(String label, String serviceName, String credentialName) {
         this.label = label;
-        this.icon = icon;
         this.serviceName = serviceName;
         this.credentialName = credentialName;
     }
 
     public String getLabel() {
         return label;
-    }
-
-    public String getIcon() {
-        return icon;
     }
 
     public String getServiceName() {

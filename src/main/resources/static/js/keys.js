@@ -129,6 +129,19 @@
             reveal(revealButton);
             return;
         }
+        // copies what is already on the page, e.g. a token shown once
+        var copyField = event.target.closest('.js-copy-field');
+        if (copyField) {
+            var field = document.getElementById(copyField.dataset.copyTarget);
+            if (field && navigator.clipboard) {
+                navigator.clipboard.writeText(field.value).then(function () {
+                    flash(copyField, 'bi-check2', 'Copied!');
+                });
+            } else if (field) {
+                field.select();
+            }
+            return;
+        }
         var copyButton = event.target.closest('.js-copy');
         if (copyButton) {
             copy(copyButton);

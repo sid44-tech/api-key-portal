@@ -162,7 +162,7 @@
                         <code class="key-value-text" th:text="${key.maskedValue}">••••••••</code>
                         <!-- nested: th:replace outranks th:if on the same tag -->
                         <th:block th:if="${mine}">
-                            <th:block th:replace="fragments/keys :: valueControls(${key})"></th:block>
+                            <th:block th:replace="~{fragments/keys :: valueControls(${key})}"></th:block>
                         </th:block>
                         <i class="bi bi-lock text-muted ms-1" th:unless="${mine}"
                            th:title="|Only ${key.ownerName} can see this value|" aria-hidden="true"></i>
@@ -171,11 +171,11 @@
                     <td th:text="${#temporals.format(key.createdOn, 'MMM d, yyyy')}">Jan 1, 2021</td>
                     <td>
                         <div th:text="${key.expiresOn != null ? #temporals.format(key.expiresOn, 'MMM d, yyyy') : 'Never'}">Never</div>
-                        <span th:replace="fragments/badges :: expiration(${key})"></span>
+                        <span th:replace="~{fragments/badges :: expiration(${key})}"></span>
                     </td>
                     <td class="text-end text-nowrap">
                         <th:block th:if="${mine}">
-                            <th:block th:replace="fragments/keys :: listActions(${key}, false)"></th:block>
+                            <th:block th:replace="~{fragments/keys :: listActions(${key}, false)}"></th:block>
                         </th:block>
                     </td>
                 </tr>
@@ -193,7 +193,7 @@
                     <div class="kp-eyebrow" th:text="${key.serviceName}">GitHub</div>
                     <a th:href="@{/keys/{id}(id=${key.id})}" th:text="${key.name}">Deploy token</a>
                 </div>
-                <span th:replace="fragments/badges :: expiration(${key})"></span>
+                <span th:replace="~{fragments/badges :: expiration(${key})}"></span>
             </div>
 
             <div class="kp-handover kp-row-card-subtitle" th:if="${replacements.containsKey(key.id)}">
@@ -209,7 +209,7 @@
             <div class="key-value kp-key-card-value">
                 <code class="key-value-text" th:text="${key.maskedValue}">••••••••</code>
                 <th:block th:if="${mine}">
-                    <th:block th:replace="fragments/keys :: valueControls(${key})"></th:block>
+                    <th:block th:replace="~{fragments/keys :: valueControls(${key})}"></th:block>
                 </th:block>
                 <span class="kp-row-card-locked" th:unless="${mine}">
                     <i class="bi bi-lock" aria-hidden="true"></i>
@@ -237,7 +237,7 @@
             </dl>
 
             <div class="kp-row-card-actions" th:if="${mine}">
-                <th:block th:replace="fragments/keys :: listActions(${key}, true)"></th:block>
+                <th:block th:replace="~{fragments/keys :: listActions(${key}, true)}"></th:block>
             </div>
         </li>
     </ul>

@@ -24,6 +24,11 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, Long> 
 
     long countByGroup_Id(Long groupId);
 
+    /** Who gets told when something about a key in this group needs an admin: super admins and its group admins. */
+    @Query("select u from UserAccount u where u.role = io.github.apikeyportal.user.UserRole.SUPER_ADMIN "
+            + "or (u.role = io.github.apikeyportal.user.UserRole.GROUP_ADMIN and u.group = :group)")
+    List<UserAccount> findAdminsFor(@Param("group") UserGroup group);
+
     /** How many accounts each group holds, as {@code [groupId, count]} rows. */
     @Query("select u.group.id, count(u) from UserAccount u where u.group is not null group by u.group.id")
     List<Object[]> countByGroup();

@@ -14,6 +14,9 @@ import io.github.apikeyportal.logging.AuditLog;
 import io.github.apikeyportal.integration.aws.AwsIamClient;
 import io.github.apikeyportal.integration.azure.AzureGraphClient;
 import io.github.apikeyportal.integration.cloudflare.CloudflareClient;
+import io.github.apikeyportal.integration.sendgrid.SendGridAccess;
+import io.github.apikeyportal.integration.sendgrid.SendGridClient;
+import io.github.apikeyportal.integration.twilio.TwilioClient;
 import io.github.apikeyportal.integration.gitlab.GitLabClient;
 import io.github.apikeyportal.integration.google.GoogleIamClient;
 import io.github.apikeyportal.user.UserAccount;
@@ -35,18 +38,24 @@ public class ServiceIntegrationService {
     private final AwsIamClient awsIamClient;
     private final GitLabClient gitLabClient;
     private final CloudflareClient cloudflareClient;
+    private final TwilioClient twilioClient;
+    private final SendGridClient sendGridClient;
     private final ActivityService activity;
     private final AuditLog audit;
 
     public ServiceIntegrationService(ServiceIntegrationRepository repository, AzureGraphClient graphClient,
             GoogleIamClient googleIamClient, AwsIamClient awsIamClient, GitLabClient gitLabClient,
-            CloudflareClient cloudflareClient, ActivityService activity, AuditLog audit) {
+            CloudflareClient cloudflareClient, TwilioClient twilioClient, SendGridClient sendGridClient,
+            ActivityService activity,
+            AuditLog audit) {
         this.repository = repository;
         this.graphClient = graphClient;
         this.googleIamClient = googleIamClient;
         this.awsIamClient = awsIamClient;
         this.gitLabClient = gitLabClient;
         this.cloudflareClient = cloudflareClient;
+        this.twilioClient = twilioClient;
+        this.sendGridClient = sendGridClient;
         this.activity = activity;
         this.audit = audit;
     }
@@ -228,6 +237,14 @@ public class ServiceIntegrationService {
                 cloudflareClient.verifyToken(integration.getClientSecret());
                 // reading the template proves it exists and has policies to copy
                 cloudflareClient.templateToken(integration.getClientSecret(), integration.getTenantId());
+            }
+            case TWILIO -> twilioClient.verifyKeyAccess(integration.getTenantId(), integration.getClientId(),
+                    integration.getClientSecret());
+            case SENDGRID -> {
+                List<String> scopes = sendGridClient.scopes(integration.getClientSecret());
+                SendGridAccess.requireKeyManagement(scopes);
+                // proves the chosen access is grantable before anyone tries to mint
+                SendGridAccess.fromCode(integration.getTenantId()).scopesFor(scopes);
             }
             case AWS_IAM -> {
                 // STS says whose credentials these are; a key from the wrong

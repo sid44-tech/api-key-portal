@@ -96,6 +96,18 @@ public class ServiceIntegrationController {
                 }
                 yield "integrations/cloudflare-setup";
             }
+            case TWILIO -> {
+                if (!model.containsAttribute("form")) {
+                    model.addAttribute("form", new TwilioIntegrationForm());
+                }
+                yield "integrations/twilio-setup";
+            }
+            case SENDGRID -> {
+                if (!model.containsAttribute("form")) {
+                    model.addAttribute("form", new SendGridIntegrationForm());
+                }
+                yield "integrations/sendgrid-setup";
+            }
         };
     }
 
@@ -210,6 +222,49 @@ public class ServiceIntegrationController {
             bindingResult.reject("cloudflare.connect.failed", e.getMessage()
                     + " Double-check the token from step 1 and the template token ID from step 2.");
             return "integrations/cloudflare-setup";
+        }
+    }
+
+    @PostMapping("/twilio")
+    public String connectTwilio(@AuthenticationPrincipal PortalUser principal,
+            @Valid @ModelAttribute("form") TwilioIntegrationForm form,
+            BindingResult bindingResult, RedirectAttributes redirectAttributes) {
+        if (bindingResult.hasErrors()) {
+            return "integrations/twilio-setup";
+        }
+        try {
+            ServiceIntegration integration = integrationService.connect(ServiceProvider.TWILIO, form.getName(),
+                    form.getAccountSid(), form.getApiKeySid(), form.getApiKeySecret(),
+                    userService.getCurrent(principal));
+            redirectAttributes.addFlashAttribute("success",
+                    "Connected " + integration.getName() + ". The credentials were verified and stored encrypted.");
+            return "redirect:/integrations";
+        } catch (ProvisioningException e) {
+            bindingResult.reject("twilio.connect.failed", e.getMessage()
+                    + " Double-check that the key from step 1 is a Main key, and the values from steps 2 and 3.");
+            return "integrations/twilio-setup";
+        }
+    }
+
+    @PostMapping("/sendgrid")
+    public String connectSendGrid(@AuthenticationPrincipal PortalUser principal,
+            @Valid @ModelAttribute("form") SendGridIntegrationForm form,
+            BindingResult bindingResult, RedirectAttributes redirectAttributes) {
+        if (bindingResult.hasErrors()) {
+            return "integrations/sendgrid-setup";
+        }
+        try {
+            // the chosen access doubles as the integration's "tenant"; SendGrid has no account id to store
+            String access = form.getAccess().getCode();
+            ServiceIntegration integration = integrationService.connect(ServiceProvider.SENDGRID, form.getName(),
+                    access, access, form.getApiKey(), userService.getCurrent(principal));
+            redirectAttributes.addFlashAttribute("success",
+                    "Connected " + integration.getName() + ". The credentials were verified and stored encrypted.");
+            return "redirect:/integrations";
+        } catch (ProvisioningException e) {
+            bindingResult.reject("sendgrid.connect.failed", e.getMessage()
+                    + " Double-check the key's permissions from step 1.");
+            return "integrations/sendgrid-setup";
         }
     }
 

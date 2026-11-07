@@ -8,7 +8,7 @@
     <meta name="color-scheme" content="light dark">
     <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
-    <title layout:title-pattern="$CONTENT_TITLE · $LAYOUT_TITLE" th:text="${portalName ?: 'API Key Portal'}">API Key Portal</title>
+    <title layout:title-pattern="$CONTENT_TITLE · $LAYOUT_TITLE" th:text="${portalName ?: 'Key Management Portal'}">Key Management Portal</title>
     <!-- an uploaded logo doubles as the tab icon -->
     <link rel="icon" th:if="${hasLogo}" th:href="@{/theme/logo(v=${themeVersion ?: '0'})}">
     <!-- For the reveal and copy buttons, whose request is a POST made from script -->
@@ -23,55 +23,85 @@
          empty while the built-in look is in use. Versioned so a save shows on the next page. -->
     <link rel="stylesheet" th:href="@{/theme.css(v=${themeVersion ?: '0'})}">
 </head>
-<body>
-<header class="kp-header">
-    <div class="container">
-        <a class="kp-brand" th:href="@{/}">
+<body th:classappend="${#authorization.expression('isAuthenticated()')} ? 'kp-has-sidebar'">
+<!-- Signed in: a sidebar that collapses to icons on desktop and slides in on phones.
+     Whether it starts collapsed is settled by theme.js before the first paint. -->
+<a class="visually-hidden-focusable kp-skip" href="#content">Skip to content</a>
+
+<div class="kp-topbar" sec:authorize="isAuthenticated()">
+    <button type="button" class="btn kp-icon-btn js-nav-open" aria-controls="kp-sidebar" aria-expanded="false"
+            aria-label="Open navigation"><i class="bi bi-list" aria-hidden="true"></i></button>
+    <a class="kp-brand" th:href="@{/}" th:title="${portalName ?: 'Key Management Portal'}">
             <img class="kp-brand-logo" th:if="${hasLogo}" th:src="@{/theme/logo(v=${themeVersion ?: '0'})}" alt="">
             <span class="kp-brand-mark" th:unless="${hasLogo}" aria-hidden="true"><i class="bi bi-key-fill"></i></span>
-            <span th:text="${portalName ?: 'API Key Portal'}">API Key Portal</span>
+            <span class="kp-brand-name" th:text="${portalName ?: 'Key Management Portal'}">Key Management Portal</span>
         </a>
+</div>
 
-        <ul class="kp-nav" sec:authorize="isAuthenticated()">
-            <li><a th:href="@{/dashboard}" th:classappend="${activeNav == 'dashboard'} ? 'active'"
-                   th:attrappend="aria-current=${activeNav == 'dashboard'} ? 'page'">Dashboard</a></li>
-            <li><a th:href="@{/keys}" th:classappend="${activeNav == 'keys'} ? 'active'"
-                   th:attrappend="aria-current=${activeNav == 'keys'} ? 'page'">Keys</a></li>
-            <li><a th:href="@{/people}" th:classappend="${activeNav == 'people'} ? 'active'"
-                   th:attrappend="aria-current=${activeNav == 'people'} ? 'page'">People</a></li>
-            <li><a th:href="@{/integrations}" th:classappend="${activeNav == 'integrations'} ? 'active'"
-                   th:attrappend="aria-current=${activeNav == 'integrations'} ? 'page'">Integrations</a></li>
-            <li sec:authorize="hasAnyRole('SUPER_ADMIN', 'GROUP_ADMIN')">
-                <a th:href="@{/invitations}" th:classappend="${activeNav == 'invitations'} ? 'active'"
-                   th:attrappend="aria-current=${activeNav == 'invitations'} ? 'page'">Invitations</a></li>
-            <li sec:authorize="hasRole('SUPER_ADMIN')">
-                <a th:href="@{/groups}" th:classappend="${activeNav == 'groups'} ? 'active'"
-                   th:attrappend="aria-current=${activeNav == 'groups'} ? 'page'">Groups</a></li>
-            <li sec:authorize="hasAnyRole('SUPER_ADMIN', 'GROUP_ADMIN')">
-                <a th:href="@{/activity}" th:classappend="${activeNav == 'activity'} ? 'active'"
-                   th:attrappend="aria-current=${activeNav == 'activity'} ? 'page'">History</a></li>
-            <li sec:authorize="hasRole('SUPER_ADMIN')">
-                <a th:href="@{/sso}" th:classappend="${activeNav == 'sso'} ? 'active'"
-                   th:attrappend="aria-current=${activeNav == 'sso'} ? 'page'">Single sign-on</a></li>
-            <li sec:authorize="hasRole('SUPER_ADMIN')">
-                <a th:href="@{/appearance}" th:classappend="${activeNav == 'appearance'} ? 'active'"
-                   th:attrappend="aria-current=${activeNav == 'appearance'} ? 'page'">Appearance</a></li>
+<aside id="kp-sidebar" class="kp-sidebar" sec:authorize="isAuthenticated()" aria-label="Main navigation">
+    <div class="kp-sidebar-head">
+        <a class="kp-brand" th:href="@{/}" th:title="${portalName ?: 'Key Management Portal'}">
+            <img class="kp-brand-logo" th:if="${hasLogo}" th:src="@{/theme/logo(v=${themeVersion ?: '0'})}" alt="">
+            <span class="kp-brand-mark" th:unless="${hasLogo}" aria-hidden="true"><i class="bi bi-key-fill"></i></span>
+            <span class="kp-brand-name" th:text="${portalName ?: 'Key Management Portal'}">Key Management Portal</span>
+        </a>
+        <button type="button" class="btn kp-icon-btn kp-nav-close js-nav-close" aria-label="Close navigation">
+            <i class="bi bi-x-lg" aria-hidden="true"></i></button>
+    </div>
+
+    <nav class="kp-side-nav">
+        <ul>
+            <li><a th:href="@{/dashboard}" class="kp-side-link" th:classappend="${activeNav == 'dashboard'} ? 'active'"
+                   th:attrappend="aria-current=${activeNav == 'dashboard'} ? 'page'" title="Dashboard">
+                <i class="bi bi-speedometer2" aria-hidden="true"></i><span class="kp-side-label">Dashboard</span></a></li>
+            <li><a th:href="@{/keys}" class="kp-side-link" th:classappend="${activeNav == 'keys'} ? 'active'"
+                   th:attrappend="aria-current=${activeNav == 'keys'} ? 'page'" title="Keys">
+                <i class="bi bi-key" aria-hidden="true"></i><span class="kp-side-label">Keys</span></a></li>
+            <li><a th:href="@{/people}" class="kp-side-link" th:classappend="${activeNav == 'people'} ? 'active'"
+                   th:attrappend="aria-current=${activeNav == 'people'} ? 'page'" title="People">
+                <i class="bi bi-people" aria-hidden="true"></i><span class="kp-side-label">People</span></a></li>
+            <li><a th:href="@{/integrations}" class="kp-side-link" th:classappend="${activeNav == 'integrations'} ? 'active'"
+                   th:attrappend="aria-current=${activeNav == 'integrations'} ? 'page'" title="Integrations">
+                <i class="bi bi-plug" aria-hidden="true"></i><span class="kp-side-label">Integrations</span></a></li>
+            <li th:if="${appAccessEnabled == true or #authorization.expression('hasRole(''SUPER_ADMIN'')')}"><a th:href="@{/app-access}" class="kp-side-link" th:classappend="${activeNav == 'app-access'} ? 'active'"
+                   th:attrappend="aria-current=${activeNav == 'app-access'} ? 'page'" title="App access">
+                <i class="bi bi-box-arrow-in-down" aria-hidden="true"></i><span class="kp-side-label">App access</span></a></li>
         </ul>
+        <th:block sec:authorize="hasAnyRole('SUPER_ADMIN', 'GROUP_ADMIN')">
+        <div class="kp-side-section">Administration</div>
+        <ul>
+            <li sec:authorize="hasAnyRole('SUPER_ADMIN', 'GROUP_ADMIN')"><a th:href="@{/invitations}" class="kp-side-link" th:classappend="${activeNav == 'invitations'} ? 'active'"
+                   th:attrappend="aria-current=${activeNav == 'invitations'} ? 'page'" title="Invitations">
+                <i class="bi bi-envelope" aria-hidden="true"></i><span class="kp-side-label">Invitations</span></a></li>
+            <li sec:authorize="hasAnyRole('SUPER_ADMIN', 'GROUP_ADMIN')"><a th:href="@{/activity}" class="kp-side-link" th:classappend="${activeNav == 'activity'} ? 'active'"
+                   th:attrappend="aria-current=${activeNav == 'activity'} ? 'page'" title="History">
+                <i class="bi bi-clock-history" aria-hidden="true"></i><span class="kp-side-label">History</span></a></li>
+            <li sec:authorize="hasRole('SUPER_ADMIN')"><a th:href="@{/groups}" class="kp-side-link" th:classappend="${activeNav == 'groups'} ? 'active'"
+                   th:attrappend="aria-current=${activeNav == 'groups'} ? 'page'" title="Groups">
+                <i class="bi bi-diagram-3" aria-hidden="true"></i><span class="kp-side-label">Groups</span></a></li>
+            <li sec:authorize="hasRole('SUPER_ADMIN')"><a th:href="@{/sso}" class="kp-side-link" th:classappend="${activeNav == 'sso'} ? 'active'"
+                   th:attrappend="aria-current=${activeNav == 'sso'} ? 'page'" title="Single sign-on">
+                <i class="bi bi-shield-lock" aria-hidden="true"></i><span class="kp-side-label">Single sign-on</span></a></li>
+            <li sec:authorize="hasRole('SUPER_ADMIN')"><a th:href="@{/appearance}" class="kp-side-link" th:classappend="${activeNav == 'appearance'} ? 'active'"
+                   th:attrappend="aria-current=${activeNav == 'appearance'} ? 'page'" title="Appearance">
+                <i class="bi bi-palette" aria-hidden="true"></i><span class="kp-side-label">Appearance</span></a></li>
+        </ul>
+        </th:block>
+    </nav>
 
-        <div class="kp-user dropdown" sec:authorize="isAuthenticated()">
+    <div class="kp-sidebar-foot">
+        <div class="kp-user dropup">
             <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"
-                    aria-label="Account menu">
+                    aria-label="Account menu" th:title="${#authentication.principal.displayName}">
                 <span class="kp-avatar" aria-hidden="true"
                       th:text="${#strings.substring(#authentication.principal.displayName, 0, 1)}">A</span>
-                <span class="d-none d-sm-inline" sec:authentication="principal.displayName">Administrator</span>
-                <i class="bi bi-chevron-down small" aria-hidden="true"></i>
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end">
-                <li class="dropdown-header">
-                    <span sec:authentication="principal.displayName">Administrator</span>
+                <span class="kp-side-label kp-user-text">
+                    <span class="kp-user-name" sec:authentication="principal.displayName">Administrator</span>
                     <small sec:authentication="principal.email">admin@example.com</small>
-                </li>
-                <li><hr class="dropdown-divider"></li>
+                </span>
+                <i class="bi bi-three-dots kp-side-label" aria-hidden="true"></i>
+            </button>
+            <ul class="dropdown-menu">
                 <li><a class="dropdown-item" th:href="@{/profile}"><i class="bi bi-person" aria-hidden="true"></i> My profile</a></li>
                 <!-- the principal, not a model attribute: most pages don't publish currentUser -->
                 <li th:unless="${#authentication.principal.ssoLinked}">
@@ -84,11 +114,28 @@
                 </li>
             </ul>
         </div>
+        <button type="button" class="btn kp-side-link kp-collapse-btn js-nav-collapse" aria-controls="kp-sidebar"
+                aria-expanded="true" title="Collapse sidebar">
+            <i class="bi bi-chevron-double-left" aria-hidden="true"></i><span class="kp-side-label">Collapse</span>
+        </button>
+    </div>
+</aside>
+<div class="kp-backdrop js-nav-close" sec:authorize="isAuthenticated()" aria-hidden="true"></div>
+
+<div class="kp-shell">
+<!-- signed out (error pages): just the brand, no navigation -->
+<header class="kp-header" sec:authorize="!isAuthenticated()">
+    <div class="container">
+        <a class="kp-brand" th:href="@{/}" th:title="${portalName ?: 'Key Management Portal'}">
+            <img class="kp-brand-logo" th:if="${hasLogo}" th:src="@{/theme/logo(v=${themeVersion ?: '0'})}" alt="">
+            <span class="kp-brand-mark" th:unless="${hasLogo}" aria-hidden="true"><i class="bi bi-key-fill"></i></span>
+            <span class="kp-brand-name" th:text="${portalName ?: 'Key Management Portal'}">Key Management Portal</span>
+        </a>
     </div>
 </header>
 
-<main class="container">
-    <div class="kp-flash" th:if="${success != null or warning != null or error != null}">
+<main class="container" id="content">
+    <div class="kp-flash" th:if="${status == null and (success != null or warning != null or error != null)}">
         <div class="alert alert-success alert-dismissible fade show" role="alert" th:if="${success != null}">
             <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
             <span th:text="${success}">Saved.</span>
@@ -113,12 +160,14 @@
 
 <footer class="kp-footer">
     <div class="container d-flex justify-content-between flex-wrap gap-2">
-        <span th:text="${portalName ?: 'API Key Portal'}">API Key Portal</span>
+        <span th:text="${portalName ?: 'Key Management Portal'}">Key Management Portal</span>
         <span>Key values are encrypted at rest and only ever shown to their owner.</span>
     </div>
 </footer>
+</div>
 
 <script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
+<script th:src="@{/js/nav.js}"></script>
 <th:block layout:fragment="scripts"></th:block>
 </body>
 </html>

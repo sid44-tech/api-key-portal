@@ -149,6 +149,13 @@ public class ApiKey {
     private String rotationFailure;
 
     /**
+     * When an in-place rotation was last sent to the provider and not yet
+     * stored. Written by {@link ApiKeyRepository#markRotationStarted} only.
+     */
+    @Column(name = "rotation_started_at", insertable = false, updatable = false)
+    private Instant rotationStartedAt;
+
+    /**
      * When the portal deleted this credential at its provider, for providers whose
      * keys never expire on their own (Google, AWS). Null until then - and always,
      * for providers that retire their own credentials.
@@ -219,6 +226,10 @@ public class ApiKey {
 
     public String getRotationFailure() {
         return rotationFailure;
+    }
+
+    public Instant getRotationStartedAt() {
+        return rotationStartedAt;
     }
 
     /** True once the portal has deleted this credential at the provider; the value no longer works anywhere. */

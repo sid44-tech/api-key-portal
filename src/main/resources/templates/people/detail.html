@@ -28,7 +28,7 @@
                     <div>
                         <h1 th:text="${person.displayName}">Alex Carter</h1>
                         <p class="kp-subtitle d-flex align-items-center gap-2 flex-wrap">
-                            <span th:replace="fragments/badges :: role(${person.role})"></span>
+                            <span th:replace="~{fragments/badges :: role(${person.role})}"></span>
                             <span th:if="${person.jobTitle != null}" th:text="${person.jobTitle}">Backend engineer</span>
                             <span class="pill pill-neutral" th:unless="${person.enabled}">Disabled</span>
                         </p>

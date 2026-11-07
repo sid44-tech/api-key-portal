@@ -20,8 +20,7 @@ public record AlertCard(Severity severity, String title, String text, List<Fact>
     public enum Severity {
         ATTENTION("Attention", "#c62d2d", "🔴"),
         WARNING("Warning", "#e69600", "🟠"),
-        GOOD("Good", "#1f8a4c", "🟢"),
-        NEUTRAL("Default", "#86868b", "ℹ️");
+        GOOD("Good", "#1f8a4c", "🟢");
 
         final String adaptiveColor;
         final String hex;

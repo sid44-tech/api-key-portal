@@ -65,34 +65,62 @@ class BootstrapAdminInitializerTest {
     }
 
     @Test
-    void seedsTheSuperAdminWithTheDefaultPasswordAndMakesThemChangeIt() {
+    void seedsTheSuperAdminWithAConfiguredPasswordAndMakesThemChangeIt() {
         emptyPortal();
 
-        initializer("changeme", "").bootstrap();
+        initializer("a-configured-start", "").bootstrap();
 
         UserAccount admin = seeded();
         assertThat(admin.getEmail()).isEqualTo("admin@example.com");
         assertThat(admin.getRole()).isEqualTo(UserRole.SUPER_ADMIN);
         assertThat(admin.getGroup().getName()).isEqualTo("Administrators");
-        assertThat(passwordEncoder.matches("changeme", admin.getPasswordHash())).isTrue();
-        // the default is in the README, so it cannot be left in place
+        assertThat(passwordEncoder.matches("a-configured-start", admin.getPasswordHash())).isTrue();
         assertThat(admin.isMustChangePassword()).isTrue();
     }
 
     @Test
-    void storesOnlyAHashOfTheDefaultPassword() {
+    void storesOnlyAHashOfTheConfiguredPassword() {
+        emptyPortal();
+
+        initializer("a-configured-start", "").bootstrap();
+
+        assertThat(seeded().getPasswordHash()).startsWith("$2").doesNotContain("a-configured-start");
+    }
+
+    @Test
+    void withNoPasswordConfiguredARandomOneIsGeneratedAndMustBeChanged() {
+        emptyPortal();
+
+        initializer("", "").bootstrap();
+
+        UserAccount admin = seeded();
+        assertThat(admin.getPasswordHash()).startsWith("$2");
+        assertThat(passwordEncoder.matches("", admin.getPasswordHash())).isFalse();
+        assertThat(admin.isMustChangePassword()).isTrue();
+    }
+
+    @Test
+    void theFormerChangemeDefaultIsNeverAccepted() {
         emptyPortal();
 
         initializer("changeme", "").bootstrap();
 
-        assertThat(seeded().getPasswordHash()).startsWith("$2").doesNotContain("changeme");
+        // still in old .env files and the old README, so everyone knows it
+        assertThat(passwordEncoder.matches("changeme", seeded().getPasswordHash())).isFalse();
+    }
+
+    @Test
+    void generatedPasswordsAreLongAndDifferEveryTime() {
+        String first = BootstrapAdminInitializer.randomPassword();
+        assertThat(first).hasSize(20).matches("[A-Za-z0-9]+");
+        assertThat(BootstrapAdminInitializer.randomPassword()).isNotEqualTo(first);
     }
 
     @Test
     void aConfiguredHashWinsAndForcesNoChange() {
         emptyPortal();
 
-        initializer("changeme", "$2a$10$a-bcrypt-hash").bootstrap();
+        initializer("a-configured-start", "$2a$10$a-bcrypt-hash").bootstrap();
 
         UserAccount admin = seeded();
         assertThat(admin.getPasswordHash()).isEqualTo("$2a$10$a-bcrypt-hash");
@@ -105,7 +133,7 @@ class BootstrapAdminInitializerTest {
         when(accounts.count()).thenReturn(1L);
         when(accounts.findAllByOrderByDisplayNameAsc()).thenReturn(List.of());
 
-        initializer("changeme", "").bootstrap();
+        initializer("a-configured-start", "").bootstrap();
 
         verify(accounts, never()).save(any());
     }
@@ -120,7 +148,7 @@ class BootstrapAdminInitializerTest {
         when(keys.claimOwnerless(admin, admin.getGroup())).thenReturn(3);
         when(integrations.claimUngrouped(admin.getGroup())).thenReturn(1);
 
-        initializer("changeme", "$2a$10$a-bcrypt-hash").bootstrap();
+        initializer("a-configured-start", "$2a$10$a-bcrypt-hash").bootstrap();
 
         verify(keys).claimOwnerless(admin, admin.getGroup());
         verify(integrations).claimUngrouped(admin.getGroup());

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Connect SendGrid</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a th:href="@{/integrations}">Integrations</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Connect SendGrid</li>
+                </ol>
+            </nav>
+
+            <h1 class="mb-2"><i class="bi bi-envelope-paper-fill me-2" aria-hidden="true"></i>Connect SendGrid</h1>
+            <p class="text-muted mb-4">
+                A one-time setup, done in about three minutes. You'll create one API key for this portal to
+                manage keys with. Afterwards, the portal can create SendGrid API keys with a single click.
+            </p>
+
+            <form th:action="@{/integrations/sendgrid}" th:object="${form}" method="post" novalidate>
+
+                <div class="alert alert-danger d-flex align-items-start" th:if="${#fields.hasGlobalErrors()}">
+                    <i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>
+                    <div>
+                        <strong>SendGrid did not accept the connection.</strong>
+                        <div th:each="err : ${#fields.globalErrors()}" th:text="${err}">Error</div>
+                    </div>
+                </div>
+
+                <!-- Step 1 -->
+                <div class="card mb-3 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">1</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Create an API key for the portal</h2>
+                            <ol class="mb-3">
+                                <li>In SendGrid, open <strong>Settings → API Keys → Create API Key</strong>.</li>
+                                <li>Name it <code>Key Management Portal</code> (any name works).</li>
+                                <li>Choose <strong>Restricted Access</strong>, set <strong>API Keys</strong> to
+                                    <em>Full Access</em>, and give it every other permission you want the portal's
+                                    keys to be able to have - at least <strong>Mail Send</strong>.</li>
+                                <li>Create it and copy the key - SendGrid shows it only once.</li>
+                            </ol>
+                            <p class="text-muted small mb-2">
+                                <i class="bi bi-shield-check me-1" aria-hidden="true"></i>
+                                SendGrid only lets a key hand out permissions it has itself, so this key's
+                                permissions are the ceiling for every key the portal creates. Keys the portal
+                                creates never get key management themselves.
+                            </p>
+                            <a href="https://app.sendgrid.com/settings/api_keys"
+                               target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary btn-sm mb-3">
+                                <i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>
+                                Open API Keys in SendGrid
+                            </a>
+                            <div class="mb-2 col-md-8">
+                                <label class="form-label" for="apiKey">API key</label>
+                                <input type="password" class="form-control font-monospace" th:field="*{apiKey}"
+                                       th:errorclass="is-invalid" autocomplete="off" spellcheck="false"
+                                       placeholder="SG.…" maxlength="256">
+                                <div class="invalid-feedback" th:errors="*{apiKey}"></div>
+                            </div>
+                            <p class="text-muted small mb-0">
+                                <i class="bi bi-lock-fill me-1" aria-hidden="true"></i>
+                                Stored encrypted (AES-256-GCM) and never shown again in this portal either.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="card mb-3 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">2</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Choose what the portal's keys may do</h2>
+                            <div class="form-check" th:each="a : ${T(io.github.apikeyportal.integration.sendgrid.SendGridAccess).values()}">
+                                <input class="form-check-input" type="radio" th:field="*{access}" th:value="${a}">
+                                <label class="form-check-label" th:for="${#ids.prev('access')}" th:text="${a.label}">Mail Send only</label>
+                            </div>
+                            <div class="text-danger small" th:errors="*{access}"></div>
+                            <p class="text-muted small mt-2 mb-0">Mail Send only is right for almost every app
+                                that sends email, and is the safest choice.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="card mb-4 setup-step">
+                    <div class="card-body d-flex">
+                        <div class="step-number me-3">3</div>
+                        <div class="flex-grow-1">
+                            <h2 class="h5">Name it and connect</h2>
+                            <p>This name shows up in the provider dropdown on the Add key screen, and as the
+                                service name on keys created through it.</p>
+                            <div class="mb-3 col-md-6">
+                                <label class="form-label" for="name">Integration name</label>
+                                <input type="text" class="form-control" th:field="*{name}"
+                                       th:errorclass="is-invalid" maxlength="100">
+                                <div class="invalid-feedback" th:errors="*{name}"></div>
+                            </div>
+                            <p class="text-muted small">
+                                <i class="bi bi-magic me-1" aria-hidden="true"></i>
+                                The portal checks the key's permissions against SendGrid before anything is
+                                saved, so a missing permission surfaces right here.
+                            </p>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-plug me-1" aria-hidden="true"></i> Verify &amp; connect
+                            </button>
+                            <a th:href="@{/integrations}" class="btn btn-link">Cancel</a>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+</html>

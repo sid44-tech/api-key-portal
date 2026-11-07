@@ -2,8 +2,9 @@
 #
 #   docker compose -f docker-compose.allinone.yml up -d
 #
-# Then open http://localhost:8080 and sign in as admin@localhost / changeme,
-# which the portal makes you replace before it lets you do anything else.
+# Then open http://localhost:8080 and sign in as admin@localhost with the
+# one-time password from the log (docker compose -f docker-compose.allinone.yml
+# logs | grep "One-time password"), which the portal makes you replace first.
 #
 # One thing has to be configured first: PORTAL_ENCRYPTION_KEY, which encrypts
 # every stored key value. Generate it with `openssl rand -base64 32`, put it in
@@ -31,7 +32,7 @@ services:
       # Seeds the first account, which has to change its password at first
       # sign-in. Only read while the portal has no accounts at all.
       PORTAL_ADMIN_EMAIL: ${PORTAL_ADMIN_EMAIL:-admin@localhost}
-      PORTAL_ADMIN_PASSWORD: ${PORTAL_ADMIN_PASSWORD:-changeme}
+      PORTAL_ADMIN_PASSWORD: ${PORTAL_ADMIN_PASSWORD:-}
     volumes:
       - keyportal-data:/var/lib/keyportal
     restart: unless-stopped

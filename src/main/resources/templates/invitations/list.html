@@ -56,8 +56,8 @@
                     <td class="kp-cell-primary" th:text="${invite.email}">sam@example.com</td>
                     <td th:if="${currentUser.superAdmin}"
                         th:text="${invite.group != null ? invite.group.name : '-'}">Platform team</td>
-                    <td><span th:replace="fragments/badges :: role(${invite.role})"></span></td>
-                    <td><span th:replace="fragments/badges :: invitation(${status})"></span></td>
+                    <td><span th:replace="~{fragments/badges :: role(${invite.role})}"></span></td>
+                    <td><span th:replace="~{fragments/badges :: invitation(${status})}"></span></td>
                     <td th:text="${invite.invitedBy != null ? invite.invitedBy.displayName : '-'}">Alex Carter</td>
                     <td th:text="${#temporals.format(invite.expiresAt, 'MMM d, yyyy h:mm a')}">-</td>
                     <td class="text-end">

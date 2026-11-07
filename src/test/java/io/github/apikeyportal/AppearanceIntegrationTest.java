@@ -56,7 +56,7 @@ class AppearanceIntegrationTest {
     private static final byte[] PNG = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 'I', 'H', 'D', 'R'};
 
     private static MockHttpServletRequestBuilder save(String lightAccent, String darkCanvas) {
-        return save("API Key Portal", lightAccent, darkCanvas);
+        return save("Key Management Portal", lightAccent, darkCanvas);
     }
 
     private static MockHttpServletRequestBuilder save(String name, String lightAccent, String darkCanvas) {
@@ -126,14 +126,14 @@ class AppearanceIntegrationTest {
         String page = mvc.perform(get("/keys")).andReturn().getResponse().getContentAsString();
         assertThat(page).contains("<title>Keys · Keys at Contoso</title>")
                 .contains(">Keys at Contoso</span>")
-                .doesNotContain(">API Key Portal</span>");
+                .doesNotContain(">Key Management Portal</span>");
 
         // the sign-in page is rendered for whoever arrives, name included
         String login = mvc.perform(get("/login")).andReturn().getResponse().getContentAsString();
         assertThat(login).contains("Sign in to Keys at Contoso");
 
         // saving the default name again means "the built-in one", stored as such
-        mvc.perform(save("API Key Portal", "#0a5fd6", "#000000"));
+        mvc.perform(save("Key Management Portal", "#0a5fd6", "#000000"));
         assertThat(settings.findFirstByOrderByIdAsc().orElseThrow().getPortalName()).isNull();
     }
 
@@ -188,7 +188,7 @@ class AppearanceIntegrationTest {
         mvc.perform(post("/appearance/reset").with(csrf())).andExpect(redirectedUrl("/appearance"));
 
         String page = mvc.perform(get("/keys")).andReturn().getResponse().getContentAsString();
-        assertThat(page).contains("<title>Keys · API Key Portal</title>").contains("kp-brand-mark")
+        assertThat(page).contains("<title>Keys · Key Management Portal</title>").contains("kp-brand-mark")
                 .doesNotContain("kp-brand-logo");
         mvc.perform(get("/theme/logo")).andExpect(status().isNotFound());
     }

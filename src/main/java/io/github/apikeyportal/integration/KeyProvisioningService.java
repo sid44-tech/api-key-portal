@@ -6,6 +6,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
 
@@ -23,6 +24,9 @@ import io.github.apikeyportal.integration.aws.AwsIamClient.CreatedUser;
 import io.github.apikeyportal.integration.azure.AzureGraphClient;
 import io.github.apikeyportal.integration.cloudflare.CloudflareClient;
 import io.github.apikeyportal.integration.gitlab.GitLabClient;
+import io.github.apikeyportal.integration.sendgrid.SendGridAccess;
+import io.github.apikeyportal.integration.sendgrid.SendGridClient;
+import io.github.apikeyportal.integration.twilio.TwilioClient;
 import io.github.apikeyportal.integration.azure.AzureGraphClient.CreatedApplication;
 import io.github.apikeyportal.integration.azure.AzureGraphClient.CreatedSecret;
 import io.github.apikeyportal.integration.google.GoogleIamClient;
@@ -62,26 +66,32 @@ public class KeyProvisioningService {
     private final AwsIamClient awsIamClient;
     private final GitLabClient gitLabClient;
     private final CloudflareClient cloudflareClient;
+    private final TwilioClient twilioClient;
+    private final SendGridClient sendGridClient;
     private final ApiKeyService apiKeyService;
     private final long[] retryDelaysSeconds;
 
     @Autowired
     public KeyProvisioningService(ServiceIntegrationService integrations, AzureGraphClient graphClient,
             GoogleIamClient googleIamClient, AwsIamClient awsIamClient, GitLabClient gitLabClient,
-            CloudflareClient cloudflareClient, ApiKeyService apiKeyService) {
+            CloudflareClient cloudflareClient, TwilioClient twilioClient, SendGridClient sendGridClient,
+            ApiKeyService apiKeyService) {
         this(integrations, graphClient, googleIamClient, awsIamClient, gitLabClient, cloudflareClient,
-                apiKeyService, DEFAULT_RETRY_DELAYS_SECONDS);
+                twilioClient, sendGridClient, apiKeyService, DEFAULT_RETRY_DELAYS_SECONDS);
     }
 
     KeyProvisioningService(ServiceIntegrationService integrations, AzureGraphClient graphClient,
             GoogleIamClient googleIamClient, AwsIamClient awsIamClient, GitLabClient gitLabClient,
-            CloudflareClient cloudflareClient, ApiKeyService apiKeyService, long[] retryDelaysSeconds) {
+            CloudflareClient cloudflareClient, TwilioClient twilioClient, SendGridClient sendGridClient,
+            ApiKeyService apiKeyService, long[] retryDelaysSeconds) {
         this.integrations = integrations;
         this.graphClient = graphClient;
         this.googleIamClient = googleIamClient;
         this.awsIamClient = awsIamClient;
         this.gitLabClient = gitLabClient;
         this.cloudflareClient = cloudflareClient;
+        this.twilioClient = twilioClient;
+        this.sendGridClient = sendGridClient;
         this.apiKeyService = apiKeyService;
         this.retryDelaysSeconds = retryDelaysSeconds;
     }
@@ -110,6 +120,8 @@ public class KeyProvisioningService {
             case AWS_IAM -> provisionAws(integration, name.trim(), validity, notes, owner);
             case GITLAB -> provisionGitLab(integration, name.trim(), validity, notes, owner);
             case CLOUDFLARE -> provisionCloudflare(integration, name.trim(), validity, notes, owner);
+            case TWILIO -> provisionTwilio(integration, name.trim(), validity, notes, owner);
+            case SENDGRID -> provisionSendGrid(integration, name.trim(), validity, notes, owner);
         };
     }
 
@@ -136,6 +148,8 @@ public class KeyProvisioningService {
             case GOOGLE_CLOUD -> rotateGoogle(expiring, integration);
             case AWS_IAM -> rotateAws(expiring, integration);
             case GITLAB -> rotateGitLab(expiring, integration);
+            case TWILIO -> rotateTwilio(expiring, integration);
+            case SENDGRID -> rotateSendGrid(expiring, integration);
             case CLOUDFLARE -> throw new ProvisioningException("Cloudflare keys cannot be replaced automatically");
         };
     }
@@ -237,6 +251,15 @@ public class KeyProvisioningService {
             }
             case AWS_IAM -> awsIamClient.deleteAccessKey(integration.getClientId(), integration.getClientSecret(),
                     expired.getProviderResourceId(), awsAccessKeyIdOf(expired));
+            case TWILIO -> twilioClient.deleteKey(integration.getTenantId(), integration.getClientId(),
+                    integration.getClientSecret(), twilioKeySidOf(expired));
+            case SENDGRID -> {
+                if (!StringUtils.hasText(expired.getProviderCredentialId())) {
+                    throw new ProvisioningException("Could not work out which SendGrid key to delete: "
+                            + "no key id was recorded");
+                }
+                yield sendGridClient.deleteKey(integration.getClientSecret(), expired.getProviderCredentialId());
+            }
             default -> throw new IllegalStateException(integration.getProvider() + " cannot delete replaced keys");
         };
         apiKeyService.markRevokedAtProvider(expired.getId(), deleted
@@ -309,19 +332,69 @@ public class KeyProvisioningService {
      * Creating a "replacement" row here would leave the old one sitting in the
      * list looking usable when it is not, which is the one outcome worth
      * designing against.
+     * <p>
+     * Because the new value exists only in GitLab's response, saving it is
+     * retried. If it still can't be saved, the stored token id now points at a
+     * revoked token; the next attempt notices, finds the live token that
+     * replaced it and rotates that one instead, so the key heals on its own.
      */
     private ApiKey rotateGitLab(ApiKey expiring, ServiceIntegration integration) {
         LocalDate requested = LocalDate.now().plusDays(Math.min(replacementLifetimeDays(expiring), 365));
-        GitLabClient.CreatedToken rotated = gitLabClient.rotateProjectAccessToken(integration.getTenantId(),
-                integration.getClientSecret(), integration.getClientId(),
-                expiring.getProviderResourceId(), requested);
+        String baseUrl = integration.getTenantId();
+        String adminToken = integration.getClientSecret();
+        String project = integration.getClientId();
+        String tokenId = expiring.getProviderResourceId();
+
+        // recorded before GitLab is called: if the result is then lost, the
+        // next sweep knows a rotation may have happened and looks for it
+        boolean earlierRotationUnsaved = expiring.getRotationStartedAt() != null;
+        apiKeyService.markRotationStarted(expiring.getId());
+
+        GitLabClient.CreatedToken rotated;
+        try {
+            rotated = gitLabClient.rotateProjectAccessToken(baseUrl, adminToken, project, tokenId, requested);
+        } catch (ProvisioningException e) {
+            if (!earlierRotationUnsaved) {
+                throw e;
+            }
+            // an earlier rotation may have gone through without its result being stored
+            Long successor = gitLabClient.findActiveSuccessor(baseUrl, adminToken, project, tokenId);
+            if (successor == null) {
+                throw e;
+            }
+            log.warn("Token {} of {} was already revoked; rotating its successor {} to recover",
+                    tokenId, expiring, successor);
+            rotated = gitLabClient.rotateProjectAccessToken(baseUrl, adminToken, project,
+                    String.valueOf(successor), requested);
+        }
 
         LocalDate expiresOn = rotated.expiresAt() != null ? LocalDate.parse(rotated.expiresAt()) : requested;
-        ApiKey updated = apiKeyService.replaceValueInPlace(expiring.getId(), rotated.token(), expiresOn,
-                String.valueOf(rotated.id()));
+        ApiKey updated = saveRotatedValue(expiring, rotated, expiresOn);
+        apiKeyService.clearRotationStarted(expiring.getId());
         log.info("Rotated {} in place through {} (token id {} -> {})", updated, integration,
                 expiring.getProviderResourceId(), rotated.id());
         return updated;
+    }
+
+    /** The only copy of the new value is in hand: try hard to store it before giving up. */
+    private ApiKey saveRotatedValue(ApiKey expiring, GitLabClient.CreatedToken rotated, LocalDate expiresOn) {
+        // the same delays as the provider retries, so tests can run them at zero
+        for (int attempt = 0; ; attempt++) {
+            try {
+                return apiKeyService.replaceValueInPlace(expiring.getId(), rotated.token(), expiresOn,
+                        String.valueOf(rotated.id()));
+            } catch (RuntimeException e) {
+                if (attempt >= retryDelaysSeconds.length) {
+                    log.error("Could not store the rotated GitLab token for {}; the next sweep will rotate "
+                            + "GitLab token {} again to recover", expiring, rotated.id(), e);
+                    throw new RotationNotSavedException("GitLab issued a new token and revoked the old one, "
+                            + "but the new value could not be saved: " + e.getMessage(), e);
+                }
+                log.warn("Storing the rotated GitLab token for {} failed (attempt {}), retrying: {}",
+                        expiring, attempt + 1, e.getMessage());
+                sleepSeconds(retryDelaysSeconds[attempt]);
+            }
+        }
     }
 
     /**
@@ -491,6 +564,154 @@ public class KeyProvisioningService {
         notes.append("Created via the ").append(integration.getName()).append(" integration.\n")
                 .append("Token ID: ").append(token.id()).append('\n')
                 .append("Permissions copied from the template token \"").append(template.name()).append("\".");
+        return notes.toString();
+    }
+
+    /**
+     * The account-level resource SendGrid keys hang off. SendGrid has nothing
+     * finer, but the rotation sweep only considers keys with a resource id.
+     */
+    private static final String SENDGRID_ACCOUNT = "account";
+
+    /**
+     * SendGrid: an API key with the scopes the integration grants. The stored
+     * value is the key itself; its id (not secret) goes in the notes, so it is
+     * findable in SendGrid's settings. Keys never expire on their own, so the
+     * chosen validity is the portal's date, as for Twilio.
+     */
+    private ApiKey provisionSendGrid(ServiceIntegration integration, String displayName, SecretValidity validity,
+            String notes, UserAccount owner) {
+        SendGridClient.CreatedKey created = mintSendGridKey(integration, displayName);
+        ApiKey key = apiKeyService.create(new ApiKeyDetails(displayName, integration.getName(), created.apiKey(),
+                LocalDate.now(), LocalDate.now().plusDays(validity.getDays()),
+                buildSendGridNotes(notes, integration, created)),
+                owner, KeyOrigin.provisionedBy(integration.getName()),
+                KeyProvenance.provisioned(integration.getId(), SENDGRID_ACCOUNT, created.id()));
+        integrations.markVerified(integration);
+        log.info("Provisioned {} in {} (API key id {})", key, integration, created.id());
+        return key;
+    }
+
+    /** SendGrid: a second key beside the old one, which {@link #revoke} deletes once its date arrives. */
+    private ApiKey rotateSendGrid(ApiKey expiring, ServiceIntegration integration) {
+        SendGridClient.CreatedKey created = mintSendGridKey(integration, expiring.getName());
+        ApiKey replacement = apiKeyService.create(new ApiKeyDetails(expiring.getName(),
+                expiring.getServiceName(), created.apiKey(), LocalDate.now(),
+                LocalDate.now().plusDays(replacementLifetimeDays(expiring)),
+                rotationNotes(expiring, "API key ID: " + created.id())),
+                expiring.getOwner(), KeyOrigin.rotatedBy(integration.getName()),
+                KeyProvenance.rotatedFrom(expiring, created.id()));
+        integrations.markVerified(integration);
+        log.info("Rotated {}: minted {} (API key id {})", expiring, replacement, created.id());
+        return replacement;
+    }
+
+    /** Scopes are worked out afresh each time, so a change to the portal's key is picked up. */
+    private SendGridClient.CreatedKey mintSendGridKey(ServiceIntegration integration, String name) {
+        String adminKey = integration.getClientSecret();
+        List<String> scopes = SendGridAccess.fromCode(integration.getTenantId())
+                .scopesFor(sendGridClient.scopes(adminKey));
+        return sendGridClient.createKey(adminKey, name, scopes);
+    }
+
+    private static String buildSendGridNotes(String userNotes, ServiceIntegration integration,
+            SendGridClient.CreatedKey created) {
+        StringBuilder notes = new StringBuilder();
+        if (StringUtils.hasText(userNotes)) {
+            notes.append(userNotes.trim()).append("\n\n");
+        }
+        notes.append("Created via the ").append(integration.getName()).append(" integration.\n")
+                .append("API key ID: ").append(created.id()).append('\n')
+                .append("Access: ").append(SendGridAccess.fromCode(integration.getTenantId()).getLabel())
+                .append(". SendGrid keys don't expire on their own: the expiry here is the portal's, and with ")
+                .append("automatic replacement on the portal deletes this key at SendGrid when the date ")
+                .append("arrives, once its replacement exists.");
+        return notes.toString();
+    }
+
+    /**
+     * Twilio: a Standard API key in the account. The stored value is what a
+     * consumer needs to authenticate, as three env-style lines (account SID, key
+     * SID, secret); the key SID goes in the notes too, so the key is findable in
+     * the Twilio console. Like AWS, Twilio keys never expire on their own, so the
+     * chosen validity is the portal's date.
+     */
+    private ApiKey provisionTwilio(ServiceIntegration integration, String displayName, SecretValidity validity,
+            String notes, UserAccount owner) {
+        String accountSid = integration.getTenantId();
+        TwilioClient.CreatedKey created = twilioClient.createKey(accountSid, integration.getClientId(),
+                integration.getClientSecret(), displayName);
+
+        ApiKey key = apiKeyService.create(new ApiKeyDetails(displayName, integration.getName(),
+                twilioValue(accountSid, created), LocalDate.now(), LocalDate.now().plusDays(validity.getDays()),
+                buildTwilioNotes(notes, integration, created)),
+                owner, KeyOrigin.provisionedBy(integration.getName()),
+                KeyProvenance.provisioned(integration.getId(), accountSid, created.sid()));
+        integrations.markVerified(integration);
+        log.info("Provisioned {} in {} (API key {})", key, integration, created.sid());
+        return key;
+    }
+
+    /**
+     * Twilio: a second API key in the same account, beside the old one. The old
+     * key is deleted at Twilio by {@link #revoke} once its date arrives.
+     */
+    private ApiKey rotateTwilio(ApiKey expiring, ServiceIntegration integration) {
+        String accountSid = integration.getTenantId();
+        TwilioClient.CreatedKey created = twilioClient.createKey(accountSid, integration.getClientId(),
+                integration.getClientSecret(), expiring.getName());
+
+        ApiKey replacement = apiKeyService.create(new ApiKeyDetails(expiring.getName(),
+                expiring.getServiceName(), twilioValue(accountSid, created), LocalDate.now(),
+                LocalDate.now().plusDays(replacementLifetimeDays(expiring)),
+                rotationNotes(expiring, "API key SID: " + created.sid())),
+                expiring.getOwner(), KeyOrigin.rotatedBy(integration.getName()),
+                KeyProvenance.rotatedFrom(expiring, created.sid()));
+        integrations.markVerified(integration);
+        log.info("Rotated {}: minted {} (API key {})", expiring, replacement, created.sid());
+        return replacement;
+    }
+
+    private static String twilioValue(String accountSid, TwilioClient.CreatedKey created) {
+        return "TWILIO_ACCOUNT_SID=" + accountSid
+                + "\nTWILIO_API_KEY=" + created.sid()
+                + "\nTWILIO_API_SECRET=" + created.secret();
+    }
+
+    /**
+     * The key SID to delete: recorded on the key when it was minted, or - as a
+     * fallback - read from the stored value, where it is always present.
+     */
+    static String twilioKeySidOf(ApiKey key) {
+        if (StringUtils.hasText(key.getProviderCredentialId())) {
+            return key.getProviderCredentialId();
+        }
+        String value = key.getKeyValue() == null ? "" : key.getKeyValue();
+        for (String line : value.split("\\R")) {
+            String trimmed = line.trim();
+            if (trimmed.startsWith("TWILIO_API_KEY=")) {
+                String sid = trimmed.substring("TWILIO_API_KEY=".length()).trim();
+                if (!sid.isEmpty()) {
+                    return sid;
+                }
+            }
+        }
+        throw new ProvisioningException("Could not work out which Twilio API key to delete: the stored value "
+                + "has no TWILIO_API_KEY line");
+    }
+
+    private static String buildTwilioNotes(String userNotes, ServiceIntegration integration,
+            TwilioClient.CreatedKey created) {
+        StringBuilder notes = new StringBuilder();
+        if (StringUtils.hasText(userNotes)) {
+            notes.append(userNotes.trim()).append("\n\n");
+        }
+        notes.append("Created via the ").append(integration.getName()).append(" integration.\n")
+                .append("API key SID: ").append(created.sid()).append('\n')
+                .append("A Standard API key: it can use Twilio's APIs but cannot manage keys or accounts. ")
+                .append("Twilio keys don't expire on their own: the expiry here is the portal's, and with ")
+                .append("automatic replacement on the portal deletes this key at Twilio when the date arrives, ")
+                .append("once its replacement exists.");
         return notes.toString();
     }
 

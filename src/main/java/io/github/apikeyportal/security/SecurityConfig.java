@@ -3,8 +3,10 @@ package io.github.apikeyportal.security;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.annotation.Order;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -79,7 +81,36 @@ public class SecurityConfig {
         this.audit = audit;
     }
 
+    /**
+     * The read API for applications, kept entirely apart from the web sign-in.
+     * Apps authenticate with an app token on every request, checked by
+     * {@code AppAccessService}; there is no session to steal, no login page to
+     * redirect to, and no cookie a browser could attach - which is also why CSRF
+     * protection, built for cookies, does not apply. Anything this chain lets
+     * through still has to present a valid token to get past the controller.
+     */
     @Bean
+    @Order(1)
+    public SecurityFilterChain appAccessApiFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher("/api/**")
+                .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .requestCache(cache -> cache.disable())
+                .securityContext(context -> context.disable())
+                .formLogin(form -> form.disable())
+                .httpBasic(basic -> basic.disable())
+                .logout(logout -> logout.disable())
+                .anonymous(anonymous -> anonymous.disable())
+                .headers(headers -> headers
+                        .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'none'; frame-ancestors 'none'"))
+                        .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.NO_REFERRER)));
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
     public SecurityFilterChain securityFilterChain(HttpSecurity http, MfaProperties mfaProperties) throws Exception {
         http
                 .authorizeHttpRequests(authorize -> authorize
@@ -112,8 +143,14 @@ public class SecurityConfig {
                         .requestMatchers("/activity/**").hasAnyRole("SUPER_ADMIN", "GROUP_ADMIN")
                         .requestMatchers("/integrations/new", "/integrations/azure-ad",
                                 "/integrations/google-cloud", "/integrations/aws",
-                                "/integrations/gitlab", "/integrations/cloudflare",
+                                "/integrations/gitlab", "/integrations/cloudflare", "/integrations/twilio", "/integrations/sendgrid",
                                 "/integrations/alerts/**")
+                                .hasAnyRole("SUPER_ADMIN", "GROUP_ADMIN")
+                        // application access: only the super admin flips the server-wide
+                        // switch; creating and deleting tokens is for admins (and which
+                        // group's, the service checks). Everyone else may look.
+                        .requestMatchers("/app-access/switch").hasRole("SUPER_ADMIN")
+                        .requestMatchers("/app-access/new", "/app-access/tokens/**")
                                 .hasAnyRole("SUPER_ADMIN", "GROUP_ADMIN")
                         // connecting the organisation's identity provider is the one
                         // thing only the super admin can do: it decides who gets in

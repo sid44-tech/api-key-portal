@@ -1,6 +1,9 @@
 package io.github.apikeyportal.rotation;
 
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +18,7 @@ import io.github.apikeyportal.integration.ServiceProvider;
 import io.github.apikeyportal.key.ApiKey;
 import io.github.apikeyportal.notification.NotificationProperties;
 import io.github.apikeyportal.theme.ThemeService;
+import io.github.apikeyportal.user.UserAccount;
 
 /**
  * Tells a key's owner that their key is about to expire and a replacement has
@@ -109,6 +113,52 @@ public class KeyRotationMailer {
                 .append(rotated.getServiceName()).append(" keys. You can turn it off on your profile, ")
                 .append("or for this key alone on its page.\n");
         return text.toString();
+    }
+
+    /**
+     * The provider revoked the old value but the portal lost the new one: the
+     * key is broken until the next sweep recovers it. The owner and the admins
+     * who can act on the key all hear about it.
+     *
+     * @return true if the email went out
+     */
+    public boolean sendRotationNotSaved(ApiKey key, List<UserAccount> admins, String reason) {
+        JavaMailSender sender = mailSender.getIfAvailable();
+        if (sender == null) {
+            log.warn("No mail server configured; nobody was emailed that {} lost its rotated value", key);
+            return false;
+        }
+        Set<String> recipients = new LinkedHashSet<>();
+        recipients.add(key.getOwner().getEmail());
+        admins.forEach(admin -> recipients.add(admin.getEmail()));
+
+        StringBuilder text = new StringBuilder();
+        text.append(key.getServiceName()).append(" rotated the key below and revoked its previous value, but\n");
+        text.append(theme.portalName()).append(" could not save the new value. Anything using this key has\n");
+        text.append("stopped working.\n\n");
+        text.append("Key:     ").append(key.getName()).append('\n');
+        text.append("Service: ").append(key.getServiceName()).append('\n');
+        text.append("Owner:   ").append(key.getOwnerName()).append('\n');
+        text.append("Problem: ").append(reason).append('\n');
+        text.append("Key page: ").append(keyUrl(key)).append("\n\n");
+        text.append("The next daily sweep will try to recover the key by rotating it again. To fix it\n");
+        text.append("sooner, create a new token in ").append(key.getServiceName())
+                .append(" and paste its value into the key.\n");
+
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(properties.getFromAddress());
+        message.setTo(recipients.toArray(String[]::new));
+        message.setSubject("Urgent: your " + key.getServiceName() + " key \"" + key.getName()
+                + "\" is broken after a failed rotation");
+        message.setText(text.toString());
+        try {
+            sender.send(message);
+            log.info("Told {} that {} lost its rotated value", recipients, key);
+            return true;
+        } catch (MailException e) {
+            log.error("Could not send the failed-rotation email for {} to {}", key, recipients, e);
+            return false;
+        }
     }
 
     static String subject(ApiKey expiring) {

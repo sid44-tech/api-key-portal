@@ -29,6 +29,15 @@
                 The portal will create an API token copying the permissions of your template token, and store
                 it here encrypted. You never have to touch the Cloudflare dashboard or copy anything.
             </p>
+            <p class="text-muted mb-4" th:if="${integration.provider.name() == 'TWILIO'}">
+                The portal will create a Standard API key in account
+                <code th:text="${integration.tenantId}">account</code> and store it here encrypted, together
+                with the account SID it belongs to. You never have to touch the Twilio Console or copy anything.
+            </p>
+            <p class="text-muted mb-4" th:if="${integration.provider.name() == 'SENDGRID'}">
+                The portal will create a SendGrid API key with the access this integration grants, and store
+                it here encrypted. You never have to touch SendGrid or copy anything.
+            </p>
             <p class="text-muted mb-4" th:if="${integration.provider.name() == 'AWS_IAM'}">
                 The portal will create a new IAM user in account
                 <code th:text="${integration.tenantId}">account</code>, generate an access key pair for it, and
@@ -70,6 +79,11 @@
                         Used as the token's name in GitLab and as the key name here.</small>
                     <small class="form-text" th:if="${integration.provider.name() == 'CLOUDFLARE'}">
                         Used as the token's name in Cloudflare and as the key name here.</small>
+                    <small class="form-text" th:if="${integration.provider.name() == 'TWILIO'}">
+                        Used as the API key's friendly name in Twilio (up to 64 characters) and as the key name
+                        here.</small>
+                    <small class="form-text" th:if="${integration.provider.name() == 'SENDGRID'}">
+                        Used as the API key's name in SendGrid and as the key name here.</small>
                     <div class="invalid-feedback" th:errors="*{name}"></div>
                 </div>
 
@@ -94,6 +108,14 @@
                         never expire on their own, so this date is the portal's: you'll be reminded as it
                         approaches, and with automatic replacement on the portal mints a new key a week ahead
                         and deletes this one at AWS when the date arrives.</small>
+                    <small class="form-text" th:if="${integration.provider.name() == 'TWILIO'}">Twilio API keys
+                        never expire on their own, so this date is the portal's: you'll be reminded as it
+                        approaches, and with automatic replacement on the portal mints a new key a week ahead
+                        and deletes this one at Twilio when the date arrives.</small>
+                    <small class="form-text" th:if="${integration.provider.name() == 'SENDGRID'}">SendGrid API
+                        keys never expire on their own, so this date is the portal's: you'll be reminded as it
+                        approaches, and with automatic replacement on the portal mints a new key a week ahead
+                        and deletes this one at SendGrid when the date arrives.</small>
                     <div class="invalid-feedback" th:errors="*{validity}"></div>
                 </div>
 

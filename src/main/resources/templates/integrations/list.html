@@ -114,6 +114,28 @@
                 </div>
             </div>
         </div>
+        <div class="col">
+            <div class="card h-100 kp-provider is-connected">
+                <div class="card-body d-flex flex-column">
+                    <span class="kp-provider-icon" aria-hidden="true"><i class="bi bi-chat-dots-fill"></i></span>
+                    <h3 class="h6 mb-1">Twilio</h3>
+                    <p class="mb-2"><span class="badge text-bg-primary">Creates keys for you</span></p>
+                    <p class="text-muted small">Creates API keys in your account or subaccount.</p>
+                    <a th:href="@{/integrations/new(provider='TWILIO')}" class="btn btn-primary btn-sm mt-auto align-self-start">Connect</a>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100 kp-provider is-connected">
+                <div class="card-body d-flex flex-column">
+                    <span class="kp-provider-icon" aria-hidden="true"><i class="bi bi-envelope-paper-fill"></i></span>
+                    <h3 class="h6 mb-1">SendGrid</h3>
+                    <p class="mb-2"><span class="badge text-bg-primary">Creates keys for you</span></p>
+                    <p class="text-muted small">Creates API keys, Mail Send only or broader.</p>
+                    <a th:href="@{/integrations/new(provider='SENDGRID')}" class="btn btn-primary btn-sm mt-auto align-self-start">Connect</a>
+                </div>
+            </div>
+        </div>
         <div class="col" th:each="p : ${unconnectedProviders}">
             <div class="card h-100 kp-provider">
                 <div class="card-body d-flex flex-column">

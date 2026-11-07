@@ -92,6 +92,26 @@ public class ActivityEvent {
         this.occurredAt = occurredAt;
     }
 
+    /**
+     * An event with an application, not a person, behind it: a key read through
+     * an app token. Filed under the token's group, so that group's admins see it.
+     */
+    public static ActivityEvent byApp(ActivityAction action, String tokenName, String tokenPrefix, Long groupId,
+            String groupName, Long targetId, String targetName, String detail, Instant occurredAt) {
+        ActivityEvent event = new ActivityEvent();
+        event.action = action;
+        String actor = "App token: " + tokenName;
+        event.actorName = actor.length() > 100 ? actor.substring(0, 100) : actor;
+        event.actorEmail = "app-token:" + tokenPrefix;
+        event.groupId = groupId;
+        event.groupName = groupName;
+        event.targetId = targetId;
+        event.targetName = targetName;
+        event.detail = detail;
+        event.occurredAt = occurredAt;
+        return event;
+    }
+
     public Long getId() {
         return id;
     }

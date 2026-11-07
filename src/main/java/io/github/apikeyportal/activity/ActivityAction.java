@@ -31,7 +31,11 @@ public enum ActivityAction {
     SSO_CONFIGURED("Single sign-on changed", "bi-shield-lock", "pill-accent"),
     /** The portal's colours were changed or reset under Appearance. */
     APPEARANCE_CHANGED("Appearance changed", "bi-palette", "pill-accent"),
-    GROUP_CREATED("Group created", "bi-diagram-3", "pill-neutral");
+    GROUP_CREATED("Group created", "bi-diagram-3", "pill-neutral"),
+    KEY_READ_BY_APP("Key read by an app", "bi-box-arrow-in-down", "pill-warning"),
+    APP_TOKEN_CREATED("App token created", "bi-key-fill", "pill-accent"),
+    APP_TOKEN_DELETED("App token deleted", "bi-key-fill", "pill-danger"),
+    API_ACCESS_CHANGED("App access switched", "bi-toggles", "pill-accent");
 
     private final String label;
 

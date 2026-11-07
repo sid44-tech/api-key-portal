@@ -21,7 +21,7 @@
                     <div class="kp-eyebrow" th:text="${key.serviceName}">GitHub</div>
                     <h1 th:text="${key.name}">Deploy token</h1>
                     <p class="kp-subtitle d-flex align-items-center gap-2">
-                        <span th:replace="fragments/badges :: expiration(${key})"></span>
+                        <span th:replace="~{fragments/badges :: expiration(${key})}"></span>
                         <span th:if="${key.daysUntilExpiry != null and key.daysUntilExpiry >= 0}"
                               th:text="${key.daysUntilExpiry == 0 ? 'Expires today' : key.daysUntilExpiry + ' days remaining'}">30 days remaining</span>
                         <span th:if="${key.expiresOn == null}">Doesn't expire</span>
@@ -100,7 +100,7 @@
                             <dd class="key-value">
                                 <code class="key-value-text" th:text="${key.maskedValue}">••••••••</code>
                                 <th:block th:if="${mine}">
-                                    <th:block th:replace="fragments/keys :: valueControls(${key})"></th:block>
+                                    <th:block th:replace="~{fragments/keys :: valueControls(${key})}"></th:block>
                                 </th:block>
                                 <div class="form-text" th:unless="${mine}">
                                     <i class="bi bi-lock me-1" aria-hidden="true"></i>

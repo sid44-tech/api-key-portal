@@ -52,7 +52,7 @@
                         <div class="kp-cell-secondary" th:text="${event.actorEmail}">alex@example.com</div>
                     </td>
                     <td>
-                        <span th:replace="fragments/badges :: activity(${event.action})"></span>
+                        <span th:replace="~{fragments/badges :: activity(${event.action})}"></span>
                         <div class="kp-cell-secondary mt-1" th:if="${event.keySource != null}"
                              th:text="${event.keySource.label}">Created via integration</div>
                     </td>
@@ -78,7 +78,7 @@
         <li th:each="event : ${page.content}" class="kp-row-card">
             <div class="kp-row-card-head">
                 <div>
-                    <span th:replace="fragments/badges :: activity(${event.action})"></span>
+                    <span th:replace="~{fragments/badges :: activity(${event.action})}"></span>
                     <div class="kp-row-card-subtitle" th:if="${event.keySource != null}"
                          th:text="${event.keySource.label}">Created via integration</div>
                 </div>

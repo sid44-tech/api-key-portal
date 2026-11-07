@@ -138,6 +138,41 @@ public class GitLabClient {
         }
     }
 
+    /**
+     * Finds the live token that took over from a revoked one, for when a
+     * rotation went through at GitLab but the portal never stored its result.
+     * A rotated token keeps its name, so the successor is the one active token
+     * sharing the old one's name.
+     *
+     * @return the successor's id, or {@code null} if the old token is still
+     *         active, or there is no single active token by that name
+     */
+    public Long findActiveSuccessor(String baseUrl, String token, String project, String tokenId) {
+        try {
+            String tokensUrl = projectUrl(baseUrl, project) + "/access_tokens";
+            TokenInfo old = restClient.get()
+                    .uri(java.net.URI.create(tokensUrl + "/" + URLEncoder.encode(tokenId, StandardCharsets.UTF_8)))
+                    .header("PRIVATE-TOKEN", token)
+                    .retrieve()
+                    .body(TokenInfo.class);
+            if (old == null || old.name() == null || old.active()) {
+                return null;
+            }
+            TokenInfo[] active = restClient.get()
+                    .uri(java.net.URI.create(tokensUrl + "?state=active"))
+                    .header("PRIVATE-TOKEN", token)
+                    .retrieve()
+                    .body(TokenInfo[].class);
+            List<TokenInfo> matches = active == null ? List.of()
+                    : java.util.Arrays.stream(active).filter(t -> t.active() && old.name().equals(t.name())).toList();
+            return matches.size() == 1 ? matches.get(0).id() : null;
+        } catch (RestClientResponseException e) {
+            throw translate("Could not look up the project access tokens", e);
+        } catch (RestClientException e) {
+            throw unreachable(baseUrl, e);
+        }
+    }
+
     private static java.net.URI projectUrl(String baseUrl, String project) {
         // A path like group/app goes into the URL as one encoded segment. Built
         // as a URI, not a String: RestClient treats a String as a template and
@@ -180,5 +215,10 @@ public class GitLabClient {
      */
     public record CreatedToken(@JsonProperty("id") Long id, @JsonProperty("token") String token,
             @JsonProperty("expires_at") String expiresAt) {
+    }
+
+    /** A token as GitLab lists it: no value, just enough to tell which one is which. */
+    record TokenInfo(@JsonProperty("id") Long id, @JsonProperty("name") String name,
+            @JsonProperty("active") boolean active) {
     }
 }

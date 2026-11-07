@@ -76,7 +76,7 @@ server:
         # mistyped http:// request cannot leak it. Off by default only because
         # a fresh install is reached over plain http://localhost and a Secure
         # cookie would make signing in silently impossible there. Set it to
-        # true the moment the portal is behind HTTPS - see the README's
+        # true the moment the portal is behind HTTPS - see docs/configuration.md,
         # "Behind a reverse proxy and HTTPS".
         secure: ${PORTAL_SECURE_COOKIE:false}
         # Script never needs the session cookie; this is Tomcat's default,
@@ -126,14 +126,15 @@ portal:
   security:
     # Seeds the super admin while the portal has no accounts at all. Sign-up is
     # closed, so a fresh install always gets this one account; everybody else is
-    # invited by somebody already in. The default password has to be replaced at
-    # the first sign-in - until then that account can reach nothing else.
+    # invited by somebody already in. With no admin-password set, a random one
+    # is generated and printed once in the log. It has to be replaced at the
+    # first sign-in - until then that account can reach nothing else.
     # Setting admin-password-hash instead is taken as a deliberate choice and
     # forces no change. PORTAL_USERNAME / PORTAL_PASSWORD_HASH are the
     # pre-multi-user names, still honoured so an upgrade in place doesn't
     # silently lose its login.
     admin-email: ${PORTAL_ADMIN_EMAIL:${PORTAL_USERNAME:admin@localhost}}
-    admin-password: ${PORTAL_ADMIN_PASSWORD:changeme}
+    admin-password: ${PORTAL_ADMIN_PASSWORD:}
     admin-password-hash: ${PORTAL_ADMIN_PASSWORD_HASH:${PORTAL_PASSWORD_HASH:}}
     admin-group-name: ${PORTAL_ADMIN_GROUP:Administrators}
     mfa:
@@ -174,7 +175,7 @@ portal:
     # switched it on - per provider on their profile, or per key on its page.
     # Runs an hour before the reminder sweep so a replaced key's owner gets one
     # email ("a replacement is ready") instead of that plus a plain warning.
-    # Azure AD and GitLab rotate on their own terms; Google Cloud and AWS keys
+    # Azure AD and GitLab rotate on their own terms; Google Cloud, AWS, Twilio and SendGrid keys
     # never expire by themselves, so the same sweep deletes a replaced key at the
     # provider once its date has passed - that is what makes it truly expired.
     enabled: ${PORTAL_AUTO_ROTATION:true}

@@ -112,7 +112,7 @@ public class GoogleIamClient {
                             "accountId", accountId,
                             "serviceAccount", Map.of(
                                     "displayName", displayName,
-                                    "description", "Created by API Key Portal")))
+                                    "description", "Created by Key Management Portal")))
                     .retrieve()
                     .body(CreatedServiceAccount.class);
             if (created == null || created.email() == null || created.email().isBlank()) {

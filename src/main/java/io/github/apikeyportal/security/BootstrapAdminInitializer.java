@@ -1,5 +1,7 @@
 package io.github.apikeyportal.security;
 
+import java.security.SecureRandom;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
@@ -21,8 +23,10 @@ import io.github.apikeyportal.user.UserRole;
  * predates accounts existing.
  * <p>
  * Nobody can sign themselves up, so a fresh install has to start with one account
- * or there would be no way in at all. It gets the default password from
- * {@code PORTAL_ADMIN_PASSWORD} and is marked as having to replace it: until they
+ * or there would be no way in at all. It gets its password from
+ * {@code PORTAL_ADMIN_PASSWORD} or, if that is not set, a random one written once
+ * to the log - so signing in first takes access to the server, not just to the
+ * login page. Either way it is marked as having to replace it: until they
  * do, that account can reach nothing but the change-password page.
  * <p>
  * A deployment that would rather not have a plaintext password in its
@@ -43,6 +47,10 @@ import io.github.apikeyportal.user.UserRole;
 public class BootstrapAdminInitializer implements InitializingBean {
 
     private static final Logger log = LoggerFactory.getLogger(BootstrapAdminInitializer.class);
+
+    private static final String FORMER_DEFAULT = "changeme";
+    private static final String ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     private final SecurityProperties properties;
     private final UserAccountRepository accounts;
@@ -77,8 +85,15 @@ public class BootstrapAdminInitializer implements InitializingBean {
             return;
         }
         boolean hashConfigured = StringUtils.hasText(properties.getAdminPasswordHash());
+        String configured = properties.getAdminPassword();
+        if (FORMER_DEFAULT.equals(configured)) {
+            // the old shipped default, still in many .env files: everyone knows it
+            log.warn("Ignoring PORTAL_ADMIN_PASSWORD=changeme, the former default; generating a password instead");
+            configured = null;
+        }
+        String generated = hashConfigured || StringUtils.hasText(configured) ? null : randomPassword();
         String passwordHash = hashConfigured ? properties.getAdminPasswordHash()
-                : passwordEncoder.encode(properties.getAdminPassword());
+                : passwordEncoder.encode(generated != null ? generated : configured);
 
         UserGroup group = groups.findByNameIgnoreCase(properties.getAdminGroupName())
                 .orElseGet(() -> groups.save(new UserGroup(properties.getAdminGroupName())));
@@ -89,12 +104,32 @@ public class BootstrapAdminInitializer implements InitializingBean {
 
         if (hashConfigured) {
             log.info("Seeded the super admin {} from the configured password hash", admin);
+        } else if (generated != null) {
+            // the only place this password ever appears; it is never stored in plain text
+            log.warn("""
+
+                    ================================================================
+                     First start: seeded the super admin {}
+                     One-time password: {}
+                     Sign in at /login and change it - the portal will not let that
+                     account do anything else until you do. This is not shown again.
+                    ================================================================""",
+                    admin.getEmail(), generated);
         } else {
             log.warn("Seeded the super admin {} with the default password from PORTAL_ADMIN_PASSWORD. "
                     + "Sign in at /login and change it - the portal will not let that account do "
                     + "anything else until you do.", admin);
         }
         claimLeftovers();
+    }
+
+    /** 20 characters from an unambiguous alphabet: about 115 bits, and easy to copy by hand. */
+    static String randomPassword() {
+        StringBuilder password = new StringBuilder(20);
+        for (int i = 0; i < 20; i++) {
+            password.append(ALPHABET.charAt(RANDOM.nextInt(ALPHABET.length())));
+        }
+        return password.toString();
     }
 
     /**

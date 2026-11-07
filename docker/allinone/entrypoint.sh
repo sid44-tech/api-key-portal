@@ -77,7 +77,7 @@ if [ -s "$encryption_key_file" ]; then
         log "WARNING: $encryption_key_file holds a key from an earlier start that is"
         log "WARNING: NOT the one in PORTAL_ENCRYPTION_KEY. If any values were written"
         log "WARNING: under it, add it as a named key (PORTAL_ENCRYPTION_KEYS_<ID>) and"
-        log "WARNING: run the re-encrypt command - see the README - before deleting it."
+        log "WARNING: run the re-encrypt command - see docs/configuration.md - before deleting it."
     fi
 fi
 

@@ -97,7 +97,7 @@ public class AzureGraphClient {
                     .body(Map.of(
                             "displayName", displayName,
                             "signInAudience", "AzureADMyOrg",
-                            "notes", "Created by API Key Portal"))
+                            "notes", "Created by Key Management Portal"))
                     .retrieve()
                     .body(CreatedApplication.class);
             if (created == null || created.objectId() == null || created.clientId() == null) {

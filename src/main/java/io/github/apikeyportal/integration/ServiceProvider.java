@@ -35,7 +35,17 @@ public enum ServiceProvider {
      */
     GITLAB("GitLab", "bi-gitlab", true, true, false, false, false),
 
-    CLOUDFLARE("Cloudflare", "bi-cloud-fill", false, true, false, false, false);
+    CLOUDFLARE("Cloudflare", "bi-cloud-fill", false, true, false, false, false),
+
+    /**
+     * As AWS: Twilio API keys never expire on their own, so the date is the
+     * portal's, made true by deleting the old key after the hand-over. Twilio
+     * allows many keys per account, so the replacement simply sits beside it.
+     */
+    TWILIO("Twilio", "bi-chat-dots-fill", true, true, true, true, true),
+
+    /** As Twilio: keys never expire, so the portal enforces the date by deleting the replaced key. */
+    SENDGRID("SendGrid", "bi-envelope-paper-fill", true, true, true, true, true);
 
     private final String label;
 

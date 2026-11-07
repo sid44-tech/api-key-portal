@@ -55,13 +55,8 @@ public class ReencryptService {
     /**
      * @param examined values looked at
      * @param rewritten values moved onto the active key
-     * @param failed values that could not be decrypted, and were left alone
      */
-    public record Result(int examined, int rewritten, int failed) {
-
-        public boolean isComplete() {
-            return failed == 0;
-        }
+    public record Result(int examined, int rewritten) {
     }
 
     /** How many stored values are not yet on the active key, by key id. */
@@ -126,7 +121,6 @@ public class ReencryptService {
             }
         }
 
-        Result result = new Result(examined, rewritten, failed);
         if (failed > 0) {
             // the transaction is about to roll back; say so plainly
             audit.refused("encryption_key_rotated", actor, "all stored values",
@@ -140,7 +134,7 @@ public class ReencryptService {
                         + encryption.getActiveKeyId() + "'");
         log.info("Re-encrypted {} of {} value(s) onto key '{}'", rewritten, examined,
                 encryption.getActiveKeyId());
-        return result;
+        return new Result(examined, rewritten);
     }
 
     private List<String> readAll(EncryptedColumn column) {

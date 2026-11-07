@@ -3,7 +3,6 @@ package io.github.apikeyportal.user;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
-import java.util.Locale;
 
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -58,24 +57,6 @@ public class PortalUser implements UserDetails, Serializable {
     /** Shown in the navigation bar. */
     public String getDisplayName() {
         return displayName;
-    }
-
-    /**
-     * Up to two initials for the avatar in the navigation bar - "Alex Carter"
-     * becomes "AC". Falls back to the email's first letter for a one-word name
-     * that is somehow blank, so the avatar is never empty.
-     */
-    public String getInitials() {
-        String source = displayName == null || displayName.isBlank() ? email : displayName;
-        if (source == null || source.isBlank()) {
-            return "?";
-        }
-        String[] words = source.trim().split("\\s+");
-        String initials = words[0].substring(0, 1);
-        if (words.length > 1) {
-            initials += words[words.length - 1].substring(0, 1);
-        }
-        return initials.toUpperCase(Locale.ROOT);
     }
 
     public UserRole getRole() {

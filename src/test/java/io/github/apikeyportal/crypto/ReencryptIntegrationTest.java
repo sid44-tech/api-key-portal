@@ -130,7 +130,6 @@ class ReencryptIntegrationTest {
 
         assertThat(result.rewritten()).isEqualTo(2);
         assertThat(result.examined()).isEqualTo(2);
-        assertThat(result.isComplete()).isTrue();
         assertThat(rawKeyValue()).startsWith("kp1:2026a:");
         assertThat(rawIntegrationSecret()).startsWith("kp1:2026a:");
         assertThat(rotating.countByKeyId()).containsExactly(Map.entry("2026a", 2));

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>App token created</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <h1 class="mb-2"><i class="bi bi-check-circle me-2 text-success" aria-hidden="true"></i>App token created</h1>
+            <p class="text-muted mb-4">
+                <strong th:text="${token.name}">billing-service</strong> for
+                <span th:text="${token.group.name}">Platform team</span>, valid until
+                <span th:text="${#temporals.format(token.expiresAt.atZone(T(java.time.ZoneId).systemDefault()), 'MMM d, yyyy')}">Jan 1</span>.
+            </p>
+
+            <div class="alert alert-warning d-flex align-items-start gap-2">
+                <i class="bi bi-exclamation-triangle-fill mt-1" aria-hidden="true"></i>
+                <div>Copy the token now and store it in the app's secret store. This is the only time it is shown;
+                    the portal keeps nothing it could show you again.</div>
+            </div>
+
+            <label class="form-label" for="appToken">Token</label>
+            <div class="input-group mb-4">
+                <input id="appToken" type="text" class="form-control font-monospace" readonly
+                       th:value="${plaintext}" autocomplete="off" spellcheck="false">
+                <button type="button" class="btn btn-secondary js-copy-field" data-copy-target="appToken">
+                    <i class="bi bi-clipboard me-1" aria-hidden="true"></i> Copy
+                </button>
+            </div>
+
+            <h2 class="h5">Configure the app</h2>
+            <p>Each key has a reference that stays the same when the key is replaced:</p>
+            <div class="card kp-table-card mb-3">
+                <table class="table mb-0">
+                    <thead><tr><th scope="col">Key</th><th scope="col">Reference</th></tr></thead>
+                    <tbody>
+                    <tr th:each="r : ${references}">
+                        <td th:text="${r.label}">Stripe / Prod secret</td>
+                        <td><code th:text="${r.ref}">12</code></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="mb-1">Reading one, for example:</p>
+<pre class="p-3 rounded bg-body-tertiary border font-monospace small">curl -H "Authorization: Bearer $KEYPORTAL_TOKEN" \
+  <span th:text="${baseUrl + '/api/v1/keys/' + references[0].ref}">https://portal/api/v1/keys/12</span></pre>
+            <p class="text-muted small">The response is JSON with the key's <code>value</code> and
+                <code>expiresOn</code>. <code>GET /api/v1/keys</code> lists everything the token can read.</p>
+
+            <a th:href="@{/app-access}" class="btn btn-primary">Done</a>
+        </div>
+    </div>
+</div>
+
+<th:block layout:fragment="scripts">
+    <script th:src="@{/js/keys.js}"></script>
+</th:block>
+</body>
+</html>

@@ -33,6 +33,8 @@ import io.github.apikeyportal.integration.aws.AwsIamClient;
 import io.github.apikeyportal.integration.azure.AzureGraphClient;
 import io.github.apikeyportal.integration.cloudflare.CloudflareClient;
 import io.github.apikeyportal.integration.gitlab.GitLabClient;
+import io.github.apikeyportal.integration.sendgrid.SendGridClient;
+import io.github.apikeyportal.integration.twilio.TwilioClient;
 import io.github.apikeyportal.integration.azure.AzureGraphClient.CreatedApplication;
 import io.github.apikeyportal.integration.azure.AzureGraphClient.CreatedSecret;
 import io.github.apikeyportal.integration.google.GoogleIamClient;
@@ -66,6 +68,12 @@ class KeyProvisioningServiceTest {
     private CloudflareClient cloudflareClient;
 
     @Mock
+    private TwilioClient twilioClient;
+
+    @Mock
+    private SendGridClient sendGridClient;
+
+    @Mock
     private ApiKeyService apiKeyService;
 
     private KeyProvisioningService service;
@@ -79,7 +87,7 @@ class KeyProvisioningServiceTest {
     void setUp() {
         // zero-length backoffs so retry paths run instantly in tests
         service = new KeyProvisioningService(integrations, graphClient, googleIamClient, awsIamClient,
-                gitLabClient, cloudflareClient, apiKeyService,
+                gitLabClient, cloudflareClient, twilioClient, sendGridClient, apiKeyService,
                 new long[] {0, 0});
     }
 
@@ -238,6 +246,104 @@ class KeyProvisioningServiceTest {
         // sitting next to it would be a working-looking key that is not
         verify(apiKeyService, never()).create(any(), any(), any(), any());
         verify(apiKeyService).replaceValueInPlace(eq(55L), eq("glpat-new"), any(), eq("100"));
+    }
+
+    @Test
+    void aFailedSaveOfTheRotatedGitLabTokenIsRetriedRatherThanLosingIt() {
+        ServiceIntegration gitlab = new ServiceIntegration(ServiceProvider.GITLAB, "GitLab CI",
+                "https://gitlab.example.com", "group/app", "glpat-admin");
+        ApiKey existing = gitLabKey();
+        when(gitLabClient.rotateProjectAccessToken(any(), any(), any(), eq("99"), any(LocalDate.class)))
+                .thenReturn(new GitLabClient.CreatedToken(100L, "glpat-new", null));
+        when(apiKeyService.replaceValueInPlace(eq(55L), eq("glpat-new"), any(), eq("100")))
+                .thenThrow(new IllegalStateException("database blip"))
+                .thenReturn(existing);
+
+        service.rotate(existing, gitlab);
+
+        // rotated once at GitLab, saved on the second try
+        verify(gitLabClient).rotateProjectAccessToken(any(), any(), any(), any(), any());
+        verify(apiKeyService, org.mockito.Mockito.times(2))
+                .replaceValueInPlace(eq(55L), eq("glpat-new"), any(), eq("100"));
+    }
+
+    @Test
+    void anAlreadyRevokedGitLabTokenRecoversByRotatingItsSuccessor() {
+        ServiceIntegration gitlab = new ServiceIntegration(ServiceProvider.GITLAB, "GitLab CI",
+                "https://gitlab.example.com", "group/app", "glpat-admin");
+        ApiKey existing = gitLabKey();
+        // an earlier rotation went through at GitLab (token 99 -> 100) but was never stored
+        ReflectionTestUtils.setField(existing, "rotationStartedAt", java.time.Instant.now().minusSeconds(86400));
+        when(gitLabClient.rotateProjectAccessToken(any(), any(), any(), eq("99"), any(LocalDate.class)))
+                .thenThrow(new ProvisioningException("Could not rotate the project access token (HTTP 400)"));
+        when(gitLabClient.findActiveSuccessor("https://gitlab.example.com", "glpat-admin", "group/app", "99"))
+                .thenReturn(100L);
+        when(gitLabClient.rotateProjectAccessToken(any(), any(), any(), eq("100"), any(LocalDate.class)))
+                .thenReturn(new GitLabClient.CreatedToken(101L, "glpat-fresh", null));
+        when(apiKeyService.replaceValueInPlace(eq(55L), eq("glpat-fresh"), any(), eq("101")))
+                .thenReturn(existing);
+
+        service.rotate(existing, gitlab);
+
+        verify(apiKeyService).replaceValueInPlace(eq(55L), eq("glpat-fresh"), any(), eq("101"));
+    }
+
+    @Test
+    void aGitLabRefusalWithNoSuccessorIsReportedAsIs() {
+        ServiceIntegration gitlab = new ServiceIntegration(ServiceProvider.GITLAB, "GitLab CI",
+                "https://gitlab.example.com", "group/app", "glpat-admin");
+        when(gitLabClient.rotateProjectAccessToken(any(), any(), any(), eq("99"), any(LocalDate.class)))
+                .thenThrow(new ProvisioningException("Could not rotate the project access token (HTTP 403)"));
+
+        assertThatThrownBy(() -> service.rotate(gitLabKey(), gitlab))
+                .isInstanceOf(ProvisioningException.class)
+                .hasMessageContaining("HTTP 403");
+        verify(apiKeyService, never()).replaceValueInPlace(any(), any(), any(), any());
+        // no earlier rotation was in flight, so there is nothing to look for
+        verify(gitLabClient, never()).findActiveSuccessor(any(), any(), any(), any());
+    }
+
+    @Test
+    void gitLabRotationIsRecordedBeforeGitLabIsCalledAndClearedOnceSaved() {
+        ServiceIntegration gitlab = new ServiceIntegration(ServiceProvider.GITLAB, "GitLab CI",
+                "https://gitlab.example.com", "group/app", "glpat-admin");
+        ApiKey existing = gitLabKey();
+        when(gitLabClient.rotateProjectAccessToken(any(), any(), any(), eq("99"), any(LocalDate.class)))
+                .thenReturn(new GitLabClient.CreatedToken(100L, "glpat-new", null));
+        when(apiKeyService.replaceValueInPlace(eq(55L), eq("glpat-new"), any(), eq("100"))).thenReturn(existing);
+
+        service.rotate(existing, gitlab);
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(apiKeyService, gitLabClient);
+        order.verify(apiKeyService).markRotationStarted(55L);
+        order.verify(gitLabClient).rotateProjectAccessToken(any(), any(), any(), any(), any());
+        order.verify(apiKeyService).replaceValueInPlace(any(), any(), any(), any());
+        order.verify(apiKeyService).clearRotationStarted(55L);
+    }
+
+    @Test
+    void aRotatedGitLabTokenThatCannotBeSavedIsReportedAsLost() {
+        ServiceIntegration gitlab = new ServiceIntegration(ServiceProvider.GITLAB, "GitLab CI",
+                "https://gitlab.example.com", "group/app", "glpat-admin");
+        when(gitLabClient.rotateProjectAccessToken(any(), any(), any(), eq("99"), any(LocalDate.class)))
+                .thenReturn(new GitLabClient.CreatedToken(100L, "glpat-new", null));
+        when(apiKeyService.replaceValueInPlace(any(), any(), any(), any()))
+                .thenThrow(new IllegalStateException("database down"));
+
+        assertThatThrownBy(() -> service.rotate(gitLabKey(), gitlab))
+                .isInstanceOf(RotationNotSavedException.class)
+                .hasMessageContaining("database down");
+        // the marker stays, so the next sweep knows to recover
+        verify(apiKeyService, never()).clearRotationStarted(any());
+    }
+
+    private ApiKey gitLabKey() {
+        ApiKey key = new ApiKey("CI token", "GitLab CI", "glpat-old",
+                LocalDate.now().minusDays(360), LocalDate.now().plusDays(1));
+        key.assignTo(owner, owner.getGroup());
+        key.recordProvenance(7L, "99", true, null);
+        ReflectionTestUtils.setField(key, "id", 55L);
+        return key;
     }
 
     /** A provisioned key of Alex's, as the rotation sweep would hand it over. */
@@ -461,6 +567,146 @@ class KeyProvisioningServiceTest {
         assertThatThrownBy(() -> KeyProvisioningService.awsAccessKeyIdOf(key))
                 .isInstanceOf(ProvisioningException.class)
                 .hasMessageContaining("no AWS_ACCESS_KEY_ID line");
+    }
+
+    // ---------- Twilio ----------
+
+    private static final String TWILIO_ACCOUNT = "AC" + "0".repeat(32);
+
+    private final ServiceIntegration twilio = new ServiceIntegration(ServiceProvider.TWILIO, "Twilio SMS",
+            TWILIO_ACCOUNT, "SKportal", "twilio-secret");
+
+    /** A Twilio key of Alex's expiring in five days, API key SKold. */
+    private ApiKey expiringTwilioKey() {
+        ApiKey key = new ApiKey("SMS sender", "Twilio SMS",
+                "TWILIO_ACCOUNT_SID=" + TWILIO_ACCOUNT + "\nTWILIO_API_KEY=SKold\nTWILIO_API_SECRET=old-secret",
+                LocalDate.now().minusDays(85), LocalDate.now().plusDays(5));
+        key.assignTo(owner, owner.getGroup());
+        key.recordProvenance(11L, TWILIO_ACCOUNT, null, null);
+        ReflectionTestUtils.setField(key, "providerCredentialId", "SKold");
+        ReflectionTestUtils.setField(key, "id", 63L);
+        return key;
+    }
+
+    @Test
+    void twilioProvisioningStoresAllThreeValuesAndRecordsTheKeySid() {
+        when(integrations.getById(11L, owner)).thenReturn(twilio);
+        when(twilioClient.createKey(TWILIO_ACCOUNT, "SKportal", "twilio-secret", "SMS sender"))
+                .thenReturn(new TwilioClient.CreatedKey("SKnew", "new-secret"));
+        when(apiKeyService.create(any(), eq(owner), any(), any()))
+                .thenAnswer(inv -> new ApiKey("SMS sender", "Twilio SMS", "v", LocalDate.now(), null));
+
+        service.provision(11L, " SMS sender ", SecretValidity.DAYS_90, "for alerts", owner);
+
+        ArgumentCaptor<ApiKeyDetails> details = ArgumentCaptor.forClass(ApiKeyDetails.class);
+        ArgumentCaptor<KeyProvenance> provenance = ArgumentCaptor.forClass(KeyProvenance.class);
+        verify(apiKeyService).create(details.capture(), eq(owner), any(), provenance.capture());
+        assertThat(details.getValue().getKeyValue()).isEqualTo("TWILIO_ACCOUNT_SID=" + TWILIO_ACCOUNT
+                + "\nTWILIO_API_KEY=SKnew\nTWILIO_API_SECRET=new-secret");
+        assertThat(details.getValue().getExpiresOn()).isEqualTo(LocalDate.now().plusDays(90));
+        assertThat(details.getValue().getNotes()).startsWith("for alerts").contains("API key SID: SKnew")
+                .doesNotContain("new-secret");
+        assertThat(provenance.getValue().providerResourceId()).isEqualTo(TWILIO_ACCOUNT);
+        assertThat(provenance.getValue().providerCredentialId()).isEqualTo("SKnew");
+        verify(integrations).markVerified(twilio);
+    }
+
+    @Test
+    void twilioRotationAddsASecondKeyBesideTheOldOne() {
+        ApiKey expiring = expiringTwilioKey();
+        when(twilioClient.createKey(TWILIO_ACCOUNT, "SKportal", "twilio-secret", "SMS sender"))
+                .thenReturn(new TwilioClient.CreatedKey("SKnew", "new-secret"));
+        when(apiKeyService.create(any(), eq(owner), any(), any()))
+                .thenAnswer(inv -> new ApiKey("SMS sender", "Twilio SMS", "v", LocalDate.now(), null));
+
+        service.rotate(expiring, twilio);
+
+        // the old key is left alone for the hand-over; revoke deletes it later
+        verify(twilioClient, never()).deleteKey(any(), any(), any(), any());
+        ArgumentCaptor<ApiKeyDetails> details = ArgumentCaptor.forClass(ApiKeyDetails.class);
+        ArgumentCaptor<KeyProvenance> provenance = ArgumentCaptor.forClass(KeyProvenance.class);
+        verify(apiKeyService).create(details.capture(), eq(owner), any(), provenance.capture());
+        assertThat(details.getValue().getKeyValue()).contains("TWILIO_API_KEY=SKnew");
+        assertThat(details.getValue().getExpiresOn()).isEqualTo(LocalDate.now().plusDays(90));
+        assertThat(provenance.getValue().providerCredentialId()).isEqualTo("SKnew");
+        assertThat(provenance.getValue().rotatedFromKeyId()).isEqualTo(63L);
+    }
+
+    @Test
+    void revokingATwilioKeyDeletesExactlyThatKey() {
+        when(twilioClient.deleteKey(TWILIO_ACCOUNT, "SKportal", "twilio-secret", "SKold")).thenReturn(true);
+
+        service.revoke(expiringTwilioKey(), twilio);
+
+        verify(apiKeyService).markRevokedAtProvider(eq(63L), org.mockito.ArgumentMatchers.contains("deleted at Twilio"));
+    }
+
+    @Test
+    void theTwilioKeySidFallsBackToTheStoredValue() {
+        ApiKey key = expiringTwilioKey();
+        ReflectionTestUtils.setField(key, "providerCredentialId", null);
+        assertThat(KeyProvisioningService.twilioKeySidOf(key)).isEqualTo("SKold");
+
+        key.setKeyValue("just a secret somebody pasted");
+        assertThatThrownBy(() -> KeyProvisioningService.twilioKeySidOf(key))
+                .isInstanceOf(ProvisioningException.class)
+                .hasMessageContaining("no TWILIO_API_KEY line");
+    }
+
+    // ---------- SendGrid ----------
+
+    private final ServiceIntegration sendGrid = new ServiceIntegration(ServiceProvider.SENDGRID, "SendGrid mail",
+            "mail-send", "mail-send", "SG.portal");
+
+    @Test
+    void sendGridKeysGetMailSendOnlyAndRecordTheirId() {
+        when(integrations.getById(12L, owner)).thenReturn(sendGrid);
+        when(sendGridClient.scopes("SG.portal"))
+                .thenReturn(List.of("api_keys.create", "api_keys.delete", "mail.send", "stats.read"));
+        when(sendGridClient.createKey("SG.portal", "Newsletter", List.of("mail.send")))
+                .thenReturn(new SendGridClient.CreatedKey("kid-1", "SG.new"));
+        when(apiKeyService.create(any(), eq(owner), any(), any()))
+                .thenAnswer(inv -> new ApiKey("Newsletter", "SendGrid mail", "v", LocalDate.now(), null));
+
+        service.provision(12L, "Newsletter", SecretValidity.DAYS_90, null, owner);
+
+        ArgumentCaptor<ApiKeyDetails> details = ArgumentCaptor.forClass(ApiKeyDetails.class);
+        ArgumentCaptor<KeyProvenance> provenance = ArgumentCaptor.forClass(KeyProvenance.class);
+        verify(apiKeyService).create(details.capture(), eq(owner), any(), provenance.capture());
+        assertThat(details.getValue().getKeyValue()).isEqualTo("SG.new");
+        assertThat(details.getValue().getNotes()).contains("API key ID: kid-1").doesNotContain("SG.new");
+        assertThat(provenance.getValue().providerResourceId()).isNotNull();
+        assertThat(provenance.getValue().providerCredentialId()).isEqualTo("kid-1");
+    }
+
+    @Test
+    void inheritedSendGridAccessNeverIncludesKeyManagement() {
+        ServiceIntegration broad = new ServiceIntegration(ServiceProvider.SENDGRID, "SendGrid", "inherit",
+                "inherit", "SG.portal");
+        when(integrations.getById(12L, owner)).thenReturn(broad);
+        when(sendGridClient.scopes("SG.portal"))
+                .thenReturn(List.of("api_keys.create", "api_keys.delete", "mail.send", "stats.read"));
+        when(sendGridClient.createKey(any(), any(), any())).thenReturn(new SendGridClient.CreatedKey("k", "SG.x"));
+        when(apiKeyService.create(any(), eq(owner), any(), any()))
+                .thenAnswer(inv -> new ApiKey("x", "SendGrid", "v", LocalDate.now(), null));
+
+        service.provision(12L, "Reports", SecretValidity.DAYS_90, null, owner);
+
+        verify(sendGridClient).createKey("SG.portal", "Reports", List.of("mail.send", "stats.read"));
+    }
+
+    @Test
+    void revokingASendGridKeyDeletesItById() {
+        ApiKey expired = new ApiKey("Newsletter", "SendGrid mail", "SG.old",
+                LocalDate.now().minusDays(95), LocalDate.now().minusDays(1));
+        expired.assignTo(owner, owner.getGroup());
+        ReflectionTestUtils.setField(expired, "providerCredentialId", "kid-old");
+        ReflectionTestUtils.setField(expired, "id", 64L);
+        when(sendGridClient.deleteKey("SG.portal", "kid-old")).thenReturn(true);
+
+        service.revoke(expired, sendGrid);
+
+        verify(apiKeyService).markRevokedAtProvider(eq(64L), org.mockito.ArgumentMatchers.contains("deleted at SendGrid"));
     }
 
     @Test

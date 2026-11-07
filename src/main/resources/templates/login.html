@@ -11,7 +11,7 @@
         <div class="kp-auth-brand">
             <img class="kp-brand-logo" th:if="${hasLogo}" th:src="@{/theme/logo(v=${themeVersion ?: '0'})}" alt="">
             <span class="kp-brand-mark" th:unless="${hasLogo}" aria-hidden="true"><i class="bi bi-key-fill"></i></span>
-            <h1 th:text="${'Sign in to ' + (portalName ?: 'API Key Portal')}">Sign in to API Key Portal</h1>
+            <h1 th:text="${'Sign in to ' + (portalName ?: 'Key Management Portal')}">Sign in to Key Management Portal</h1>
         </div>
 
         <div class="card">

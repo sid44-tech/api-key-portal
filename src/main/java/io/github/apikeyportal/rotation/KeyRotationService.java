@@ -10,12 +10,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import io.github.apikeyportal.integration.KeyProvisioningService;
 import io.github.apikeyportal.integration.ProvisioningException;
+import io.github.apikeyportal.integration.RotationNotSavedException;
 import io.github.apikeyportal.integration.ServiceIntegration;
 import io.github.apikeyportal.integration.ServiceIntegrationRepository;
 import io.github.apikeyportal.integration.ServiceProvider;
 import io.github.apikeyportal.key.ApiKey;
 import io.github.apikeyportal.key.ApiKeyRepository;
 import io.github.apikeyportal.logging.AuditLog;
+import io.github.apikeyportal.user.UserAccountRepository;
 import io.github.apikeyportal.alerts.AlertNotifier;
 import io.github.apikeyportal.user.UserAccount;
 
@@ -63,10 +65,12 @@ public class KeyRotationService {
     private final RotationProperties properties;
     private final AuditLog audit;
     private final AlertNotifier alerts;
+    private final UserAccountRepository users;
 
     public KeyRotationService(ApiKeyRepository keys, ServiceIntegrationRepository integrations,
             AutoRotationPreferenceRepository preferences, KeyProvisioningService provisioning,
-            KeyRotationMailer mailer, RotationProperties properties, AuditLog audit, AlertNotifier alerts) {
+            KeyRotationMailer mailer, RotationProperties properties, AuditLog audit, AlertNotifier alerts,
+            UserAccountRepository users) {
         this.keys = keys;
         this.integrations = integrations;
         this.preferences = preferences;
@@ -75,6 +79,7 @@ public class KeyRotationService {
         this.properties = properties;
         this.audit = audit;
         this.alerts = alerts;
+        this.users = users;
     }
 
     /** @return how many keys were replaced */
@@ -115,6 +120,13 @@ public class KeyRotationService {
                         key.getServiceName() + " / " + key.getName(), rotationAuditDetail(key, provider, willDelete));
                 mailer.send(key, rotatedKey, provider, willDelete);
                 rotated++;
+            } catch (RotationNotSavedException e) {
+                // the old value is already dead: this is an outage, not a refusal
+                log.error("Rotated {} through {} but lost the new value: {}", key, integration, e.getMessage());
+                audit.refused("key_rotated", key.getOwner().getEmail(),
+                        key.getServiceName() + " / " + key.getName(), e.getMessage());
+                rememberFailure(key, e.getMessage());
+                alertOwnerAndAdmins(key, e.getMessage());
             } catch (ProvisioningException e) {
                 // next sweep tries again, and the expiry reminders keep running
                 // underneath - a failed rotation never becomes a silent expiry
@@ -153,6 +165,15 @@ public class KeyRotationService {
         }
         // the group's chat channels, if it has any that want to hear; never throws
         alerts.rotationFailed(key, abbreviate(message));
+    }
+
+    /** Best effort, like {@link #rememberFailure}: the sweep moves on whatever happens here. */
+    private void alertOwnerAndAdmins(ApiKey key, String message) {
+        try {
+            mailer.sendRotationNotSaved(key, users.findAdminsFor(key.getGroup()), abbreviate(message));
+        } catch (RuntimeException e) {
+            log.warn("Could not alert anyone that {} lost its rotated value: {}", key, e.getMessage());
+        }
     }
 
     private void forgetFailure(ApiKey key) {

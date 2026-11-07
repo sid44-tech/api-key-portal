@@ -25,3 +25,15 @@
         media.addListener(apply);
     }
 })();
+
+/* The sidebar's collapsed state, also before first paint, so it never jumps. */
+(function () {
+    'use strict';
+    try {
+        if (localStorage.getItem('kp-nav-collapsed') === '1') {
+            document.documentElement.classList.add('kp-nav-collapsed');
+        }
+    } catch (e) {
+        // storage unavailable: start expanded
+    }
+})();

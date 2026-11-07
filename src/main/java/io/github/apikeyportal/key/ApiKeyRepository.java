@@ -54,6 +54,16 @@ public interface ApiKeyRepository extends JpaRepository<ApiKey, Long>, JpaSpecif
     @Query("update ApiKey k set k.rotationFailedAt = null, k.rotationFailure = null where k.id = :id")
     int clearRotationFailure(@Param("id") Long id);
 
+    @Transactional
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update ApiKey k set k.rotationStartedAt = :at where k.id = :id")
+    int markRotationStarted(@Param("id") Long id, @Param("at") Instant at);
+
+    @Transactional
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update ApiKey k set k.rotationStartedAt = null where k.id = :id")
+    int clearRotationStarted(@Param("id") Long id);
+
     /** How many keys each of the given people holds, as {@code [ownerId, count]} rows. */
     @Query("select k.owner.id, count(k) from ApiKey k where k.owner.id in :ownerIds group by k.owner.id")
     List<Object[]> countByOwnerIds(@Param("ownerIds") List<Long> ownerIds);
@@ -63,6 +73,15 @@ public interface ApiKeyRepository extends JpaRepository<ApiKey, Long>, JpaSpecif
     List<Object[]> countByGroup();
 
     long countByGroup_Id(Long groupId);
+
+    /**
+     * The keys an app token for this group may be given: the group's current
+     * keys - not ones already replaced, and not ones deleted at their provider.
+     */
+    @Query("select k from ApiKey k where k.group.id = :groupId and k.revokedAt is null "
+            + "and not exists (select r.id from ApiKey r where r.rotatedFromKeyId = k.id) "
+            + "order by lower(k.serviceName), lower(k.name)")
+    List<ApiKey> findCurrentInGroup(@Param("groupId") Long groupId);
 
     /**
      * Keys expiring in the window that somebody still wants to hear about. Keys

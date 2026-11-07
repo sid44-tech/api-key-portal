@@ -120,4 +120,27 @@ class GitLabClientTest {
                 .isInstanceOf(ProvisioningException.class)
                 .hasMessageContaining("did not include the new token value");
     }
+
+    @Test
+    void findsTheActiveTokenThatReplacedARevokedOne() {
+        server.expect(requestTo(BASE + "/api/v4/projects/42/access_tokens/99"))
+                .andRespond(withSuccess("{\"id\": 99, \"name\": \"CI\", \"active\": false}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo(BASE + "/api/v4/projects/42/access_tokens?state=active"))
+                .andRespond(withSuccess("""
+                        [{"id": 7, "name": "Other", "active": true},
+                         {"id": 100, "name": "CI", "active": true}]
+                        """, MediaType.APPLICATION_JSON));
+
+        assertThat(client.findActiveSuccessor(BASE, "glpat-admin", "42", "99")).isEqualTo(100L);
+    }
+
+    @Test
+    void aStillActiveTokenHasNoSuccessor() {
+        server.expect(requestTo(BASE + "/api/v4/projects/42/access_tokens/99"))
+                .andRespond(withSuccess("{\"id\": 99, \"name\": \"CI\", \"active\": true}",
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(client.findActiveSuccessor(BASE, "glpat-admin", "42", "99")).isNull();
+    }
 }

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   API Key Portal — design system
+   Key Management Portal — design system
    A thin layer over Bootstrap 5.3: warm off-white canvas, white surfaces with
    hairline borders, system typography, one restrained accent, soft status
    tints. Everything lives here because the CSP forbids inline styles.
@@ -69,6 +69,7 @@ body {
 
 main.container {
     flex: 1 0 auto;
+    width: 100%;
     padding-top: 0.5rem;
     padding-bottom: 4rem;
 }
@@ -127,25 +128,12 @@ h1, .h1 {
 }
 
 /* --------------------------------------------------------------------------
-   Header
+   Navigation: a sidebar that collapses to icons, and slides in on phones
    -------------------------------------------------------------------------- */
 
-.kp-header {
-    position: sticky;
-    top: 0;
-    z-index: 1020;
-    background: rgba(255, 255, 255, 0.82);
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
-    backdrop-filter: saturate(180%) blur(20px);
-    border-bottom: 1px solid var(--kp-hairline);
-    margin-bottom: 2rem;
-}
-
-.kp-header .container {
-    display: flex;
-    align-items: center;
-    gap: 1.5rem;
-    min-height: 3.5rem;
+:root {
+    --kp-sidebar-width: 15.5rem;
+    --kp-sidebar-collapsed: 4.5rem;
 }
 
 .kp-brand {
@@ -155,7 +143,7 @@ h1, .h1 {
     color: var(--kp-ink);
     font-weight: 600;
     letter-spacing: -0.01em;
-    white-space: nowrap;
+    min-width: 0;
 }
 
 .kp-brand:hover {
@@ -163,64 +151,233 @@ h1, .h1 {
     text-decoration: none;
 }
 
+.kp-brand-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .kp-brand-mark {
-    width: 1.75rem;
-    height: 1.75rem;
-    border-radius: 8px;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9px;
     background: linear-gradient(145deg, #2d7ff0, var(--kp-accent));
     color: #fff;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.95rem;
+    font-size: 1rem;
+    flex-shrink: 0;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
-.kp-nav {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
+/* signed out (error pages): a plain bar with the brand */
+.kp-header {
+    border-bottom: 1px solid var(--kp-hairline);
+    margin-bottom: 2rem;
 }
 
-.kp-nav a {
-    display: inline-block;
-    padding: 0.4rem 0.75rem;
-    border-radius: 999px;
+.kp-header .container {
+    display: flex;
+    align-items: center;
+    min-height: 3.5rem;
+}
+
+.kp-shell {
+    flex: 1 0 auto;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 100vh;
+    transition: margin-left 0.2s ease;
+}
+
+.kp-has-sidebar .kp-shell {
+    margin-left: var(--kp-sidebar-width);
+}
+
+.kp-has-sidebar main.container {
+    padding-top: 2rem;
+}
+
+.kp-nav-collapsed .kp-has-sidebar .kp-shell {
+    margin-left: var(--kp-sidebar-collapsed);
+}
+
+.kp-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 1040;
+    width: var(--kp-sidebar-width);
+    display: flex;
+    flex-direction: column;
+    background: rgba(255, 255, 255, 0.86);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    border-right: 1px solid var(--kp-hairline);
+    transition: width 0.2s ease, transform 0.25s ease;
+    overflow: hidden;
+}
+
+.kp-sidebar-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 1rem 1.1rem 0.75rem;
+    min-height: 4rem;
+}
+
+.kp-side-nav {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0.25rem 0.75rem 1rem;
+}
+
+.kp-side-nav ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.kp-side-section {
+    margin: 1.25rem 0.6rem 0.4rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--kp-ink-3);
+    white-space: nowrap;
+}
+
+.kp-side-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.5rem 0.65rem;
+    border: 0;
+    border-radius: var(--kp-radius-sm);
     color: var(--kp-ink-2);
+    background: transparent;
     font-weight: 500;
     font-size: 0.9rem;
+    text-align: left;
+    white-space: nowrap;
     transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.kp-nav a:hover {
+.kp-side-link .bi {
+    font-size: 1.1rem;
+    width: 1.25rem;
+    text-align: center;
+    flex-shrink: 0;
+    color: var(--kp-ink-3);
+    transition: color 0.15s ease;
+}
+
+.kp-side-link:hover,
+.kp-side-link:focus-visible {
     color: var(--kp-ink);
     background: var(--kp-gray-soft);
     text-decoration: none;
 }
 
-.kp-nav a.active {
-    color: var(--kp-ink);
-    background: var(--kp-gray-soft);
+.kp-side-link.active {
+    color: var(--kp-accent);
+    background: var(--kp-accent-soft);
 }
 
-.kp-user {
-    margin-left: auto;
+.kp-side-link.active .bi,
+.kp-side-link:hover .bi {
+    color: inherit;
 }
 
-.kp-user > .btn {
+.kp-sidebar-foot {
+    border-top: 1px solid var(--kp-hairline);
+    padding: 0.6rem 0.75rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.kp-collapse-btn {
+    color: var(--kp-ink-3);
+}
+
+.kp-icon-btn {
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    border-radius: 999px;
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.25rem 0.6rem 0.25rem 0.25rem;
-    border-radius: 999px;
+    justify-content: center;
+    color: var(--kp-ink-2);
+    font-size: 1.25rem;
+}
+
+.kp-icon-btn:hover {
+    background: var(--kp-gray-soft);
+    color: var(--kp-ink);
+}
+
+.kp-nav-close,
+.kp-topbar,
+.kp-backdrop {
+    display: none;
+}
+
+/* collapsed: icons only, the logo without the name */
+.kp-nav-collapsed .kp-sidebar {
+    width: var(--kp-sidebar-collapsed);
+}
+
+.kp-nav-collapsed .kp-sidebar .kp-side-label,
+.kp-nav-collapsed .kp-sidebar .kp-brand-name {
+    display: none;
+}
+
+.kp-nav-collapsed .kp-sidebar-head {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.kp-nav-collapsed .kp-side-link,
+.kp-nav-collapsed .kp-user > .btn {
+    justify-content: center;
+}
+
+.kp-nav-collapsed .kp-side-section {
+    height: 1px;
+    margin: 0.9rem 0.5rem;
+    background: var(--kp-hairline);
+    font-size: 0;
+}
+
+.kp-nav-collapsed .kp-sidebar .kp-brand-logo {
+    max-width: 2.5rem;
+}
+
+/* the account menu at the foot of the sidebar */
+.kp-user > .btn {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.4rem 0.5rem;
+    border-radius: var(--kp-radius-sm);
     border: 1px solid transparent;
     background: transparent;
     color: var(--kp-ink);
     font-weight: 500;
     font-size: 0.9rem;
+    text-align: left;
 }
 
 .kp-user > .btn:hover,
@@ -235,16 +392,40 @@ h1, .h1 {
     display: none;
 }
 
+.kp-user-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 auto;
+    line-height: 1.25;
+}
+
+.kp-user-text > * {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.kp-user-text small {
+    color: var(--kp-ink-3);
+    font-weight: 400;
+    font-size: 0.75rem;
+}
+
+.kp-user .bi-three-dots {
+    color: var(--kp-ink-3);
+}
+
 .kp-avatar {
-    width: 1.75rem;
-    height: 1.75rem;
+    width: 2rem;
+    height: 2rem;
     border-radius: 50%;
     background: var(--kp-accent-soft);
     color: var(--kp-accent);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     font-weight: 600;
     text-transform: uppercase;
     flex-shrink: 0;
@@ -253,19 +434,6 @@ h1, .h1 {
 .kp-user .dropdown-menu {
     min-width: 14rem;
     padding: 0.4rem;
-}
-
-.kp-user .dropdown-header {
-    padding: 0.5rem 0.75rem 0.35rem;
-    color: var(--kp-ink);
-    font-size: 0.85rem;
-}
-
-.kp-user .dropdown-header small {
-    display: block;
-    color: var(--kp-ink-3);
-    font-weight: 400;
-    margin-top: 0.1rem;
 }
 
 .kp-user .dropdown-item {
@@ -283,22 +451,116 @@ h1, .h1 {
     text-align: center;
 }
 
-@media (max-width: 767.98px) {
-    .kp-header .container {
-        flex-wrap: wrap;
-        row-gap: 0.25rem;
-        padding-bottom: 0.5rem;
+.kp-skip {
+    position: fixed;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 1060;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--kp-radius-sm);
+    background: var(--kp-surface);
+    box-shadow: var(--kp-shadow-lift);
+}
+
+/* phones and narrow tablets: a top bar with a menu button, the sidebar slides in */
+@media (max-width: 991.98px) {
+    .kp-has-sidebar .kp-shell,
+    .kp-nav-collapsed .kp-has-sidebar .kp-shell {
+        margin-left: 0;
     }
 
-    .kp-nav {
-        order: 3;
-        width: 100%;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
+    .kp-has-sidebar main.container {
+        padding-top: 1.25rem;
     }
 
-    .kp-nav a {
-        white-space: nowrap;
+    .kp-topbar {
+        position: sticky;
+        top: 0;
+        z-index: 1020;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 3.5rem;
+        padding: 0 0.75rem;
+        background: rgba(255, 255, 255, 0.82);
+        -webkit-backdrop-filter: saturate(180%) blur(20px);
+        backdrop-filter: saturate(180%) blur(20px);
+        border-bottom: 1px solid var(--kp-hairline);
+    }
+
+    .kp-sidebar,
+    .kp-nav-collapsed .kp-sidebar {
+        width: min(var(--kp-sidebar-width), 85vw);
+        transform: translateX(-100%);
+        box-shadow: none;
+    }
+
+    .kp-nav-open .kp-sidebar {
+        transform: none;
+        box-shadow: var(--kp-shadow-lift);
+    }
+
+    /* the collapsed choice is a desktop one; the drawer always shows labels */
+    .kp-nav-collapsed .kp-sidebar .kp-side-label,
+    .kp-nav-collapsed .kp-sidebar .kp-brand-name {
+        display: revert;
+    }
+
+    .kp-nav-collapsed .kp-sidebar .kp-user-text {
+        display: flex;
+    }
+
+    .kp-nav-collapsed .kp-side-link,
+    .kp-nav-collapsed .kp-user > .btn {
+        justify-content: flex-start;
+    }
+
+    .kp-nav-collapsed .kp-sidebar-head {
+        justify-content: space-between;
+        padding: 1rem 1.1rem 0.75rem;
+    }
+
+    .kp-nav-collapsed .kp-side-section {
+        height: auto;
+        margin: 1.25rem 0.6rem 0.4rem;
+        background: none;
+        font-size: 0.7rem;
+    }
+
+    .kp-nav-close {
+        display: inline-flex;
+    }
+
+    .kp-collapse-btn {
+        display: none;
+    }
+
+    .kp-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 1030;
+        background: rgba(0, 0, 0, 0.32);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+        display: block;
+    }
+
+    .kp-nav-open .kp-backdrop {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .kp-nav-open body {
+        overflow: hidden;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .kp-sidebar,
+    .kp-shell,
+    .kp-backdrop {
+        transition: none;
     }
 }
 
@@ -481,7 +743,6 @@ a.kp-metric:hover {
 .kp-metric-icon.is-accent { background: var(--kp-accent-soft); color: var(--kp-accent); }
 .kp-metric-icon.is-amber  { background: var(--kp-amber-soft);  color: var(--kp-amber); }
 .kp-metric-icon.is-red    { background: var(--kp-red-soft);    color: var(--kp-red); }
-.kp-metric-icon.is-green  { background: var(--kp-green-soft);  color: var(--kp-green); }
 
 .kp-metric-value {
     font-size: 1.6rem;
@@ -1196,13 +1457,6 @@ small.form-text {
     }
 }
 
-/* legacy dl.row details keep sensible spacing */
-dl.row dt {
-    color: var(--kp-ink-3);
-    font-weight: 500;
-    font-size: 0.85rem;
-}
-
 /* --------------------------------------------------------------------------
    Auth pages (login, invitation)
    -------------------------------------------------------------------------- */
@@ -1292,10 +1546,6 @@ dl.row dt {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-}
-
-.integration-blurb {
-    max-width: 36rem;
 }
 
 /* Provider cards on the integrations page */
@@ -1470,8 +1720,9 @@ dl.row dt {
     --bs-primary-rgb: 59, 140, 246;
 }
 
-[data-bs-theme="dark"] .kp-header {
-    background: rgba(28, 28, 30, 0.82);
+[data-bs-theme="dark"] .kp-sidebar,
+[data-bs-theme="dark"] .kp-topbar {
+    background: rgba(28, 28, 30, 0.86);
 }
 
 [data-bs-theme="dark"] .table {

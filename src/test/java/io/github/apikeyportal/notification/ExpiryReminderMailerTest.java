@@ -54,7 +54,7 @@ class ExpiryReminderMailerTest {
         // the email has to match the site its link lands on
         assertThat(mailer.body(key, ReminderThreshold.ONE_WEEK, 6))
                 .contains("A key you hold in Keys at Contoso expires")
-                .doesNotContain("API Key Portal");
+                .doesNotContain("Key Management Portal");
     }
 
     @Test

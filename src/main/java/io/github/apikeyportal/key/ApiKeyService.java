@@ -15,9 +15,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import io.github.apikeyportal.appaccess.ApiKeyDeletedEvent;
 import io.github.apikeyportal.activity.ActivityAction;
 import io.github.apikeyportal.activity.ActivityService;
 import io.github.apikeyportal.activity.KeyOrigin;
@@ -43,10 +46,17 @@ public class ApiKeyService {
 
     private final ApiKeyRepository repository;
     private final ActivityService activity;
+    private final ApplicationEventPublisher events;
 
     public ApiKeyService(ApiKeyRepository repository, ActivityService activity) {
+        this(repository, activity, event -> { });
+    }
+
+    @Autowired
+    public ApiKeyService(ApiKeyRepository repository, ActivityService activity, ApplicationEventPublisher events) {
         this.repository = repository;
         this.activity = activity;
+        this.events = events;
     }
 
     public static final int PAGE_SIZE = 20;
@@ -201,6 +211,20 @@ public class ApiKeyService {
      * @param providerResourceId the provider's new handle for the credential,
      *                           so the next rotation targets the right one
      */
+    /** Recorded before a provider is asked to rotate the key in place; see {@link ApiKey#getRotationStartedAt}. */
+    public void markRotationStarted(Long id) {
+        repository.markRotationStarted(id, Instant.now());
+    }
+
+    /** Best effort: a marker left behind only makes the next sweep check GitLab once more. */
+    public void clearRotationStarted(Long id) {
+        try {
+            repository.clearRotationStarted(id);
+        } catch (RuntimeException e) {
+            log.warn("Could not clear the rotation marker on key {}: {}", id, e.getMessage());
+        }
+    }
+
     @Transactional
     public ApiKey replaceValueInPlace(Long id, String newValue, LocalDate expiresOn,
             String providerResourceId) {
@@ -296,7 +320,10 @@ public class ApiKeyService {
     @Transactional
     public ApiKey delete(Long id, UserAccount viewer) {
         ApiKey key = requireOwnership(id, viewer, "delete");
+        Long successorId = repository.findByRotatedFromKeyId(id).map(ApiKey::getId).orElse(null);
         repository.delete(key);
+        // app tokens reading this key move on to its replacement, or lose it
+        events.publishEvent(new ApiKeyDeletedEvent(id, successorId));
         activity.recordKeyDeleted(viewer, key.getId(), key.getServiceName(), key.getName());
         log.info("Deleted {}", key);
         return key;

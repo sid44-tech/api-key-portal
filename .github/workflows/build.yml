@@ -92,7 +92,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
           labels: |
-            org.opencontainers.image.title=API Key Portal (${{ matrix.name }})
+            org.opencontainers.image.title=Key Management Portal (${{ matrix.name }})
             org.opencontainers.image.description=Self-hosted portal for managing API keys and secrets
 
       - name: Build the ${{ matrix.name }} image
@@ -154,7 +154,7 @@ jobs:
               sleep 3
               waited=$((waited + 3))
             done
-            grep -q "Sign in to API Key Portal" /tmp/login.html
+            grep -q "Sign in to Key Management Portal" /tmp/login.html
             echo "The portal answered after ${waited}s."
           }
 

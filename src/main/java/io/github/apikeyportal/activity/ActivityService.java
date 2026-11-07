@@ -91,6 +91,17 @@ public class ActivityService {
                 serviceName + " / " + keyName, null, null, Instant.now()));
     }
 
+    /**
+     * Records that an application read a key's value through an app token. As
+     * with a person's reveal, the value never comes near this.
+     */
+    @Transactional
+    public ActivityEvent recordKeyReadByApp(String tokenName, String tokenPrefix, Long groupId, String groupName,
+            Long keyId, String serviceName, String keyName, String detail) {
+        return save(ActivityEvent.byApp(ActivityAction.KEY_READ_BY_APP, tokenName, tokenPrefix, groupId, groupName,
+                keyId, serviceName + " / " + keyName, detail, Instant.now()));
+    }
+
     @Transactional
     public ActivityEvent record(ActivityAction action, UserAccount actor, Long targetId, String targetName) {
         return save(new ActivityEvent(action, actor, targetId, targetName, null, null, Instant.now()));

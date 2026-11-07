@@ -63,6 +63,9 @@ class KeyRotationServiceTest {
     @Mock
     private io.github.apikeyportal.alerts.AlertNotifier alerts;
 
+    @Mock
+    private io.github.apikeyportal.user.UserAccountRepository users;
+
     private KeyRotationService service;
 
     private final UserAccount alex = TestUsers.alex();
@@ -72,7 +75,7 @@ class KeyRotationServiceTest {
     @BeforeEach
     void setUp() {
         service = new KeyRotationService(keys, integrations, preferences, provisioning, mailer,
-                new RotationProperties(true, "0 0 7 * * *", 7), audit, alerts);
+                new RotationProperties(true, "0 0 7 * * *", 7), audit, alerts, users);
     }
 
     /** An expiring provisioned key of Alex's, id 42, minted through integration 7. */
@@ -181,6 +184,24 @@ class KeyRotationServiceTest {
 
         assertThat(service.rotateDueKeys(TODAY)).isZero();
         verifyNoInteractions(provisioning);
+    }
+
+    @Test
+    void aLostRotationAlertsTheOwnerAndTheAdmins() {
+        ApiKey lost = expiring();
+        candidates(lost);
+        when(integrations.findById(7L)).thenReturn(Optional.of(azure));
+        prefersRotation(true);
+        when(provisioning.rotate(lost, azure)).thenThrow(new io.github.apikeyportal.integration
+                .RotationNotSavedException("new value could not be saved", new IllegalStateException()));
+        List<UserAccount> admins = List.of(TestUsers.alex());
+        when(users.findAdminsFor(lost.getGroup())).thenReturn(admins);
+
+        assertThat(service.rotateDueKeys(TODAY)).isZero();
+
+        verify(mailer).sendRotationNotSaved(lost, admins, "new value could not be saved");
+        verify(alerts).rotationFailed(eq(lost), eq("new value could not be saved"));
+        verify(keys).markRotationFailed(eq(42L), any(), eq("new value could not be saved"));
     }
 
     @Test

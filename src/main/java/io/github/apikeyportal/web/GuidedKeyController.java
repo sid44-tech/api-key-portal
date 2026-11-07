@@ -71,7 +71,6 @@ public class GuidedKeyController {
     @GetMapping("/{provider}")
     public String wizard(@PathVariable("provider") String providerSlug, Model model) {
         GuidedProvider provider = resolve(providerSlug);
-        model.addAttribute("provider", provider);
         if (!model.containsAttribute("form")) {
             model.addAttribute("form", new GuidedKeyForm());
         }
@@ -82,9 +81,8 @@ public class GuidedKeyController {
     public String store(@PathVariable("provider") String providerSlug,
             @AuthenticationPrincipal PortalUser principal,
             @Valid @ModelAttribute("form") GuidedKeyForm form,
-            BindingResult bindingResult, Model model, RedirectAttributes redirectAttributes) {
+            BindingResult bindingResult, RedirectAttributes redirectAttributes) {
         GuidedProvider provider = resolve(providerSlug);
-        model.addAttribute("provider", provider);
         if (bindingResult.hasErrors()) {
             return template(provider);
         }

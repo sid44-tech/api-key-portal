@@ -15,7 +15,7 @@
                     <div>
                         <h1 th:text="${account.displayName}">Alex Carter</h1>
                         <p class="kp-subtitle d-flex align-items-center gap-2 flex-wrap">
-                            <span th:replace="fragments/badges :: role(${account.role})"></span>
+                            <span th:replace="~{fragments/badges :: role(${account.role})}"></span>
                             <span th:text="${account.group != null ? account.group.name : 'Not in a group yet'}">Platform team</span>
                         </p>
                     </div>

@@ -112,7 +112,7 @@
                            th:href="@{/keys/{id}(id=${replacements.get(key.id).id})}">
                             <i class="bi bi-arrow-repeat" aria-hidden="true"></i> Replacement ready</a>
                         <span th:unless="${replacements.containsKey(key.id)}"
-                              th:replace="fragments/badges :: expiration(${key})"></span>
+                              th:replace="~{fragments/badges :: expiration(${key})}"></span>
                     </td>
                 </tr>
                 </tbody>
