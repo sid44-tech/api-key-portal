@@ -123,21 +123,6 @@ log. You'll be asked to change it, then you can invite everyone else under **Inv
 Tests use a throwaway SQLite database under `target/` — no `.env` needed. Coverage lands in
 `target/site/jacoco/index.html`.
 
-## 🗺️ Roadmap
-
-**Housekeeping**
-
-- **Publish a release**: bump the version to 2.0.0 and tag `v2.0.0`, so the published images include
-  the current work
-- **Dependabot** for Maven dependencies and GitHub Actions
-- **Test against PostgreSQL**: run part of the suite against a real PostgreSQL, for example with Testcontainers
-
-**Features**
-
-- **More providers**
-  - GitLab group access tokens, alongside today's project tokens
-- **App access follow-ups**: a lockout for repeated bad tokens; a command-line tool if there's demand
-
 ## 📄 License
 
 [MIT](LICENSE) © 2021 Sid Bhat

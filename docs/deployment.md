@@ -10,7 +10,7 @@
 
 ```bash
 ./mvnw package
-PORTAL_ENCRYPTION_KEY=... java -jar target/api-key-portal-1.0.0.jar
+PORTAL_ENCRYPTION_KEY=... java -jar target/api-key-portal-2.0.0.jar
 ```
 
 Runs anywhere there's a JDK 25; SQLite beside it unless pointed at PostgreSQL. Every build
