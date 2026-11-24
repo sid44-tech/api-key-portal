@@ -39,9 +39,11 @@ import java.util.regex.Pattern;
  * <p>
  * Every request is printed as one line, and {@code GET /fake/state} shows every
  * app registration with its live secrets plus running totals of the secrets
- * created and removed. {@code --delay-seconds} holds every response back that
- * long, the way a slow tenant would; keep it under the portal's 30-second
- * timeout for Azure calls. {@code --max-secret-days} caps how long a new secret
+ * created and removed. {@code --delay-seconds} holds back the reply to each new
+ * secret that long, after the secret has been created and its line printed, so
+ * the portal can be stopped while a secret exists that it has not recorded yet;
+ * keep it under the portal's 30-second timeout for Azure calls. Every other
+ * request is answered at once. {@code --max-secret-days} caps how long a new secret
  * lasts, the way a tenant's credential lifetime policy does, so a secret can be
  * made to expire within days instead of months.
  */
@@ -88,7 +90,7 @@ public class FakeAzure {
         server.setExecutor(Executors.newCachedThreadPool());
         server.start();
         log("Fake Azure AD listening on http://localhost:" + port
-                + (delaySeconds > 0 ? ", replying after " + delaySeconds + "s" : "")
+                + (delaySeconds > 0 ? ", holding new secrets' replies for " + delaySeconds + "s" : "")
                 + (maxSecretDays > 0 ? ", secrets last at most " + maxSecretDays + " days" : ""));
     }
 
@@ -101,11 +103,13 @@ public class FakeAzure {
                 send(exchange, 200, state());
                 return;
             }
-            if (delayMillis > 0) {
-                Thread.sleep(delayMillis);
-            }
             Reply reply = route(method, path, body, exchange.getRequestHeaders().getFirst("Authorization"));
             log(method + " " + path + " -> " + reply.status() + (reply.note() == null ? "" : " " + reply.note()));
+            // The secret already exists by now; holding the reply back leaves a window
+            // in which the portal can be stopped before it has recorded the secret.
+            if (delayMillis > 0 && ADD_PASSWORD_PATH.matcher(path).matches()) {
+                Thread.sleep(delayMillis);
+            }
             send(exchange, reply.status(), reply.body());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

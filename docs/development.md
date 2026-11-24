@@ -31,7 +31,7 @@ secret from the fake, exactly as they would from Azure.
 | Option | Default | What it does |
 |---|---|---|
 | `--port` | `9090` | Port to listen on |
-| `--delay-seconds` | `0` | Holds every reply back this long, like a slow tenant. Keep it under 30, the portal's timeout for Azure calls |
+| `--delay-seconds` | `0` | Holds back the reply to each new secret this long, after the secret is created and its line printed. Stopping the portal in that window leaves a secret at the fake that the portal never recorded. Every other request is answered at once. Keep it under 30, the portal's timeout for Azure calls |
 | `--max-secret-days` | none | Caps how long a new secret lasts, like a tenant's credential lifetime policy. The portal records the shorter date, so a key can be made to come up for expiry or replacement within days |
 
 Every request is printed as one line, for example
