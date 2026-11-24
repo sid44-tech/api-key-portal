@@ -92,7 +92,7 @@ class GuidedKeyControllerTest {
     @WithPortalUser
     void verifiesGitHubTokenAndStoresItWithReportedExpiry() throws Exception {
         when(gitHubClient.verifyToken("ghp_abc"))
-                .thenReturn(new TokenInfo("sidbhat", LocalDate.of(2026, 12, 31), "repo"));
+                .thenReturn(new TokenInfo("octocat", LocalDate.of(2026, 12, 31), "repo"));
         ApiKey saved = new ApiKey("CI token", "GitHub", "ghp_abc", LocalDate.now(), LocalDate.of(2026, 12, 31));
         when(apiKeyService.create(any(), any(), any())).thenReturn(saved);
 
@@ -106,7 +106,7 @@ class GuidedKeyControllerTest {
                 eq(KeyOrigin.guidedBy("GitHub")));
         assertThat(details.getValue().getServiceName()).isEqualTo("GitHub");
         assertThat(details.getValue().getExpiresOn()).isEqualTo(LocalDate.of(2026, 12, 31));
-        assertThat(details.getValue().getNotes()).contains("sidbhat").contains("repo");
+        assertThat(details.getValue().getNotes()).contains("octocat").contains("repo");
     }
 
     @Test

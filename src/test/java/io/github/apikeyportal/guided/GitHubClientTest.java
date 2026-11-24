@@ -45,11 +45,11 @@ class GitHubClientTest {
                 .andExpect(method(HttpMethod.GET))
                 .andExpect(header("Authorization", "Bearer ghp_abc"))
                 .andExpect(header("X-GitHub-Api-Version", "2022-11-28"))
-                .andRespond(withSuccess("{\"login\":\"sidbhat\"}", MediaType.APPLICATION_JSON).headers(headers));
+                .andRespond(withSuccess("{\"login\":\"octocat\"}", MediaType.APPLICATION_JSON).headers(headers));
 
         TokenInfo info = client.verifyToken("ghp_abc");
 
-        assertThat(info.login()).isEqualTo("sidbhat");
+        assertThat(info.login()).isEqualTo("octocat");
         assertThat(info.expiresOn()).isEqualTo(LocalDate.of(2026, 12, 31));
         assertThat(info.scopes()).isEqualTo("repo, read:org");
         server.verify();
@@ -58,7 +58,7 @@ class GitHubClientTest {
     @Test
     void handlesTokensWithoutExpiryOrScopes() {
         server.expect(requestTo(API + "/user"))
-                .andRespond(withSuccess("{\"login\":\"sidbhat\"}", MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess("{\"login\":\"octocat\"}", MediaType.APPLICATION_JSON));
 
         TokenInfo info = client.verifyToken("ghp_abc");
 
