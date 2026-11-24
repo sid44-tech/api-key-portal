@@ -9,7 +9,7 @@
 ### As a Spring Boot app
 
 ```bash
-./mvnw package
+mvn package
 PORTAL_ENCRYPTION_KEY=... java -jar target/api-key-portal-2.0.0.jar
 ```
 

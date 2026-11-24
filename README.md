@@ -93,8 +93,11 @@ docker compose -f docker-compose.allinone.yml up -d
 docker compose -f docker-compose.allinone.yml logs | grep "One-time password"
 ```
 
-**Or from source** (needs JDK 21 or newer): copy `.env.example` to `.env`, set `PORTAL_ENCRYPTION_KEY`, then
-run `./mvnw spring-boot:run`.
+**Or from source** (needs JDK 21 or newer and Maven 3.8 or newer): copy `.env.example` to `.env`, set
+`PORTAL_ENCRYPTION_KEY`, then run `mvn spring-boot:run`.
+
+The Maven wrapper (`./mvnw`) works in place of `mvn` on a machine with internet access, since it
+downloads Maven first. Copies unpacked from a zip lose the executable bit, so run `chmod +x mvnw` once.
 
 Open <http://localhost:8080> and sign in as `admin@localhost` with the one-time password from the
 log. You'll be asked to change it, then you can invite everyone else under **Invitations**.
@@ -113,11 +116,12 @@ log. You'll be asked to change it, then you can invite everyone else under **Inv
 | 🔌 | [Service integrations](docs/integrations.md) | Setting up each provider, and the guided walk-throughs |
 | 🤖 | [App access](docs/app-access.md) | Letting applications read keys over the API with scoped tokens |
 | 🛡️ | [Security and audit](docs/security.md) | Security design notes, logging and the audit trail |
+| 🧰 | [Local development](docs/development.md) | Fake Azure AD and a fake mail server for trying the portal offline |
 
 ## 🧪 Tests
 
 ```bash
-./mvnw verify
+mvn verify
 ```
 
 Tests use a throwaway SQLite database under `target/` — no `.env` needed. Coverage lands in

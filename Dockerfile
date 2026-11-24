@@ -7,7 +7,8 @@ WORKDIR /workspace
 COPY mvnw .
 COPY .mvn .mvn
 COPY pom.xml .
-RUN ./mvnw -B dependency:go-offline
+# a copy unpacked from a zip has lost the executable bit
+RUN chmod +x mvnw && ./mvnw -B dependency:go-offline
 
 COPY src src
 RUN ./mvnw -B package -DskipTests

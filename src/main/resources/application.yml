@@ -181,6 +181,11 @@ portal:
     enabled: ${PORTAL_AUTO_ROTATION:true}
     cron: ${PORTAL_AUTO_ROTATION_CRON:0 0 7 * * *}
     lead-days: ${PORTAL_AUTO_ROTATION_LEAD_DAYS:7}
+  azure:
+    # Where Azure AD is reached. Only changed to point the portal at a local
+    # stand-in instead of a real tenant; see docs/development.md.
+    login-base-url: ${PORTAL_AZURE_LOGIN_BASE_URL:https://login.microsoftonline.com}
+    graph-base-url: ${PORTAL_AZURE_GRAPH_BASE_URL:https://graph.microsoft.com}
   encryption:
     # Base64 encoded 256-bit key. Generate one with: openssl rand -base64 32
     # This single key is all a portal that never rotates needs, and values

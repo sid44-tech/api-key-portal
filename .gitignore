@@ -41,3 +41,6 @@ keyportal.db*
 
 ### Local secrets ###
 .env
+
+# Messages caught by dev/FakeMailServer.java
+fake-mail/

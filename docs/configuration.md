@@ -178,7 +178,7 @@ credentials from the same `.env`:
 | `PORTAL_DB_PASSWORD` | none, required                               |
 
 ```bash
-./mvnw spring-boot:run -Dspring-boot.run.profiles=postgres
+mvn spring-boot:run -Dspring-boot.run.profiles=postgres
 ```
 
 Flyway manages the schema (`src/main/resources/db/migration`).
