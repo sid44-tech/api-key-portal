@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM eclipse-temurin:25-jdk AS build
+FROM eclipse-temurin:21-jdk AS build
 WORKDIR /workspace
 
 # Resolve dependencies in their own layer so source changes don't re-download them
@@ -12,7 +12,7 @@ RUN ./mvnw -B dependency:go-offline
 COPY src src
 RUN ./mvnw -B package -DskipTests
 
-FROM eclipse-temurin:25-jre
+FROM eclipse-temurin:21-jre
 WORKDIR /app
 
 RUN groupadd --system portal && useradd --system --gid portal portal

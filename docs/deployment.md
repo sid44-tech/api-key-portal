@@ -13,7 +13,7 @@
 PORTAL_ENCRYPTION_KEY=... java -jar target/api-key-portal-2.0.0.jar
 ```
 
-Runs anywhere there's a JDK 25; SQLite beside it unless pointed at PostgreSQL. Every build
+Runs anywhere there's Java 21 or newer; SQLite beside it unless pointed at PostgreSQL. Every build
 attaches the jar to the GitHub Actions run.
 
 ### As a container, with your own database

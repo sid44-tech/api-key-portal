@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/sid44-tech/api-key-portal/actions/workflows/build.yml"><img alt="Build" src="https://github.com/sid44-tech/api-key-portal/actions/workflows/build.yml/badge.svg"></a>
-  <img alt="Java 25" src="https://img.shields.io/badge/Java-25-orange?logo=openjdk&logoColor=white">
+  <img alt="Java 21" src="https://img.shields.io/badge/Java-21-orange?logo=openjdk&logoColor=white">
   <img alt="Spring Boot 4.1" src="https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/Docker-all--in--one-2496ED?logo=docker&logoColor=white">
   <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/License-MIT-blue"></a>
@@ -81,7 +81,7 @@ dashboard, history and a full audit trail.
 </tr>
 </table>
 
-<sub>Built with Java 25 · Spring Boot 4.1 · Spring Security · Spring Data JPA · Flyway · Thymeleaf · Bootstrap 5 — light and dark themes, custom branding.</sub>
+<sub>Built with Java 21 · Spring Boot 4.1 · Spring Security · Spring Data JPA · Flyway · Thymeleaf · Bootstrap 5 — light and dark themes, custom branding.</sub>
 
 ## 🚀 Quick start
 
@@ -93,7 +93,7 @@ docker compose -f docker-compose.allinone.yml up -d
 docker compose -f docker-compose.allinone.yml logs | grep "One-time password"
 ```
 
-**Or from source** (needs JDK 25): copy `.env.example` to `.env`, set `PORTAL_ENCRYPTION_KEY`, then
+**Or from source** (needs JDK 21 or newer): copy `.env.example` to `.env`, set `PORTAL_ENCRYPTION_KEY`, then
 run `./mvnw spring-boot:run`.
 
 Open <http://localhost:8080> and sign in as `admin@localhost` with the one-time password from the

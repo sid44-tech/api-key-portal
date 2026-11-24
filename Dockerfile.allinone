@@ -11,7 +11,7 @@
 #   docker build -f Dockerfile.allinone -t api-key-portal:allinone .
 #   docker run -p 8080:8080 -v keyportal-data:/var/lib/keyportal api-key-portal:allinone
 
-FROM eclipse-temurin:25-jdk AS build
+FROM eclipse-temurin:21-jdk AS build
 WORKDIR /workspace
 
 # Resolve dependencies in their own layer so source changes don't re-download them
@@ -36,7 +36,7 @@ RUN ./mvnw -B package -DskipTests
 # that and the only symptom would be a JVM that refuses to start.
 FROM postgres:18-trixie
 
-COPY --from=eclipse-temurin:25-jre-noble /opt/java/openjdk /opt/java/openjdk
+COPY --from=eclipse-temurin:21-jre-noble /opt/java/openjdk /opt/java/openjdk
 ENV JAVA_HOME=/opt/java/openjdk
 ENV PATH="$JAVA_HOME/bin:$PATH"
 
